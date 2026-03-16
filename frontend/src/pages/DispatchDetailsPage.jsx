@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import api from "../utils/api";
 
 const DispatchDetailsPage = () => {
@@ -31,6 +31,12 @@ const DispatchDetailsPage = () => {
   return (
     <div className="dashboard-card">
       <h2>Dispatch Details</h2>
+
+      <div style={{ marginBottom: "15px" }}>
+        <Link to={`/dispatch/${id}/print`} target="_blank">
+          <button>Print / Save PDF</button>
+        </Link>
+      </div>
 
       <p><strong>Dispatch Number:</strong> {dispatchRecord.dispatch_number}</p>
       <p><strong>Client Name:</strong> {dispatchRecord.client_name}</p>

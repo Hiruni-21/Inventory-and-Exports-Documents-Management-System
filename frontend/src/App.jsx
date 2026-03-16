@@ -37,6 +37,8 @@ import ExportDocumentListPage from "./pages/ExportDocumentListPage";
 import AddExportDocumentPage from "./pages/AddExportDocumentPage";
 import ExportDocumentDetailsPage from "./pages/ExportDocumentDetailsPage";
 import ReportsPage from "./pages/ReportsPage";
+import DispatchPrintPage from "./pages/DispatchPrintPage";
+import ExportDocumentPrintPage from "./pages/ExportDocumentPrintPage";
 
 const DashboardRouter = () => {
   const { user } = useAuth();
@@ -100,6 +102,8 @@ function App() {
         <Route path="/export-documents/add" element={<AddExportDocumentPage />} />
         <Route path="/export-documents/:id" element={<ExportDocumentDetailsPage />} />
         <Route path="/reports" element={<ReportsPage />} />
+        <Route path="/dispatch/:id/print" element={<DispatchPrintPage />} />
+        <Route path="/export-documents/:id/print" element={<ExportDocumentPrintPage />} />
       </Route>
     </Routes>
   );

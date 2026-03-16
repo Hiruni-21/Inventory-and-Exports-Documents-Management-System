@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import api from "../utils/api";
 
 const ExportDocumentDetailsPage = () => {
@@ -31,6 +31,12 @@ const ExportDocumentDetailsPage = () => {
   return (
     <div className="dashboard-card">
       <h2>Export Document Details</h2>
+
+      <div style={{ marginBottom: "15px" }}>
+        <Link to={`/export-documents/${id}/print`} target="_blank">
+          <button>Print / Save PDF</button>
+        </Link>
+      </div>
 
       <p><strong>Document Number:</strong> {record.document_number}</p>
       <p><strong>Document Type:</strong> {record.document_type}</p>
