@@ -14,6 +14,7 @@ const wastageRoutes = require("./routes/wastageRoutes");
 const returnRoutes = require("./routes/returnRoutes");
 const dispatchRoutes = require("./routes/dispatchRoutes");
 const exportDocumentRoutes = require("./routes/exportDocumentRoutes");
+const reportRoutes = require("./routes/reportRoutes");
 
 const app = express();
 
@@ -34,6 +35,7 @@ app.use("/api/wastage", wastageRoutes);
 app.use("/api/returns", returnRoutes);
 app.use("/api/dispatch", dispatchRoutes);
 app.use("/api/export-documents", exportDocumentRoutes);
+app.use("/api/reports", reportRoutes);
 
 
 app.get("/", (req, res) => {

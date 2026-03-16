@@ -35,6 +35,7 @@ const Layout = () => {
           <Link to="/dispatch/add">Create Dispatch</Link>
           <Link to="/export-documents">Export Documents</Link>
           <Link to="/export-documents/add">Create Export Document</Link>
+          <Link to="/reports">Reports</Link>
         </nav>
 
         <button className="logout-btn" onClick={logout}>
