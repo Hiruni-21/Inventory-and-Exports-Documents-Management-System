@@ -3,9 +3,10 @@ const logActivity = require("../utils/logActivity");
 
 const getAllCategories = (req, res) => {
   const sql = `
-    SELECT *
-    FROM item_categories
-    ORDER BY id DESC
+    SELECT ic.*, u.full_name AS created_by_name
+    FROM item_categories ic
+    LEFT JOIN users u ON ic.created_by = u.id
+    ORDER BY ic.id DESC
   `;
 
   db.query(sql, (err, results) => {
@@ -14,22 +15,6 @@ const getAllCategories = (req, res) => {
     }
 
     res.json(results);
-  });
-};
-
-const getCategoryById = (req, res) => {
-  const { id } = req.params;
-
-  db.query("SELECT * FROM item_categories WHERE id = ?", [id], (err, results) => {
-    if (err) {
-      return res.status(500).json({ message: "Database error", error: err.message });
-    }
-
-    if (results.length === 0) {
-      return res.status(404).json({ message: "Category not found" });
-    }
-
-    res.json(results[0]);
   });
 };
 
@@ -47,7 +32,12 @@ const createCategory = (req, res) => {
 
   db.query(
     sql,
-    [category_name, description || null, status || "active", req.user.id],
+    [
+      category_name,
+      description || null,
+      status || "active",
+      req.user.id,
+    ],
     (err, result) => {
       if (err) {
         return res.status(500).json({ message: "Database error", error: err.message });
@@ -57,10 +47,9 @@ const createCategory = (req, res) => {
         user_id: req.user.id,
         user_name: req.user.name,
         module: "Item Categories",
-        action: "Created category",
+        action: "Created item category",
         reference_type: "item_category",
         reference_id: result.insertId,
-        details: { category_name },
         ip_address: req.ip,
       });
 
@@ -76,34 +65,33 @@ const updateCategory = (req, res) => {
   const { id } = req.params;
   const { category_name, description, status } = req.body;
 
-  if (!category_name) {
-    return res.status(400).json({ message: "Category name is required" });
-  }
-
   const sql = `
     UPDATE item_categories
     SET category_name = ?, description = ?, status = ?
     WHERE id = ?
   `;
 
-  db.query(sql, [category_name, description || null, status || "active", id], (err) => {
-    if (err) {
-      return res.status(500).json({ message: "Database error", error: err.message });
+  db.query(
+    sql,
+    [category_name, description || null, status || "active", id],
+    (err) => {
+      if (err) {
+        return res.status(500).json({ message: "Database error", error: err.message });
+      }
+
+      logActivity({
+        user_id: req.user.id,
+        user_name: req.user.name,
+        module: "Item Categories",
+        action: "Updated item category",
+        reference_type: "item_category",
+        reference_id: id,
+        ip_address: req.ip,
+      });
+
+      res.json({ message: "Category updated successfully" });
     }
-
-    logActivity({
-      user_id: req.user.id,
-      user_name: req.user.name,
-      module: "Item Categories",
-      action: "Updated category",
-      reference_type: "item_category",
-      reference_id: id,
-      details: { category_name },
-      ip_address: req.ip,
-    });
-
-    res.json({ message: "Category updated successfully" });
-  });
+  );
 };
 
 const deleteCategory = (req, res) => {
@@ -118,7 +106,7 @@ const deleteCategory = (req, res) => {
       user_id: req.user.id,
       user_name: req.user.name,
       module: "Item Categories",
-      action: "Deleted category",
+      action: "Deleted item category",
       reference_type: "item_category",
       reference_id: id,
       ip_address: req.ip,
@@ -130,7 +118,6 @@ const deleteCategory = (req, res) => {
 
 module.exports = {
   getAllCategories,
-  getCategoryById,
   createCategory,
   updateCategory,
   deleteCategory,

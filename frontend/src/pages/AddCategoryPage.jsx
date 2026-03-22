@@ -8,13 +8,17 @@ const AddCategoryPage = () => {
   const [form, setForm] = useState({
     category_name: "",
     description: "",
+    status: "active",
   });
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    setForm((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -25,19 +29,19 @@ const AddCategoryPage = () => {
     try {
       const token = localStorage.getItem("token");
 
-      await api.post("/categories", form, {
+      await api.post("/items/categories", form, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
 
-      setSuccess("Category added successfully");
+      setSuccess("Category created successfully");
 
       setTimeout(() => {
         navigate("/categories");
       }, 1000);
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to add category");
+      setError(err.response?.data?.message || "Failed to create category");
     }
   };
 
@@ -61,10 +65,19 @@ const AddCategoryPage = () => {
         <textarea
           name="description"
           placeholder="Description"
-          rows="4"
           value={form.description}
           onChange={handleChange}
+          rows="4"
         />
+
+        <select
+          name="status"
+          value={form.status}
+          onChange={handleChange}
+        >
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
 
         <button type="submit">Save Category</button>
       </form>

@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import api from "../utils/api";
 
 const CategoryListPage = () => {
@@ -10,7 +9,7 @@ const CategoryListPage = () => {
     try {
       const token = localStorage.getItem("token");
 
-      const res = await api.get("/categories", {
+      const res = await api.get("/items/categories", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -18,7 +17,7 @@ const CategoryListPage = () => {
 
       setCategories(res.data);
     } catch (err) {
-      setError("Failed to load categories");
+      setError(err.response?.data?.message || "Failed to load categories");
     }
   };
 
@@ -30,9 +29,6 @@ const CategoryListPage = () => {
     <div>
       <div className="page-header-row">
         <h2>Item Categories</h2>
-        <Link to="/categories/add" className="add-btn">
-          + Add Category
-        </Link>
       </div>
 
       {error && <div className="error-box">{error}</div>}
@@ -45,6 +41,7 @@ const CategoryListPage = () => {
               <th>Category Name</th>
               <th>Description</th>
               <th>Status</th>
+              <th>Created At</th>
             </tr>
           </thead>
           <tbody>
@@ -55,11 +52,12 @@ const CategoryListPage = () => {
                   <td>{category.category_name}</td>
                   <td>{category.description || "-"}</td>
                   <td>{category.status}</td>
+                  <td>{new Date(category.created_at).toLocaleString()}</td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="4">No categories found</td>
+                <td colSpan="5">No categories found</td>
               </tr>
             )}
           </tbody>

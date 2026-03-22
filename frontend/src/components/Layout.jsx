@@ -1,41 +1,58 @@
-import { Link, Outlet } from "react-router-dom";
+import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 const Layout = () => {
   const { user, logout } = useAuth();
+  const location = useLocation();
+
+  const navLinks = [
+    { to: "/dashboard", label: "Dashboard" },
+    { to: "/suppliers", label: "Suppliers" },
+    { to: "/suppliers/add", label: "Add Supplier" },
+    { to: "/categories", label: "Item Categories" },
+    { to: "/categories/add", label: "Add Category" },
+    { to: "/items", label: "Item Master" },
+    { to: "/items/add", label: "Add Item" },
+    { to: "/purchase-orders", label: "Purchase Orders" },
+    { to: "/purchase-orders/add", label: "Create PO" },
+    { to: "/grn", label: "GRN" },
+    { to: "/grn/add", label: "Create GRN" },
+    { to: "/inventory", label: "Inventory" },
+    { to: "/inventory/movements", label: "Stock Movements" },
+    { to: "/inventory/low-stock", label: "Low Stock" },
+    { to: "/stock-adjustments", label: "Stock Adjustments" },
+    { to: "/stock-adjustments/add", label: "Add Adjustment" },
+    { to: "/wastage", label: "Wastage" },
+    { to: "/wastage/add", label: "Record Wastage" },
+    { to: "/returns", label: "Returns" },
+    { to: "/returns/add", label: "Record Return" },
+    { to: "/dispatch", label: "Dispatch" },
+    { to: "/dispatch/add", label: "Create Dispatch" },
+    { to: "/export-documents", label: "Export Documents" },
+    { to: "/export-documents/add", label: "Create Export Document" },
+    { to: "/reports", label: "Reports" },
+  ];
 
   return (
     <div className="app-layout">
       <aside className="sidebar">
-        <h2>Fresh World</h2>
-        <p className="role-label">{user?.role_name}</p>
+        <div className="sidebar-brand">
+          <h2>Fresh World</h2>
+          <p className="role-label">{user?.role_name || user?.role}</p>
+        </div>
 
-        <nav>
-          <Link to="/dashboard">Dashboard</Link>
-          <Link to="/suppliers">Suppliers</Link>
-          <Link to="/suppliers/add">Add Supplier</Link>
-          <Link to="/categories">Categories</Link>
-          <Link to="/categories/add">Add Category</Link>
-          <Link to="/items">Items</Link>
-          <Link to="/items/add">Add Item</Link>
-          <Link to="/purchase-orders">Purchase Orders</Link>
-          <Link to="/purchase-orders/add">Create PO</Link>
-          <Link to="/grn">GRN</Link>
-          <Link to="/grn/add">Create GRN</Link>
-          <Link to="/inventory">Inventory</Link>
-          <Link to="/inventory/movements">Stock Movements</Link>
-          <Link to="/inventory/low-stock">Low Stock</Link>
-          <Link to="/stock-adjustments">Stock Adjustments</Link>
-          <Link to="/stock-adjustments/add">Add Adjustment</Link>
-          <Link to="/wastage">Wastage</Link>
-          <Link to="/wastage/add">Record Wastage</Link>
-          <Link to="/returns">Returns</Link>
-          <Link to="/returns/add">Record Return</Link>
-          <Link to="/dispatch">Dispatch</Link>
-          <Link to="/dispatch/add">Create Dispatch</Link>
-          <Link to="/export-documents">Export Documents</Link>
-          <Link to="/export-documents/add">Create Export Document</Link>
-          <Link to="/reports">Reports</Link>
+        <nav className="sidebar-nav">
+          {navLinks.map((link) => (
+            <Link
+              key={link.to}
+              to={link.to}
+              className={`sidebar-link ${
+                location.pathname === link.to ? "active" : ""
+              }`}
+            >
+              {link.label}
+            </Link>
+          ))}
         </nav>
 
         <button className="logout-btn" onClick={logout}>
@@ -45,9 +62,14 @@ const Layout = () => {
 
       <main className="main-content">
         <header className="topbar">
-          <h1>Inventory & Export Documents Management System</h1>
           <div>
-            Welcome, <strong>{user?.name}</strong>
+            <h1>Inventory & Export Documents Management System</h1>
+            <p className="topbar-subtitle">Fresh World ERP Workspace</p>
+          </div>
+
+          <div className="topbar-user-box">
+            <span className="topbar-user-label">Welcome</span>
+            <strong>{user?.name}</strong>
           </div>
         </header>
 

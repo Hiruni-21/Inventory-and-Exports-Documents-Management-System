@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import api from "../utils/api";
 
 const ItemListPage = () => {
@@ -18,7 +17,7 @@ const ItemListPage = () => {
 
       setItems(res.data);
     } catch (err) {
-      setError("Failed to load items");
+      setError(err.response?.data?.message || "Failed to load items");
     }
   };
 
@@ -29,10 +28,7 @@ const ItemListPage = () => {
   return (
     <div>
       <div className="page-header-row">
-        <h2>Item Master</h2>
-        <Link to="/items/add" className="add-btn">
-          + Add Item
-        </Link>
+        <h2>Items</h2>
       </div>
 
       {error && <div className="error-box">{error}</div>}
@@ -42,13 +38,14 @@ const ItemListPage = () => {
           <thead>
             <tr>
               <th>ID</th>
-              <th>Item Code</th>
-              <th>Item Name</th>
+              <th>Code</th>
+              <th>Name</th>
+              <th>Botanical Name</th>
               <th>Category</th>
+              <th>Type</th>
               <th>Unit</th>
               <th>Reorder Level</th>
-              <th>Perishable</th>
-              <th>Return Eligible</th>
+              <th>Unit Cost</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -57,19 +54,20 @@ const ItemListPage = () => {
               items.map((item) => (
                 <tr key={item.id}>
                   <td>{item.id}</td>
-                  <td>{item.item_code}</td>
-                  <td>{item.item_name}</td>
+                  <td>{item.code}</td>
+                  <td>{item.name}</td>
+                  <td>{item.botanical_name || "-"}</td>
                   <td>{item.category_name}</td>
+                  <td>{item.type}</td>
                   <td>{item.unit}</td>
                   <td>{item.reorder_level}</td>
-                  <td>{item.is_perishable}</td>
-                  <td>{item.return_eligibility}</td>
+                  <td>{item.unit_cost}</td>
                   <td>{item.status}</td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="9">No items found</td>
+                <td colSpan="10">No items found</td>
               </tr>
             )}
           </tbody>
