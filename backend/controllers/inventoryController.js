@@ -1,69 +1,49 @@
 const db = require("../config/db");
 
-const getInventoryList = (req, res) => {
-  const sql = `
+const getInventory = (req, res) => {
+  const { category, type } = req.query;
+
+  let sql = `
     SELECT
-      i.id AS item_id,
-      i.item_code,
-      i.item_name,
+      inv.id,
+      inv.item_id,
+      i.code,
+      i.name,
+      i.botanical_name,
       c.category_name,
+      i.type,
       i.unit,
       i.reorder_level,
-      i.is_perishable,
-      i.return_eligibility,
-      IFNULL(SUM(ib.available_quantity), 0) AS total_available_quantity
-    FROM items i
+      i.storage_temp,
+      i.unit_cost,
+      inv.qty_on_hand,
+      inv.qty_reserved,
+      inv.qty_available,
+      inv.avg_unit_cost,
+      inv.total_value,
+      inv.last_movement_at,
+      inv.updated_at
+    FROM inventory inv
+    JOIN items i ON inv.item_id = i.id
     JOIN item_categories c ON i.category_id = c.id
-    LEFT JOIN inventory_batches ib ON i.id = ib.item_id AND ib.status = 'Available'
-    GROUP BY i.id
-    ORDER BY i.id DESC
+    WHERE 1=1
   `;
 
-  db.query(sql, (err, results) => {
-    if (err) {
-      return res.status(500).json({ message: "Database error", error: err.message });
-    }
+  const params = [];
 
-    res.json(results);
-  });
-};
+  if (category) {
+    sql += ` AND i.category_id = ?`;
+    params.push(category);
+  }
 
-const getInventoryBatchesByItem = (req, res) => {
-  const { itemId } = req.params;
+  if (type) {
+    sql += ` AND i.type = ?`;
+    params.push(type);
+  }
 
-  const sql = `
-    SELECT
-      ib.*,
-      g.grn_number
-    FROM inventory_batches ib
-    JOIN grn g ON ib.grn_id = g.id
-    WHERE ib.item_id = ?
-      AND ib.status = 'Available'
-      AND ib.available_quantity > 0
-    ORDER BY ib.id DESC
-  `;
+  sql += ` ORDER BY i.name ASC`;
 
-  db.query(sql, [itemId], (err, results) => {
-    if (err) {
-      return res.status(500).json({ message: "Database error", error: err.message });
-    }
-
-    res.json(results);
-  });
-};
-
-const getStockMovements = (req, res) => {
-  const sql = `
-    SELECT
-      sm.*,
-      i.item_name,
-      i.item_code
-    FROM stock_movements sm
-    JOIN items i ON sm.item_id = i.id
-    ORDER BY sm.id DESC
-  `;
-
-  db.query(sql, (err, results) => {
+  db.query(sql, params, (err, results) => {
     if (err) {
       return res.status(500).json({ message: "Database error", error: err.message });
     }
@@ -75,17 +55,21 @@ const getStockMovements = (req, res) => {
 const getLowStockItems = (req, res) => {
   const sql = `
     SELECT
-      i.id AS item_id,
-      i.item_code,
-      i.item_name,
+      inv.id,
+      inv.item_id,
+      i.code,
+      i.name,
+      c.category_name,
+      i.type,
       i.unit,
       i.reorder_level,
-      IFNULL(SUM(ib.available_quantity), 0) AS total_available_quantity
-    FROM items i
-    LEFT JOIN inventory_batches ib ON i.id = ib.item_id AND ib.status = 'Available'
-    GROUP BY i.id
-    HAVING total_available_quantity <= i.reorder_level
-    ORDER BY total_available_quantity ASC
+      inv.qty_available,
+      (i.reorder_level - inv.qty_available) AS shortage
+    FROM inventory inv
+    JOIN items i ON inv.item_id = i.id
+    JOIN item_categories c ON i.category_id = c.id
+    WHERE inv.qty_available <= i.reorder_level
+    ORDER BY shortage DESC, i.name ASC
   `;
 
   db.query(sql, (err, results) => {
@@ -97,9 +81,98 @@ const getLowStockItems = (req, res) => {
   });
 };
 
+const getExpiryItems = (req, res) => {
+  const days = Number(req.query.days) || 7;
+
+  const sql = `
+    SELECT
+      b.id,
+      b.item_id,
+      i.code,
+      i.name,
+      i.unit,
+      b.batch_number,
+      b.qty_remaining,
+      b.received_date,
+      b.expiry_date,
+      DATEDIFF(b.expiry_date, CURDATE()) AS days_left,
+      b.status
+    FROM batches b
+    JOIN items i ON b.item_id = i.id
+    WHERE b.expiry_date IS NOT NULL
+      AND b.qty_remaining > 0
+      AND b.expiry_date <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
+    ORDER BY b.expiry_date ASC, i.name ASC
+  `;
+
+  db.query(sql, [days], (err, results) => {
+    if (err) {
+      return res.status(500).json({ message: "Database error", error: err.message });
+    }
+
+    res.json(results);
+  });
+};
+
+const getBatchesByItemId = (req, res) => {
+  const { itemId } = req.params;
+
+  const sql = `
+    SELECT
+      b.id,
+      b.item_id,
+      b.batch_number,
+      b.qty_received,
+      b.qty_remaining,
+      b.qty_reserved,
+      b.received_date,
+      b.expiry_date,
+      b.grn_id,
+      b.source_type,
+      b.unit_cost,
+      b.status,
+      i.unit
+    FROM batches b
+    JOIN items i ON b.item_id = i.id
+    WHERE b.item_id = ?
+    ORDER BY
+      CASE WHEN b.expiry_date IS NULL THEN 1 ELSE 0 END,
+      b.expiry_date ASC,
+      b.received_date ASC
+  `;
+
+  db.query(sql, [itemId], (err, results) => {
+    if (err) {
+      return res.status(500).json({ message: "Database error", error: err.message });
+    }
+
+    res.json(results);
+  });
+};
+
+const getInventoryValuation = (req, res) => {
+  const sql = `
+    SELECT
+      COUNT(*) AS total_items,
+      COALESCE(SUM(qty_on_hand), 0) AS total_qty_on_hand,
+      COALESCE(SUM(qty_available), 0) AS total_qty_available,
+      COALESCE(SUM(total_value), 0) AS total_inventory_value
+    FROM inventory
+  `;
+
+  db.query(sql, (err, results) => {
+    if (err) {
+      return res.status(500).json({ message: "Database error", error: err.message });
+    }
+
+    res.json(results[0]);
+  });
+};
+
 module.exports = {
-  getInventoryList,
-  getInventoryBatchesByItem,
-  getStockMovements,
+  getInventory,
   getLowStockItems,
+  getExpiryItems,
+  getBatchesByItemId,
+  getInventoryValuation,
 };
