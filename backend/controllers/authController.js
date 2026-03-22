@@ -5,39 +5,29 @@ const jwt = require("jsonwebtoken");
 const loginUser = (req, res) => {
   const { email, password } = req.body;
 
-  console.log("=== LOGIN ATTEMPT ===");
-  console.log("Email:", email);
-  console.log("Typed password:", password);
-
   const sql = `
-    SELECT users.id, users.name, users.email, users.password, roles.role_name
+    SELECT id, full_name, email, password, role, status, supplier_id
     FROM users
-    JOIN roles ON users.role_id = roles.id
-    WHERE users.email = ?
+    WHERE email = ?
+    LIMIT 1
   `;
 
   db.query(sql, [email], async (err, results) => {
     if (err) {
-      console.log("DB ERROR:", err);
-      return res.status(500).json({
-        message: "Database error",
-        error: err.message,
-      });
+      return res.status(500).json({ message: "Database error", error: err.message });
     }
 
-    console.log("DB RESULTS:", results);
-
     if (results.length === 0) {
-      console.log("No user found");
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
     const user = results[0];
 
-    console.log("Stored hash:", user.password);
+    if (user.status !== "active") {
+      return res.status(403).json({ message: "User account is inactive" });
+    }
 
     const isMatch = await bcrypt.compare(password, user.password);
-    console.log("Password match result:", isMatch);
 
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid email or password" });
@@ -46,9 +36,10 @@ const loginUser = (req, res) => {
     const token = jwt.sign(
       {
         id: user.id,
+        name: user.full_name,
         email: user.email,
-        role_name: user.role_name,
-        name: user.name,
+        role: user.role,
+        supplier_id: user.supplier_id,
       },
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
@@ -59,18 +50,20 @@ const loginUser = (req, res) => {
       token,
       user: {
         id: user.id,
-        name: user.name,
+        name: user.full_name,
         email: user.email,
-        role_name: user.role_name,
+        role: user.role,
+        supplier_id: user.supplier_id,
       },
     });
   });
 };
 
 const getMe = (req, res) => {
-  return res.json({
-    user: req.user,
-  });
+  return res.json({ user: req.user });
 };
 
-module.exports = { loginUser, getMe };
+module.exports = {
+  loginUser,
+  getMe,
+};
