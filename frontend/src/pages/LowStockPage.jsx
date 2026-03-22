@@ -17,7 +17,7 @@ const LowStockPage = () => {
 
       setItems(res.data);
     } catch (err) {
-      setError("Failed to load low stock items");
+      setError(err.response?.data?.message || "Failed to load low stock items");
     }
   };
 
@@ -28,7 +28,7 @@ const LowStockPage = () => {
   return (
     <div>
       <div className="page-header-row">
-        <h2>Low Stock Alerts</h2>
+        <h2>Low Stock Items</h2>
       </div>
 
       {error && <div className="error-box">{error}</div>}
@@ -37,27 +37,35 @@ const LowStockPage = () => {
         <table className="custom-table">
           <thead>
             <tr>
-              <th>Item Code</th>
-              <th>Item Name</th>
+              <th>ID</th>
+              <th>Code</th>
+              <th>Name</th>
+              <th>Category</th>
+              <th>Type</th>
               <th>Unit</th>
               <th>Reorder Level</th>
-              <th>Available Qty</th>
+              <th>Qty Available</th>
+              <th>Shortage</th>
             </tr>
           </thead>
           <tbody>
             {items.length > 0 ? (
               items.map((item) => (
-                <tr key={item.item_id}>
-                  <td>{item.item_code}</td>
-                  <td>{item.item_name}</td>
+                <tr key={item.id}>
+                  <td>{item.item_id}</td>
+                  <td>{item.code}</td>
+                  <td>{item.name}</td>
+                  <td>{item.category_name}</td>
+                  <td>{item.type}</td>
                   <td>{item.unit}</td>
                   <td>{item.reorder_level}</td>
-                  <td>{item.total_available_quantity}</td>
+                  <td>{item.qty_available}</td>
+                  <td>{item.shortage}</td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="5">No low stock items found</td>
+                <td colSpan="9">No low stock items found</td>
               </tr>
             )}
           </tbody>
