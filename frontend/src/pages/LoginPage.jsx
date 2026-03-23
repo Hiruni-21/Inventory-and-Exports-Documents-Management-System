@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import companyLogo from "../assets/company-logo.png";
 
 const roleConfig = {
   manager: {
@@ -83,9 +84,7 @@ const LoginPage = () => {
       <div className="lcard">
         <div className="ll">
           <div className="ll-logo">
-            <svg viewBox="0 0 40 40">
-              <path d="M20 4C10 4 4 12 4 20c0 10 8 16 16 16s16-6 16-16c0-8-6-16-16-16zM16 14c2-4 6-6 10-4-4 2-6 6-6 10 0-4-2-8-4-6zm-2 6c-2-4 0-10 4-12 0 4-2 8-2 12-2-2-4 0-2 0zm6 0c0 4-2 8-6 10 0-4 2-8 6-10zm0 0c0 4 2 8 6 10 0-4-2-8-6-10z" />
-            </svg>
+            <img src={companyLogo} alt="Fresh World logo" className="brand-logo-img" />
           </div>
 
           <div className="ll-title">
@@ -95,8 +94,7 @@ const LoginPage = () => {
           </div>
 
           <div className="ll-sub">
-            Inventory &amp; Export Documents Management System · Manning Market,
-            Colombo · Est. 2005
+            Inventory &amp; Export Documents Management System 
           </div>
 
           <div className="ll-div"></div>
@@ -127,13 +125,13 @@ const LoginPage = () => {
           {error && (
             <div
               style={{
-                marginBottom: 14,
+                marginBottom: "14px",
                 padding: "12px 14px",
                 background: "var(--d100)",
                 border: "1px solid rgba(200,75,47,.2)",
                 borderRadius: "var(--r)",
                 color: "var(--d)",
-                fontSize: 12,
+                fontSize: "12px",
                 fontWeight: 600,
               }}
             >
@@ -197,16 +195,16 @@ const LoginPage = () => {
               </div>
             </div>
 
-            <button type="submit" className="sign-btn">
+            <button className="sign-btn" type="submit">
               Sign In
             </button>
           </form>
 
           <div className="demo-box">
-            <strong>Demo:</strong> Use role name + 123{" "}
-            <code>manager123</code> <code>ops123</code>{" "}
-            <code>supervisor123</code> <code>logistics123</code>{" "}
-            <code>supplier123</code> or just <code>demo123</code> for any role
+            <strong>Demo:</strong> Use role name + 123 &nbsp;
+            <code>manager123</code> <code>ops123</code> <code>supervisor123</code>{" "}
+            <code>logistics123</code> <code>supplier123</code>
+            &nbsp; or just <code>demo123</code> for any role
           </div>
         </div>
       </div>
