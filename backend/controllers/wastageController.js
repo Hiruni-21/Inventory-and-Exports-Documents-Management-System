@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const { refreshInventorySnapshot } = require("./inventoryController");
 
 const getAllWastage = (req, res) => {
   const sql = `
@@ -8,10 +9,10 @@ const getAllWastage = (req, res) => {
       w.reason,
       w.notes,
       w.created_at,
-      i.item_name,
-      i.item_code,
+      i.name AS item_name,
+      i.code AS item_code,
       ib.batch_code,
-      u.name AS created_by_name
+      u.full_name AS created_by_name
     FROM wastage_records w
     JOIN items i ON w.item_id = i.id
     JOIN inventory_batches ib ON w.batch_id = ib.id
@@ -36,6 +37,12 @@ const createWastage = (req, res) => {
     return res.status(400).json({ message: "Required fields are missing" });
   }
 
+  const wasteQty = Number(quantity);
+
+  if (wasteQty <= 0) {
+    return res.status(400).json({ message: "Wastage quantity must be greater than 0" });
+  }
+
   const getBatchSql = `
     SELECT available_quantity
     FROM inventory_batches
@@ -51,8 +58,7 @@ const createWastage = (req, res) => {
       return res.status(404).json({ message: "Inventory batch not found" });
     }
 
-    const currentQty = parseFloat(batchResults[0].available_quantity);
-    const wasteQty = parseFloat(quantity);
+    const currentQty = Number(batchResults[0].available_quantity || 0);
 
     if (wasteQty > currentQty) {
       return res.status(400).json({ message: "Not enough stock in selected batch" });
@@ -74,7 +80,7 @@ const createWastage = (req, res) => {
 
       const insertWastageSql = `
         INSERT INTO wastage_records
-        (item_id, batch_id, quantity, reason, notes, created_by)
+          (item_id, batch_id, quantity, reason, notes, created_by)
         VALUES (?, ?, ?, ?, ?, ?)
       `;
 
@@ -88,7 +94,7 @@ const createWastage = (req, res) => {
 
           const movementSql = `
             INSERT INTO stock_movements
-            (item_id, movement_type, reference_type, reference_id, quantity, notes)
+              (item_id, movement_type, reference_type, reference_id, quantity, notes)
             VALUES (?, 'OUT', 'WASTAGE', ?, ?, ?)
           `;
 
@@ -105,7 +111,13 @@ const createWastage = (req, res) => {
                 return res.status(500).json({ message: "Database error", error: mErr.message });
               }
 
-              res.status(201).json({ message: "Wastage recorded successfully" });
+              refreshInventorySnapshot(item_id, (refreshErr) => {
+                if (refreshErr) {
+                  return res.status(500).json({ message: "Database error", error: refreshErr.message });
+                }
+
+                res.status(201).json({ message: "Wastage recorded successfully" });
+              });
             }
           );
         }

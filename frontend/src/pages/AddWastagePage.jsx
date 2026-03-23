@@ -1,14 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
 
 const AddWastagePage = () => {
   const navigate = useNavigate();
-  const token = localStorage.getItem("token");
 
   const [inventory, setInventory] = useState([]);
   const [batches, setBatches] = useState([]);
-
   const [form, setForm] = useState({
     item_id: "",
     batch_id: "",
@@ -17,131 +15,220 @@ const AddWastagePage = () => {
     notes: "",
   });
 
+  const [loading, setLoading] = useState(true);
+  const [batchLoading, setBatchLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
   useEffect(() => {
-    fetchInventory();
+    const loadInventory = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const res = await api.get("/inventory");
+        setInventory(
+          (Array.isArray(res.data) ? res.data : []).filter((item) => Number(item.qty_available) > 0)
+        );
+      } catch (err) {
+        setError(err.response?.data?.message || "Failed to load inventory");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadInventory();
   }, []);
 
-const fetchInventory = async () => {
-  try {
-    const res = await api.get("/inventory", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+  const selectedBatch = useMemo(
+    () => batches.find((batch) => String(batch.id) === String(form.batch_id)),
+    [batches, form.batch_id]
+  );
 
-    const availableItems = res.data.filter(
-      (item) => Number(item.total_available_quantity) > 0
-    );
+  const availableQty =
+    selectedBatch?.qty_remaining ?? selectedBatch?.available_quantity ?? "—";
 
-    setInventory(availableItems);
-  } catch {
-    setError("Failed to load inventory");
-  }
-};
-const handleChange = async (e) => {
-  const { name, value } = e.target;
+  const handleChange = async (e) => {
+    const { name, value } = e.target;
+    const nextForm = { ...form, [name]: value };
 
-  const updatedForm = { ...form, [name]: value };
-
-  if (name === "item_id") {
-    updatedForm.batch_id = "";
-  }
-
-  setForm(updatedForm);
-
-  if (name === "item_id" && value) {
-    try {
-      const res = await api.get(`/inventory/batches/${value}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setBatches(res.data);
-    } catch {
-      setError("Failed to load item batches");
+    if (name === "item_id") {
+      nextForm.batch_id = "";
+      setBatches([]);
     }
-  }
-};
+
+    setForm(nextForm);
+
+    if (name === "item_id" && value) {
+      setBatchLoading(true);
+      setError("");
+      try {
+        const res = await api.get(`/inventory/batches/${value}`);
+        setBatches(Array.isArray(res.data) ? res.data : []);
+      } catch (err) {
+        setError(err.response?.data?.message || "Failed to load item batches");
+      } finally {
+        setBatchLoading(false);
+      }
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setSuccess("");
 
+    if (!form.item_id || !form.batch_id || !form.quantity || !form.reason) {
+      setError("Please fill all required fields");
+      return;
+    }
+
+    setSaving(true);
+
     try {
-      await api.post("/wastage", form, {
-        headers: { Authorization: `Bearer ${token}` },
+      await api.post("/wastage", {
+        item_id: Number(form.item_id),
+        batch_id: Number(form.batch_id),
+        quantity: Number(form.quantity),
+        reason: form.reason,
+        notes: form.notes,
       });
 
       setSuccess("Wastage recorded successfully");
-
-      setTimeout(() => {
-        navigate("/wastage");
-      }, 1000);
+      setTimeout(() => navigate("/wastage"), 800);
     } catch (err) {
       setError(err.response?.data?.message || "Failed to record wastage");
+    } finally {
+      setSaving(false);
     }
   };
 
   return (
-    <div className="form-page">
-      <h2>Record Wastage</h2>
+    <div className="md md-lg" style={{ maxWidth: "100%", display: "flex" }}>
+      <div className="md-h">
+        <h3>🗑 Record Wastage</h3>
+        <button type="button" className="md-x" onClick={() => navigate("/wastage")}>
+          ✕
+        </button>
+      </div>
 
-      {error && <div className="error-box">{error}</div>}
-      {success && <div className="success-box">{success}</div>}
+      <form onSubmit={handleSubmit}>
+        <div className="md-b">
+          <div className="ib ib-w">
+            <span>🗑</span>
+            <div>
+              Record damaged or expired stock against the exact batch. Available in selected batch:{" "}
+              <strong>{availableQty}</strong>
+            </div>
+          </div>
 
-      <form className="custom-form" onSubmit={handleSubmit}>
-        <select name="item_id" value={form.item_id} onChange={handleChange} required>
-          <option value="">Select Item</option>
-          {inventory.map((item) => (
-            <option key={item.item_id} value={item.item_id}>
-              {item.item_name} ({item.item_code})
-            </option>
-          ))}
-        </select>
+          {loading ? (
+            <div className="ib ib-i">
+              <span>⏳</span>
+              <div>Loading inventory...</div>
+            </div>
+          ) : null}
 
-        <select name="batch_id" value={form.batch_id} onChange={handleChange} required>
-          <option value="">Select Batch</option>
+          {batchLoading ? (
+            <div className="ib ib-i">
+              <span>⏳</span>
+              <div>Loading item batches...</div>
+            </div>
+          ) : null}
 
-          {batches.map((batch) => (
-            <option key={batch.id} value={batch.id}>
-              {batch.batch_code} - Available: {batch.available_quantity} {batch.unit}
-            </option>
-          ))}
+          {error ? (
+            <div className="ib ib-d">
+              <span>⚠️</span>
+              <div>{error}</div>
+            </div>
+          ) : null}
 
-          {batches.length === 0 && form.item_id && (
-            <option value="" disabled>No available batches</option>
-          )}
-        </select>
+          {success ? (
+            <div className="ib ib-s">
+              <span>✅</span>
+              <div>{success}</div>
+            </div>
+          ) : null}
 
-        
-        <input
-          type="number"
-          step="0.01"
-          name="quantity"
-          placeholder="Wastage Quantity"
-          value={form.quantity}
-          onChange={handleChange}
-          required
-        />
+          <div className="fs2">
+            <div className="fst">Wastage Details</div>
 
-        <input
-          type="text"
-          name="reason"
-          placeholder="Reason"
-          value={form.reason}
-          onChange={handleChange}
-          required
-        />
+            <div className="fr">
+              <div className="ff">
+                <label className="fl">Item</label>
+                <select className="fc" name="item_id" value={form.item_id} onChange={handleChange}>
+                  <option value="">Select item</option>
+                  {inventory.map((item) => (
+                    <option key={item.item_id} value={item.item_id}>
+                      {(item.name || item.item_name)} ({item.code || item.item_code})
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-        <textarea
-          name="notes"
-          placeholder="Notes"
-          rows="4"
-          value={form.notes}
-          onChange={handleChange}
-        />
+              <div className="ff">
+                <label className="fl">Batch</label>
+                <select className="fc" name="batch_id" value={form.batch_id} onChange={handleChange}>
+                  <option value="">Select batch</option>
+                  {batches.map((batch) => (
+                    <option key={batch.id} value={batch.id}>
+                      {(batch.batch_number || batch.batch_code)} - Available:{" "}
+                      {batch.qty_remaining || batch.available_quantity} {batch.unit || ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
-        <button type="submit">Save Wastage</button>
+            <div className="fr">
+              <div className="ff">
+                <label className="fl">Wastage Quantity</label>
+                <input
+                  className="fc"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  name="quantity"
+                  value={form.quantity}
+                  onChange={handleChange}
+                  placeholder="0.00"
+                />
+              </div>
+
+              <div className="ff">
+                <label className="fl">Reason</label>
+                <input
+                  className="fc"
+                  type="text"
+                  name="reason"
+                  value={form.reason}
+                  onChange={handleChange}
+                  placeholder="Expired, fungal damage, bruising..."
+                />
+              </div>
+            </div>
+
+            <div className="ff">
+              <label className="fl">Notes</label>
+              <textarea
+                className="fc"
+                name="notes"
+                value={form.notes}
+                onChange={handleChange}
+                placeholder="Extra wastage notes..."
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="md-f">
+          <button type="button" className="btn btn-s" onClick={() => navigate("/wastage")}>
+            Cancel
+          </button>
+          <button type="submit" className="btn btn-p" disabled={saving}>
+            {saving ? "Saving..." : "Save Wastage"}
+          </button>
+        </div>
       </form>
     </div>
   );

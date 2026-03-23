@@ -1,55 +1,109 @@
-import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import api from "../utils/api";
+
+const fmtDate = (value) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-CA");
+};
+
+const badgeClass = (status) => {
+  const value = String(status || "pending").toLowerCase();
+  if (value.includes("approved")) return "bg-g";
+  if (value.includes("sent")) return "bg-b";
+  if (value.includes("closed") || value.includes("received")) return "bg-p";
+  return "bg-a";
+};
 
 const PurchaseOrderDetailsPage = () => {
   const { id } = useParams();
   const [purchaseOrder, setPurchaseOrder] = useState(null);
   const [error, setError] = useState("");
 
-  const fetchPurchaseOrder = async () => {
-    try {
-      const token = localStorage.getItem("token");
-
-      const res = await api.get(`/purchase-orders/${id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      setPurchaseOrder(res.data);
-    } catch (err) {
-      setError("Failed to load purchase order details");
-    }
-  };
-
   useEffect(() => {
+    const fetchPurchaseOrder = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await api.get(`/purchase-orders/${id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setPurchaseOrder(res.data);
+      } catch {
+        setError("Failed to load purchase order details");
+      }
+    };
+
     fetchPurchaseOrder();
   }, [id]);
 
-  if (error) return <div className="error-box">{error}</div>;
-  if (!purchaseOrder) return <div>Loading...</div>;
+  const totalQty = useMemo(() => {
+    return (purchaseOrder?.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+  }, [purchaseOrder]);
+
+  if (error) return <div className="ib ib-d"><span>⚠️</span><div>{error}</div></div>;
+  if (!purchaseOrder) return <div className="tw"><div className="tw-h"><h3>Loading purchase order...</h3></div></div>;
 
   return (
-    <div className="dashboard-card">
-      <h2>Purchase Order Details</h2>
+    <div>
+      <div className="cg cg-3" style={{ marginBottom: 16 }}>
+        <div className="kc">
+          <div className="kic g">📄</div>
+          <div className="kv">{purchaseOrder.po_number}</div>
+          <div className="kl">PO Number</div>
+        </div>
+        <div className="kc">
+          <div className="kic a">📦</div>
+          <div className="kv">{purchaseOrder.items?.length || 0}</div>
+          <div className="kl">Line Items</div>
+        </div>
+        <div className="kc">
+          <div className="kic b">⚖️</div>
+          <div className="kv">{totalQty}</div>
+          <div className="kl">Total Ordered Qty</div>
+        </div>
+      </div>
 
-      <p><strong>PO Number:</strong> {purchaseOrder.po_number}</p>
-      <p><strong>Supplier:</strong> {purchaseOrder.supplier_name}</p>
-      <p><strong>Contact:</strong> {purchaseOrder.contact_number}</p>
-      <p><strong>Email:</strong> {purchaseOrder.email || "-"}</p>
-      <p><strong>Expected Delivery:</strong> {purchaseOrder.expected_delivery_date || "-"}</p>
-      <p><strong>Status:</strong> {purchaseOrder.status}</p>
-      <p><strong>Created By:</strong> {purchaseOrder.created_by_name || "-"}</p>
-      <p><strong>Remarks:</strong> {purchaseOrder.remarks || "-"}</p>
+      <div className="tw" style={{ marginBottom: 16 }}>
+        <div className="tw-h">
+          <h3>Purchase Order Details</h3>
+          <span className={`badge ${badgeClass(purchaseOrder.status)}`}>{purchaseOrder.status || "Pending"}</span>
+        </div>
+        <div className="md-b" style={{ padding: 20 }}>
+          <div className="fg fg-2">
+            <div>
+              <div className="fst">Supplier</div>
+              <p><strong>{purchaseOrder.supplier_name}</strong></p>
+              <p>{purchaseOrder.contact_number || "—"}</p>
+              <p>{purchaseOrder.email || "—"}</p>
+            </div>
+            <div>
+              <div className="fst">Order Info</div>
+              <p><strong>Date Placed:</strong> {fmtDate(purchaseOrder.created_at)}</p>
+              <p><strong>Required By:</strong> {fmtDate(purchaseOrder.expected_delivery_date)}</p>
+              <p><strong>Created By:</strong> {purchaseOrder.created_by_name || "—"}</p>
+            </div>
+          </div>
 
-      <h3 style={{ marginTop: "20px", marginBottom: "10px" }}>Items</h3>
+          <div style={{ marginTop: 16 }}>
+            <div className="fst">Remarks</div>
+            <div className="ib ib-i" style={{ marginBottom: 0 }}>
+              <span>📝</span>
+              <div>{purchaseOrder.remarks || "No remarks added for this purchase order."}</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-      <div className="table-wrapper">
-        <table className="custom-table">
+      <div className="tw">
+        <div className="tw-h">
+          <h3>PO Items</h3>
+          <Link to="/grn/add" className="btn btn-p btn-xs">Create GRN</Link>
+        </div>
+        <table>
           <thead>
             <tr>
-              <th>ID</th>
               <th>Item Code</th>
               <th>Item Name</th>
               <th>Unit</th>
@@ -57,19 +111,18 @@ const PurchaseOrderDetailsPage = () => {
             </tr>
           </thead>
           <tbody>
-            {purchaseOrder.items.length > 0 ? (
+            {purchaseOrder.items?.length ? (
               purchaseOrder.items.map((item) => (
                 <tr key={item.id}>
-                  <td>{item.id}</td>
-                  <td>{item.item_code}</td>
-                  <td>{item.item_name}</td>
+                  <td style={{ fontFamily: "monospace", fontSize: 11, color: "var(--text3)" }}>{item.item_code}</td>
+                  <td style={{ fontWeight: 600 }}>{item.item_name}</td>
                   <td>{item.unit}</td>
                   <td>{item.quantity}</td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="5">No items found</td>
+                <td colSpan="4" style={{ textAlign: "center", color: "var(--text3)" }}>No items found</td>
               </tr>
             )}
           </tbody>

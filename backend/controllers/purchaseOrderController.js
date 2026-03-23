@@ -5,19 +5,19 @@ const getAllPurchaseOrders = (req, res) => {
     SELECT 
       po.id,
       po.po_number,
-      po.expected_delivery_date,
+      NULL AS expected_delivery_date,
       po.status,
       po.created_at,
       s.supplier_name,
-      u.name AS created_by_name
+      NULL AS created_by_name
     FROM purchase_orders po
     JOIN suppliers s ON po.supplier_id = s.id
-    LEFT JOIN users u ON po.created_by = u.id
     ORDER BY po.id DESC
   `;
 
   db.query(sql, (err, results) => {
     if (err) {
+      console.error("getAllPurchaseOrders error:", err);
       return res.status(500).json({ message: "Database error", error: err.message });
     }
 
@@ -31,30 +31,33 @@ const getPurchaseOrderById = (req, res) => {
   const poSql = `
     SELECT 
       po.*,
+      NULL AS expected_delivery_date,
       s.supplier_name,
       s.contact_number,
       s.email,
-      u.name AS created_by_name
+      NULL AS created_by_name
     FROM purchase_orders po
     JOIN suppliers s ON po.supplier_id = s.id
-    LEFT JOIN users u ON po.created_by = u.id
     WHERE po.id = ?
   `;
 
   const itemsSql = `
     SELECT 
       poi.id,
+      poi.item_id,
       poi.quantity,
-      i.item_name,
-      i.item_code,
+      i.name AS item_name,
+      i.code AS item_code,
       i.unit
     FROM purchase_order_items poi
     JOIN items i ON poi.item_id = i.id
     WHERE poi.purchase_order_id = ?
+    ORDER BY poi.id ASC
   `;
 
   db.query(poSql, [id], (err, poResults) => {
     if (err) {
+      console.error("getPurchaseOrderById error:", err);
       return res.status(500).json({ message: "Database error", error: err.message });
     }
 
@@ -64,6 +67,7 @@ const getPurchaseOrderById = (req, res) => {
 
     db.query(itemsSql, [id], (itemErr, itemResults) => {
       if (itemErr) {
+        console.error("getPurchaseOrderById items error:", itemErr);
         return res.status(500).json({ message: "Database error", error: itemErr.message });
       }
 
@@ -76,32 +80,43 @@ const getPurchaseOrderById = (req, res) => {
 };
 
 const createPurchaseOrder = (req, res) => {
-  const { supplier_id, expected_delivery_date, remarks, items } = req.body;
-  const created_by = req.user.id;
+  const { supplier_id, items } = req.body;
 
-  if (!supplier_id || !items || items.length === 0) {
+  if (!supplier_id || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ message: "Supplier and items are required" });
+  }
+
+  const cleanItems = items
+    .map((item) => ({
+      item_id: Number(item.item_id),
+      quantity: Number(item.quantity || 0),
+    }))
+    .filter((item) => item.item_id && item.quantity > 0);
+
+  if (cleanItems.length === 0) {
+    return res.status(400).json({ message: "At least one valid item is required" });
   }
 
   const poNumber = `PO-${Date.now()}`;
 
   const poSql = `
     INSERT INTO purchase_orders
-    (po_number, supplier_id, expected_delivery_date, remarks, created_by)
-    VALUES (?, ?, ?, ?, ?)
+    (po_number, supplier_id, order_date)
+    VALUES (?, ?, CURDATE())
   `;
 
   db.query(
     poSql,
-    [poNumber, supplier_id, expected_delivery_date || null, remarks || null, created_by],
+    [poNumber, supplier_id],
     (err, result) => {
       if (err) {
+        console.error("createPurchaseOrder error:", err);
         return res.status(500).json({ message: "Database error", error: err.message });
       }
 
       const purchaseOrderId = result.insertId;
 
-      const itemValues = items.map((item) => [
+      const itemValues = cleanItems.map((item) => [
         purchaseOrderId,
         item.item_id,
         item.quantity,
@@ -115,10 +130,11 @@ const createPurchaseOrder = (req, res) => {
 
       db.query(itemSql, [itemValues], (itemErr) => {
         if (itemErr) {
+          console.error("createPurchaseOrder items error:", itemErr);
           return res.status(500).json({ message: "Database error", error: itemErr.message });
         }
 
-        res.status(201).json({
+        return res.status(201).json({
           message: "Purchase order created successfully",
           purchaseOrderId,
           poNumber,
@@ -127,7 +143,6 @@ const createPurchaseOrder = (req, res) => {
     }
   );
 };
-
 module.exports = {
   getAllPurchaseOrders,
   getPurchaseOrderById,

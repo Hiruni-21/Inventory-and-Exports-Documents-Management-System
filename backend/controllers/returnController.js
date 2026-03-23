@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const { refreshInventorySnapshot } = require("./inventoryController");
 
 const getAllReturns = (req, res) => {
   const sql = `
@@ -9,10 +10,10 @@ const getAllReturns = (req, res) => {
       r.notes,
       r.created_at,
       s.supplier_name,
-      i.item_name,
-      i.item_code,
+      i.name AS item_name,
+      i.code AS item_code,
       ib.batch_code,
-      u.name AS created_by_name
+      u.full_name AS created_by_name
     FROM goods_returns r
     JOIN suppliers s ON r.supplier_id = s.id
     JOIN items i ON r.item_id = i.id
@@ -38,6 +39,12 @@ const createReturn = (req, res) => {
     return res.status(400).json({ message: "Required fields are missing" });
   }
 
+  const returnQty = Number(quantity);
+
+  if (returnQty <= 0) {
+    return res.status(400).json({ message: "Return quantity must be greater than 0" });
+  }
+
   const getBatchSql = `
     SELECT available_quantity
     FROM inventory_batches
@@ -53,8 +60,7 @@ const createReturn = (req, res) => {
       return res.status(404).json({ message: "Inventory batch not found" });
     }
 
-    const currentQty = parseFloat(batchResults[0].available_quantity);
-    const returnQty = parseFloat(quantity);
+    const currentQty = Number(batchResults[0].available_quantity || 0);
 
     if (returnQty > currentQty) {
       return res.status(400).json({ message: "Not enough stock in selected batch" });
@@ -76,7 +82,7 @@ const createReturn = (req, res) => {
 
       const insertReturnSql = `
         INSERT INTO goods_returns
-        (supplier_id, item_id, batch_id, quantity, reason, notes, created_by)
+          (supplier_id, item_id, batch_id, quantity, reason, notes, created_by)
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `;
 
@@ -90,7 +96,7 @@ const createReturn = (req, res) => {
 
           const movementSql = `
             INSERT INTO stock_movements
-            (item_id, movement_type, reference_type, reference_id, quantity, notes)
+              (item_id, movement_type, reference_type, reference_id, quantity, notes)
             VALUES (?, 'OUT', 'RETURN', ?, ?, ?)
           `;
 
@@ -107,7 +113,13 @@ const createReturn = (req, res) => {
                 return res.status(500).json({ message: "Database error", error: mErr.message });
               }
 
-              res.status(201).json({ message: "Goods return recorded successfully" });
+              refreshInventorySnapshot(item_id, (refreshErr) => {
+                if (refreshErr) {
+                  return res.status(500).json({ message: "Database error", error: refreshErr.message });
+                }
+
+                res.status(201).json({ message: "Goods return recorded successfully" });
+              });
             }
           );
         }
