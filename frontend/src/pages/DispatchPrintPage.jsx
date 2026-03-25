@@ -10,14 +10,9 @@ const DispatchPrintPage = () => {
   useEffect(() => {
     const fetchDetails = async () => {
       try {
-        const token = localStorage.getItem("token");
-
-        const res = await api.get(`/dispatch/${id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
+        const res = await api.get(`/dispatch/${id}`);
         setDispatchRecord(res.data);
-      } catch (err) {
+      } catch {
         setError("Failed to load dispatch details");
       }
     };
@@ -27,9 +22,7 @@ const DispatchPrintPage = () => {
 
   useEffect(() => {
     if (dispatchRecord) {
-      setTimeout(() => {
-        window.print();
-      }, 500);
+      setTimeout(() => window.print(), 500);
     }
   }, [dispatchRecord]);
 
@@ -39,13 +32,13 @@ const DispatchPrintPage = () => {
   return (
     <div className="print-page">
       <div className="print-header">
-        <h1>Fresh World</h1>
-        <h2>Dispatch / Market List</h2>
+        <h1>Fresh World Exporters</h1>
+        <h2>Local Dispatch Note</h2>
       </div>
 
       <div className="print-section">
         <p><strong>Dispatch Number:</strong> {dispatchRecord.dispatch_number}</p>
-        <p><strong>Client Name:</strong> {dispatchRecord.client_name}</p>
+        <p><strong>Customer:</strong> {dispatchRecord.client_name}</p>
         <p><strong>Dispatch Date:</strong> {dispatchRecord.dispatch_date}</p>
         <p><strong>Created By:</strong> {dispatchRecord.created_by_name || "-"}</p>
         <p><strong>Remarks:</strong> {dispatchRecord.remarks || "-"}</p>
@@ -65,7 +58,7 @@ const DispatchPrintPage = () => {
             </tr>
           </thead>
           <tbody>
-            {dispatchRecord.items.length > 0 ? (
+            {dispatchRecord.items?.length > 0 ? (
               dispatchRecord.items.map((item) => (
                 <tr key={item.id}>
                   <td>{item.id}</td>

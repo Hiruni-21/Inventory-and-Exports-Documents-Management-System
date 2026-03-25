@@ -21,6 +21,7 @@ import LowStockPage from "./pages/LowStockPage";
 import StockAdjustmentListPage from "./pages/StockAdjustmentListPage";
 import AddStockAdjustmentPage from "./pages/AddStockAdjustmentPage";
 import ReportsPage from "./pages/ReportsPage";
+
 import PurchaseOrderListPage from "./pages/PurchaseOrderListPage";
 import AddPurchaseOrderPage from "./pages/AddPurchaseOrderPage";
 import PurchaseOrderDetailsPage from "./pages/PurchaseOrderDetailsPage";
@@ -31,14 +32,19 @@ import ReturnListPage from "./pages/ReturnListPage";
 import AddReturnPage from "./pages/AddReturnPage";
 import WastageListPage from "./pages/WastageListPage";
 import AddWastagePage from "./pages/AddWastagePage";
+
+import LocalCustomersPage from "./pages/LocalCustomersPage";
+import GlobalCustomersPage from "./pages/GlobalCustomersPage";
 import DispatchListPage from "./pages/DispatchListPage";
 import AddDispatchPage from "./pages/AddDispatchPage";
 import DispatchDetailsPage from "./pages/DispatchDetailsPage";
 import DispatchPrintPage from "./pages/DispatchPrintPage";
+
 import ExportDocumentListPage from "./pages/ExportDocumentListPage";
 import AddExportDocumentPage from "./pages/AddExportDocumentPage";
 import ExportDocumentDetailsPage from "./pages/ExportDocumentDetailsPage";
 import ExportDocumentPrintPage from "./pages/ExportDocumentPrintPage";
+
 import StockMovementsPage from "./pages/StockMovementsPage";
 import SupplierDashboardPage from "./pages/SupplierDashboard";
 import SupplierOrdersPage from "./pages/PurchaseOrderListPage";
@@ -102,8 +108,9 @@ function App() {
         <Route path="/wastage" element={<WastageListPage />} />
         <Route path="/wastage/add" element={<AddWastagePage />} />
 
-        <Route path="/customers/local" element={<DispatchListPage />} />
-        <Route path="/customers/global" element={<ExportDocumentListPage />} />
+        <Route path="/customers/local" element={<LocalCustomersPage />} />
+        <Route path="/customers/global" element={<GlobalCustomersPage />} />
+
         <Route path="/dispatch/local" element={<DispatchListPage />} />
         <Route path="/dispatch/global" element={<DispatchListPage />} />
         <Route path="/dispatch/add" element={<AddDispatchPage />} />

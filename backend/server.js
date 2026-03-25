@@ -6,21 +6,15 @@ require("./config/db");
 const authRoutes = require("./routes/authRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const userRoutes = require("./routes/userRoutes");
-
 const categoryRoutes = require("./routes/categoryRoutes");
-const itemCategoryRoutes = require("./routes/itemCategoryRoutes");
 const itemRoutes = require("./routes/itemRoutes");
 const inventoryRoutes = require("./routes/inventoryRoutes");
-const stockAdjustmentRoutes = require("./routes/stockAdjustmentRoutes");
-
 const supplierRoutes = require("./routes/supplierRoutes");
 const purchaseOrderRoutes = require("./routes/purchaseOrderRoutes");
 const grnRoutes = require("./routes/grnRoutes");
 const returnRoutes = require("./routes/returnRoutes");
 const wastageRoutes = require("./routes/wastageRoutes");
-
 const dispatchRoutes = require("./routes/dispatchRoutes");
-const exportDocumentRoutes = require("./routes/exportDocumentRoutes");
 
 const app = express();
 
@@ -31,21 +25,15 @@ app.use("/uploads", express.static("uploads"));
 app.use("/api/auth", authRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/users", userRoutes);
-
-app.use("/api/categories", categoryRoutes);
-app.use("/api/item-categories", itemCategoryRoutes);
+app.use("/api/items/categories", categoryRoutes);
 app.use("/api/items", itemRoutes);
 app.use("/api/inventory", inventoryRoutes);
-app.use("/api/stock-adjustments", stockAdjustmentRoutes);
-
 app.use("/api/suppliers", supplierRoutes);
 app.use("/api/purchase-orders", purchaseOrderRoutes);
 app.use("/api/grn", grnRoutes);
 app.use("/api/returns", returnRoutes);
 app.use("/api/wastage", wastageRoutes);
-
 app.use("/api/dispatch", dispatchRoutes);
-app.use("/api/export-documents", exportDocumentRoutes);
 
 app.get("/", (req, res) => {
   res.send("Fresh World ERP backend is running");

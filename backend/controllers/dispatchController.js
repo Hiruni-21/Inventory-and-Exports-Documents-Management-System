@@ -9,7 +9,7 @@ const getAllDispatches = (req, res) => {
       d.dispatch_date,
       d.remarks,
       d.created_at,
-      u.name AS created_by_name
+      u.full_name AS created_by_name
     FROM dispatch_records d
     LEFT JOIN users u ON d.created_by = u.id
     ORDER BY d.id DESC
@@ -17,7 +17,11 @@ const getAllDispatches = (req, res) => {
 
   db.query(sql, (err, results) => {
     if (err) {
-      return res.status(500).json({ message: "Database error", error: err.message });
+      console.error("getAllDispatches error:", err);
+      return res.status(500).json({
+        message: "Database error",
+        error: err.message,
+      });
     }
 
     res.json(results);
@@ -29,8 +33,13 @@ const getDispatchById = (req, res) => {
 
   const dispatchSql = `
     SELECT
-      d.*,
-      u.name AS created_by_name
+      d.id,
+      d.dispatch_number,
+      d.client_name,
+      d.dispatch_date,
+      d.remarks,
+      d.created_at,
+      u.full_name AS created_by_name
     FROM dispatch_records d
     LEFT JOIN users u ON d.created_by = u.id
     WHERE d.id = ?
@@ -39,29 +48,41 @@ const getDispatchById = (req, res) => {
   const itemsSql = `
     SELECT
       di.id,
+      di.dispatch_id,
+      di.item_id,
+      di.batch_id,
       di.quantity,
-      i.item_code,
-      i.item_name,
+      i.code AS item_code,
+      i.name AS item_name,
       i.unit,
       ib.batch_code
     FROM dispatch_items di
     JOIN items i ON di.item_id = i.id
     JOIN inventory_batches ib ON di.batch_id = ib.id
     WHERE di.dispatch_id = ?
+    ORDER BY di.id ASC
   `;
 
   db.query(dispatchSql, [id], (err, dispatchResults) => {
     if (err) {
-      return res.status(500).json({ message: "Database error", error: err.message });
+      console.error("getDispatchById error:", err);
+      return res.status(500).json({
+        message: "Database error",
+        error: err.message,
+      });
     }
 
-    if (dispatchResults.length === 0) {
+    if (!dispatchResults.length) {
       return res.status(404).json({ message: "Dispatch not found" });
     }
 
     db.query(itemsSql, [id], (itemErr, itemResults) => {
       if (itemErr) {
-        return res.status(500).json({ message: "Database error", error: itemErr.message });
+        console.error("getDispatchById items error:", itemErr);
+        return res.status(500).json({
+          message: "Database error",
+          error: itemErr.message,
+        });
       }
 
       res.json({
@@ -74,65 +95,92 @@ const getDispatchById = (req, res) => {
 
 const createDispatch = (req, res) => {
   const { client_name, dispatch_date, remarks, items } = req.body;
-  const created_by = req.user.id;
+  const created_by = req.user?.id || null;
 
-  if (!client_name || !dispatch_date || !items || items.length === 0) {
-    return res.status(400).json({ message: "Required fields are missing" });
+  if (!client_name || !dispatch_date || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({
+      message: "Client name, dispatch date, and at least one item are required",
+    });
   }
 
-  const dispatchNumber = `DISP-${Date.now()}`;
+  const cleanedItems = items
+    .map((item) => ({
+      item_id: Number(item.item_id),
+      batch_id: Number(item.batch_id),
+      quantity: Number(item.quantity || 0),
+    }))
+    .filter((item) => item.item_id && item.batch_id && item.quantity > 0);
 
-  const dispatchSql = `
+  if (!cleanedItems.length) {
+    return res.status(400).json({
+      message: "At least one valid dispatch line is required",
+    });
+  }
+
+  const dispatchNumber = `DSP-${Date.now()}`;
+
+  const insertDispatchSql = `
     INSERT INTO dispatch_records
-    (dispatch_number, client_name, dispatch_date, remarks, created_by)
+      (dispatch_number, client_name, dispatch_date, remarks, created_by)
     VALUES (?, ?, ?, ?, ?)
   `;
 
   db.query(
-    dispatchSql,
+    insertDispatchSql,
     [dispatchNumber, client_name, dispatch_date, remarks || null, created_by],
-    (err, result) => {
-      if (err) {
-        return res.status(500).json({ message: "Database error", error: err.message });
+    (dispatchErr, dispatchResult) => {
+      if (dispatchErr) {
+        console.error("createDispatch dispatch insert error:", dispatchErr);
+        return res.status(500).json({
+          message: "Database error",
+          error: dispatchErr.message,
+        });
       }
 
-      const dispatchId = result.insertId;
+      const dispatchId = dispatchResult.insertId;
 
       let processed = 0;
       let failed = false;
 
-      items.forEach((item) => {
-        const getBatchSql = `
-          SELECT available_quantity
+      cleanedItems.forEach((item) => {
+        const batchSql = `
+          SELECT id, item_id, batch_code, available_quantity
           FROM inventory_batches
           WHERE id = ? AND item_id = ?
+          LIMIT 1
         `;
 
-        db.query(getBatchSql, [item.batch_id, item.item_id], (batchErr, batchResults) => {
+        db.query(batchSql, [item.batch_id, item.item_id], (batchErr, batchRows) => {
           if (failed) return;
 
           if (batchErr) {
             failed = true;
-            return res.status(500).json({ message: "Database error", error: batchErr.message });
-          }
-
-          if (batchResults.length === 0) {
-            failed = true;
-            return res.status(404).json({ message: "Inventory batch not found" });
-          }
-
-          const currentQty = parseFloat(batchResults[0].available_quantity);
-          const dispatchQty = parseFloat(item.quantity);
-
-          if (dispatchQty > currentQty) {
-            failed = true;
-            return res.status(400).json({
-              message: `Not enough stock in selected batch for item ID ${item.item_id}`,
+            console.error("createDispatch batch lookup error:", batchErr);
+            return res.status(500).json({
+              message: "Database error",
+              error: batchErr.message,
             });
           }
 
-          const newQty = currentQty - dispatchQty;
-          const newStatus = newQty === 0 ? "Depleted" : "Available";
+          if (!batchRows.length) {
+            failed = true;
+            return res.status(404).json({
+              message: `Selected batch not found for item ${item.item_id}`,
+            });
+          }
+
+          const batch = batchRows[0];
+          const availableQty = Number(batch.available_quantity || 0);
+
+          if (item.quantity > availableQty) {
+            failed = true;
+            return res.status(400).json({
+              message: `Not enough stock in batch ${batch.batch_code}`,
+            });
+          }
+
+          const newQty = availableQty - item.quantity;
+          const newStatus = newQty <= 0 ? "Depleted" : "Available";
 
           const updateBatchSql = `
             UPDATE inventory_batches
@@ -145,29 +193,37 @@ const createDispatch = (req, res) => {
 
             if (updateErr) {
               failed = true;
-              return res.status(500).json({ message: "Database error", error: updateErr.message });
+              console.error("createDispatch batch update error:", updateErr);
+              return res.status(500).json({
+                message: "Database error",
+                error: updateErr.message,
+              });
             }
 
-            const insertDispatchItemSql = `
+            const insertItemSql = `
               INSERT INTO dispatch_items
-              (dispatch_id, item_id, batch_id, quantity)
+                (dispatch_id, item_id, batch_id, quantity)
               VALUES (?, ?, ?, ?)
             `;
 
             db.query(
-              insertDispatchItemSql,
-              [dispatchId, item.item_id, item.batch_id, dispatchQty],
-              (itemErr, itemResult) => {
+              insertItemSql,
+              [dispatchId, item.item_id, item.batch_id, item.quantity],
+              (itemErr) => {
                 if (failed) return;
 
                 if (itemErr) {
                   failed = true;
-                  return res.status(500).json({ message: "Database error", error: itemErr.message });
+                  console.error("createDispatch dispatch item insert error:", itemErr);
+                  return res.status(500).json({
+                    message: "Database error",
+                    error: itemErr.message,
+                  });
                 }
 
                 const movementSql = `
                   INSERT INTO stock_movements
-                  (item_id, movement_type, reference_type, reference_id, quantity, notes)
+                    (item_id, movement_type, reference_type, reference_id, quantity, notes)
                   VALUES (?, 'OUT', 'DISPATCH', ?, ?, ?)
                 `;
 
@@ -176,20 +232,24 @@ const createDispatch = (req, res) => {
                   [
                     item.item_id,
                     dispatchId,
-                    dispatchQty,
-                    `Stock dispatched for ${client_name}`,
+                    item.quantity,
+                    `Local dispatch created for ${client_name}`,
                   ],
                   (movementErr) => {
                     if (failed) return;
 
                     if (movementErr) {
                       failed = true;
-                      return res.status(500).json({ message: "Database error", error: movementErr.message });
+                      console.error("createDispatch stock movement error:", movementErr);
+                      return res.status(500).json({
+                        message: "Database error",
+                        error: movementErr.message,
+                      });
                     }
 
                     processed += 1;
 
-                    if (processed === items.length) {
+                    if (processed === cleanedItems.length) {
                       return res.status(201).json({
                         message: "Dispatch created successfully",
                         dispatchId,
