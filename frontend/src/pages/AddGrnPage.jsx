@@ -56,6 +56,7 @@ const AddGrnPage = () => {
       setSupplierId("");
       setSupplierName("");
       setError("");
+      setSuccess("");
 
       if (!value) return;
 
@@ -66,6 +67,7 @@ const AddGrnPage = () => {
 
         setItems(
           rows.map((item) => ({
+            purchase_order_item_id: item.purchase_order_item_id || null,
             item_id: item.item_id,
             ordered_quantity: Number(item.ordered_quantity || 0),
             delivered_quantity: Number(item.ordered_quantity || 0),
@@ -79,7 +81,7 @@ const AddGrnPage = () => {
         const selectedPo = purchaseOrders.find((po) => String(po.id) === String(value));
         setSupplierName(selectedPo?.supplier_name || "");
       } catch (err) {
-        setError(err.response?.data?.message || "Failed to load PO items");
+        setError(err.response?.data?.error || err.response?.data?.message || "Failed to load PO items");
       } finally {
         setLoadingItems(false);
       }
@@ -104,11 +106,14 @@ const AddGrnPage = () => {
 
     const cleanItems = items
       .map((item) => ({
+        purchase_order_item_id: item.purchase_order_item_id
+          ? Number(item.purchase_order_item_id)
+          : null,
         item_id: Number(item.item_id),
         ordered_quantity: Number(item.ordered_quantity || 0),
         delivered_quantity: Number(item.delivered_quantity || 0),
       }))
-      .filter((item) => item.delivered_quantity > 0);
+      .filter((item) => item.item_id && item.delivered_quantity > 0);
 
     if (!form.purchase_order_id || !supplierId || !form.received_date || cleanItems.length === 0) {
       setError("Purchase order, received date, and at least one delivered line are required");
@@ -130,7 +135,7 @@ const AddGrnPage = () => {
       setSuccess("GRN created successfully");
       setTimeout(() => navigate("/grn"), 800);
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to create GRN");
+      setError(err.response?.data?.error || err.response?.data?.message || "Failed to create GRN");
     } finally {
       setSaving(false);
     }

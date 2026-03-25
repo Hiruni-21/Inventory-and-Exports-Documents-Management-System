@@ -52,8 +52,15 @@ const getGrnById = (req, res) => {
     SELECT
       gi.id,
       gi.item_id,
-      gi.ordered_quantity,
-      gi.delivered_quantity,
+      gi.ordered_qty,
+      gi.received_qty,
+      gi.variance_qty,
+      gi.variance_percent,
+      gi.batch_number,
+      gi.expiry_date,
+      gi.unit_cost,
+      gi.line_total,
+      gi.notes,
       i.name AS item_name,
       i.code AS item_code,
       i.unit
@@ -92,6 +99,7 @@ const getPurchaseOrderItemsForGrn = (req, res) => {
 
   const sql = `
     SELECT
+      poi.id AS purchase_order_item_id,
       poi.item_id,
       poi.quantity AS ordered_quantity,
       i.name AS item_name,
@@ -120,7 +128,6 @@ const createGrn = (req, res) => {
     purchase_order_id,
     supplier_id,
     received_date,
-    received_time,
     remarks,
     items,
   } = req.body;
@@ -145,29 +152,15 @@ const createGrn = (req, res) => {
 
   const grnNumber = `GRN-${Date.now()}`;
 
-  const finalRemarks = [
-    remarks || "",
-    received_time ? `Received Time: ${received_time}` : "",
-  ]
-    .filter(Boolean)
-    .join("\n");
-
   const grnSql = `
     INSERT INTO grn
-      (grn_number, purchase_order_id, supplier_id, received_date, remarks, created_by)
-    VALUES (?, ?, ?, ?, ?, ?)
+      (grn_number, purchase_order_id, supplier_id, received_date, created_by)
+    VALUES (?, ?, ?, ?, ?)
   `;
 
   db.query(
     grnSql,
-    [
-      grnNumber,
-      purchase_order_id,
-      supplier_id,
-      received_date,
-      finalRemarks || null,
-      created_by,
-    ],
+    [grnNumber, purchase_order_id, supplier_id, received_date, created_by],
     (err, result) => {
       if (err) {
         console.error("createGrn error:", err);
@@ -176,47 +169,82 @@ const createGrn = (req, res) => {
 
       const grnId = result.insertId;
 
-      const grnItemValues = validItems.map((item) => [
-        grnId,
-        item.item_id,
-        item.ordered_quantity,
-        item.delivered_quantity,
-      ]);
+      const itemIds = [...new Set(validItems.map((item) => item.item_id))];
 
-      const grnItemSql = `
-        INSERT INTO grn_items
-          (grn_id, item_id, ordered_quantity, delivered_quantity)
-        VALUES ?
-      `;
+      db.query(
+        `SELECT id, unit, COALESCE(unit_cost, 0) AS unit_cost FROM items WHERE id IN (?)`,
+        [itemIds],
+        (itemLookupErr, itemRows) => {
+          if (itemLookupErr) {
+            console.error("createGrn item lookup error:", itemLookupErr);
+            return res.status(500).json({ message: "Database error", error: itemLookupErr.message });
+          }
 
-      db.query(grnItemSql, [grnItemValues], (itemErr) => {
-        if (itemErr) {
-          console.error("createGrn items error:", itemErr);
-          return res.status(500).json({ message: "Database error", error: itemErr.message });
-        }
+          const itemMap = {};
+          (itemRows || []).forEach((row) => {
+            itemMap[row.id] = {
+              unit: row.unit || "",
+              unit_cost: Number(row.unit_cost || 0),
+            };
+          });
 
-        const itemIds = [...new Set(validItems.map((item) => item.item_id))];
+          const grnItemValues = validItems.map((item, index) => {
+            const unitInfo = itemMap[item.item_id] || { unit: "", unit_cost: 0 };
+            const varianceQty = item.delivered_quantity - item.ordered_quantity;
+            const variancePercent =
+              item.ordered_quantity > 0
+                ? (varianceQty / item.ordered_quantity) * 100
+                : 0;
+            const batchNumber = `BATCH-${grnId}-${index + 1}`;
+            const lineTotal = item.delivered_quantity * unitInfo.unit_cost;
 
-        db.query(
-          `SELECT id, unit FROM items WHERE id IN (?)`,
-          [itemIds],
-          (unitErr, itemRows) => {
-            if (unitErr) {
-              console.error("createGrn unit lookup error:", unitErr);
-              return res.status(500).json({ message: "Database error", error: unitErr.message });
+            return [
+              grnId,
+              null, // purchase_order_item_id kept NULL for now because current FK points to po_items, not purchase_order_items
+              item.item_id,
+              item.ordered_quantity,
+              item.delivered_quantity,
+              varianceQty,
+              variancePercent,
+              batchNumber,
+              null, // expiry_date
+              unitInfo.unit_cost,
+              lineTotal,
+              remarks || null,
+            ];
+          });
+
+          const grnItemSql = `
+            INSERT INTO grn_items
+              (
+                grn_id,
+                purchase_order_item_id,
+                item_id,
+                ordered_qty,
+                received_qty,
+                variance_qty,
+                variance_percent,
+                batch_number,
+                expiry_date,
+                unit_cost,
+                line_total,
+                notes
+              )
+            VALUES ?
+          `;
+
+          db.query(grnItemSql, [grnItemValues], (itemErr) => {
+            if (itemErr) {
+              console.error("createGrn items error:", itemErr);
+              return res.status(500).json({ message: "Database error", error: itemErr.message });
             }
-
-            const unitMap = {};
-            (itemRows || []).forEach((row) => {
-              unitMap[row.id] = row.unit || "";
-            });
 
             let processed = 0;
             let failed = false;
 
             validItems.forEach((item, index) => {
+              const unitInfo = itemMap[item.item_id] || { unit: "", unit_cost: 0 };
               const batchCode = `BATCH-${grnId}-${index + 1}`;
-              const unit = unitMap[item.item_id] || "";
 
               const inventorySql = `
                 INSERT INTO inventory_batches
@@ -232,7 +260,7 @@ const createGrn = (req, res) => {
                   batchCode,
                   item.delivered_quantity,
                   item.delivered_quantity,
-                  unit,
+                  unitInfo.unit,
                   received_date,
                 ],
                 (inventoryErr) => {
@@ -300,9 +328,9 @@ const createGrn = (req, res) => {
                 }
               );
             });
-          }
-        );
-      });
+          });
+        }
+      );
     }
   );
 };
