@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import api from "../utils/api";
 
 const statusClassMap = {
@@ -18,6 +18,16 @@ const getBadgeClass = (status) => {
   return statusClassMap[key] || "bg-a";
 };
 
+const getStatusLabel = (status) => {
+  const value = String(status || "pending").toLowerCase();
+  if (value.includes("await") || value.includes("pending")) return "Awaiting Approval";
+  if (value.includes("approved")) return "Approved";
+  if (value.includes("sent")) return "Sent";
+  if (value.includes("closed") || value.includes("received")) return "Closed";
+  if (value.includes("draft")) return "Draft";
+  return status || "Pending";
+};
+
 const fmtDate = (value) => {
   if (!value) return "—";
   const date = new Date(value);
@@ -26,6 +36,8 @@ const fmtDate = (value) => {
 };
 
 const PurchaseOrderListPage = () => {
+  const navigate = useNavigate();
+
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -89,19 +101,43 @@ const PurchaseOrderListPage = () => {
   return (
     <div>
       <div className="fb">
-        <button type="button" className={`ft ${filter === "all" ? "on" : ""}`} onClick={() => setFilter("all")}>
+        <button
+          type="button"
+          className={`ft ${filter === "all" ? "on" : ""}`}
+          onClick={() => setFilter("all")}
+        >
           All ({counts.all})
         </button>
-        <button type="button" className={`ft ${filter === "awaiting" ? "on" : ""}`} onClick={() => setFilter("awaiting")}>
+
+        <button
+          type="button"
+          className={`ft ${filter === "awaiting" ? "on" : ""}`}
+          onClick={() => setFilter("awaiting")}
+        >
           Awaiting Approval ({counts.awaiting})
         </button>
-        <button type="button" className={`ft ${filter === "approved" ? "on" : ""}`} onClick={() => setFilter("approved")}>
+
+        <button
+          type="button"
+          className={`ft ${filter === "approved" ? "on" : ""}`}
+          onClick={() => setFilter("approved")}
+        >
           Approved ({counts.approved})
         </button>
-        <button type="button" className={`ft ${filter === "sent" ? "on" : ""}`} onClick={() => setFilter("sent")}>
+
+        <button
+          type="button"
+          className={`ft ${filter === "sent" ? "on" : ""}`}
+          onClick={() => setFilter("sent")}
+        >
           Sent ({counts.sent})
         </button>
-        <button type="button" className={`ft ${filter === "closed" ? "on" : ""}`} onClick={() => setFilter("closed")}>
+
+        <button
+          type="button"
+          className={`ft ${filter === "closed" ? "on" : ""}`}
+          onClick={() => setFilter("closed")}
+        >
           Closed ({counts.closed})
         </button>
 
@@ -154,18 +190,28 @@ const PurchaseOrderListPage = () => {
                     {po.po_number}
                   </td>
                   <td style={{ fontWeight: 600 }}>{po.supplier_name || "—"}</td>
-                  <td>{fmtDate(po.created_at)}</td>
+                  <td>{fmtDate(po.order_date || po.created_at)}</td>
                   <td>{fmtDate(po.expected_delivery_date)}</td>
                   <td>
                     <span className={`badge ${getBadgeClass(po.status)}`}>
-                      {po.status || "Pending"}
+                      {getStatusLabel(po.status)}
                     </span>
                   </td>
                   <td>{po.created_by_name || "—"}</td>
                   <td>
-                    <Link to={`/purchase-orders/${po.id}`} className="ab" title="View PO">
-                      👁
-                    </Link>
+                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                      <Link to={`/purchase-orders/${po.id}`} className="ab" title="View PO">
+                        👁
+                      </Link>
+                      <button
+                        type="button"
+                        className="ab"
+                        title="Create GRN from this PO"
+                        onClick={() => navigate(`/grn/add?po=${po.id}`)}
+                      >
+                        📥
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))

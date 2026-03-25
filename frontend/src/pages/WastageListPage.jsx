@@ -15,10 +15,7 @@ const WastageListPage = () => {
   useEffect(() => {
     const fetchRecords = async () => {
       try {
-        const token = localStorage.getItem("token");
-        const res = await api.get("/wastage", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await api.get("/wastage");
         setRecords(Array.isArray(res.data) ? res.data : []);
       } catch {
         setError("Failed to load wastage records");
@@ -28,16 +25,26 @@ const WastageListPage = () => {
     fetchRecords();
   }, []);
 
-  const totalQty = useMemo(() => records.reduce((sum, row) => sum + Number(row.quantity || 0), 0), [records]);
+  const totalQty = useMemo(
+    () => records.reduce((sum, row) => sum + Number(row.quantity || 0), 0),
+    [records]
+  );
 
   return (
     <div>
       <div className="ib ib-w">
         <span>🗑</span>
-        <div>Visible wastage quantity total: <strong>{totalQty.toFixed(2)}</strong></div>
+        <div>
+          Visible wastage quantity total: <strong>{totalQty.toFixed(2)}</strong>
+        </div>
       </div>
 
-      {error ? <div className="ib ib-d"><span>⚠️</span><div>{error}</div></div> : null}
+      {error ? (
+        <div className="ib ib-d">
+          <span>⚠️</span>
+          <div>{error}</div>
+        </div>
+      ) : null}
 
       <div className="tw">
         <div className="tw-h">
@@ -61,7 +68,9 @@ const WastageListPage = () => {
               records.map((row) => (
                 <tr key={row.id}>
                   <td>{fmtDateTime(row.created_at)}</td>
-                  <td style={{ fontFamily: "monospace", fontSize: 11, color: "var(--text3)" }}>{row.item_code}</td>
+                  <td style={{ fontFamily: "monospace", fontSize: 11, color: "var(--text3)" }}>
+                    {row.item_code}
+                  </td>
                   <td style={{ fontWeight: 600 }}>{row.item_name}</td>
                   <td>{row.batch_code}</td>
                   <td>{row.quantity}</td>

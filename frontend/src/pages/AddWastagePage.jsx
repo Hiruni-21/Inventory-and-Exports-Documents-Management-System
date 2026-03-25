@@ -45,8 +45,7 @@ const AddWastagePage = () => {
     [batches, form.batch_id]
   );
 
-  const availableQty =
-    selectedBatch?.qty_remaining ?? selectedBatch?.available_quantity ?? "—";
+  const availableQty = selectedBatch?.qty_remaining ?? selectedBatch?.available_quantity ?? "—";
 
   const handleChange = async (e) => {
     const { name, value } = e.target;

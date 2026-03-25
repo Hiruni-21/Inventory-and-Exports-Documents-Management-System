@@ -17,11 +17,9 @@ const ReturnListPage = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const token = localStorage.getItem("token");
-        const headers = { Authorization: `Bearer ${token}` };
         const [returnsRes, wastageRes] = await Promise.all([
-          api.get("/returns", { headers }),
-          api.get("/wastage", { headers }),
+          api.get("/returns"),
+          api.get("/wastage"),
         ]);
 
         setReturnsData(Array.isArray(returnsRes.data) ? returnsRes.data : []);
@@ -40,11 +38,26 @@ const ReturnListPage = () => {
 
   return (
     <div>
-      {error ? <div className="ib ib-d"><span>⚠️</span><div>{error}</div></div> : null}
+      {error ? (
+        <div className="ib ib-d">
+          <span>⚠️</span>
+          <div>{error}</div>
+        </div>
+      ) : null}
 
       <div className="tab-bar">
-        <button className={`tbb ${activeTab === "returns" ? "on" : ""}`} onClick={() => setActiveTab("returns")}>↩️ Returns ({returnsData.length})</button>
-        <button className={`tbb ${activeTab === "wastage" ? "on" : ""}`} onClick={() => setActiveTab("wastage")}>🗑 Wastage Records ({wastageData.length})</button>
+        <button
+          className={`tbb ${activeTab === "returns" ? "on" : ""}`}
+          onClick={() => setActiveTab("returns")}
+        >
+          ↩️ Returns ({returnsData.length})
+        </button>
+        <button
+          className={`tbb ${activeTab === "wastage" ? "on" : ""}`}
+          onClick={() => setActiveTab("wastage")}
+        >
+          🗑 Wastage Records ({wastageData.length})
+        </button>
       </div>
 
       {activeTab === "returns" ? (
@@ -69,7 +82,14 @@ const ReturnListPage = () => {
               {returnsData.length ? (
                 returnsData.map((row) => (
                   <tr key={row.id}>
-                    <td style={{ fontFamily: "monospace", fontSize: 11, fontWeight: 700, color: "var(--d)" }}>
+                    <td
+                      style={{
+                        fontFamily: "monospace",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: "var(--d)",
+                      }}
+                    >
                       RN-{String(row.id).padStart(4, "0")}
                     </td>
                     <td>{row.supplier_name}</td>
@@ -83,7 +103,9 @@ const ReturnListPage = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="8" style={{ textAlign: "center", color: "var(--text3)" }}>No returns found</td>
+                  <td colSpan="8" style={{ textAlign: "center", color: "var(--text3)" }}>
+                    No returns found
+                  </td>
                 </tr>
               )}
             </tbody>
@@ -93,7 +115,10 @@ const ReturnListPage = () => {
         <div>
           <div className="ib ib-w">
             <span>🗑</span>
-            <div>Total wastage quantity recorded so far in this view: <strong>{wastageLossEstimate.toFixed(2)}</strong></div>
+            <div>
+              Total wastage quantity recorded so far in this view:{" "}
+              <strong>{wastageLossEstimate.toFixed(2)}</strong>
+            </div>
           </div>
 
           <div className="tw">
@@ -127,7 +152,9 @@ const ReturnListPage = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="7" style={{ textAlign: "center", color: "var(--text3)" }}>No wastage records found</td>
+                    <td colSpan="7" style={{ textAlign: "center", color: "var(--text3)" }}>
+                      No wastage records found
+                    </td>
                   </tr>
                 )}
               </tbody>

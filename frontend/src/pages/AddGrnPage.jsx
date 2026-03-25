@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../utils/api";
 
 const AddGrnPage = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [supplierId, setSupplierId] = useState("");
@@ -28,7 +29,13 @@ const AddGrnPage = () => {
       setError("");
       try {
         const res = await api.get("/purchase-orders");
-        setPurchaseOrders(Array.isArray(res.data) ? res.data : []);
+        const rows = Array.isArray(res.data) ? res.data : [];
+        setPurchaseOrders(rows);
+
+        const preselectedPo = searchParams.get("po");
+        if (preselectedPo) {
+          setForm((prev) => ({ ...prev, purchase_order_id: String(preselectedPo) }));
+        }
       } catch (err) {
         setError(err.response?.data?.message || "Failed to load purchase orders");
       } finally {
@@ -37,32 +44,18 @@ const AddGrnPage = () => {
     };
 
     fetchPurchaseOrders();
-  }, []);
+  }, [searchParams]);
 
-  const totalVariance = useMemo(() => {
-    return items.reduce(
-      (sum, item) =>
-        sum + (Number(item.delivered_quantity || 0) - Number(item.ordered_quantity || 0)),
-      0
-    );
-  }, [items]);
+  useEffect(() => {
+    if (!form.purchase_order_id) return;
 
-  const handleHeaderChange = async (e) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-
-    if (name === "purchase_order_id") {
-      setItems([]);
-      setSupplierId("");
-      setSupplierName("");
+    const loadPoItems = async () => {
+      setLoadingItems(true);
       setError("");
       setSuccess("");
 
-      if (!value) return;
-
-      setLoadingItems(true);
       try {
-        const res = await api.get(`/grn/po-items/${value}`);
+        const res = await api.get(`/grn/po-items/${form.purchase_order_id}`);
         const rows = Array.isArray(res.data) ? res.data : [];
 
         setItems(
@@ -78,14 +71,40 @@ const AddGrnPage = () => {
         );
 
         setSupplierId(rows?.[0]?.supplier_id || "");
-        const selectedPo = purchaseOrders.find((po) => String(po.id) === String(value));
+        const selectedPo = purchaseOrders.find(
+          (po) => String(po.id) === String(form.purchase_order_id)
+        );
         setSupplierName(selectedPo?.supplier_name || "");
       } catch (err) {
         setError(err.response?.data?.error || err.response?.data?.message || "Failed to load PO items");
       } finally {
         setLoadingItems(false);
       }
+    };
+
+    loadPoItems();
+  }, [form.purchase_order_id, purchaseOrders]);
+
+  const totalVariance = useMemo(() => {
+    return items.reduce(
+      (sum, item) =>
+        sum + (Number(item.delivered_quantity || 0) - Number(item.ordered_quantity || 0)),
+      0
+    );
+  }, [items]);
+
+  const handleHeaderChange = (e) => {
+    const { name, value } = e.target;
+
+    if (name === "purchase_order_id") {
+      setItems([]);
+      setSupplierId("");
+      setSupplierName("");
+      setError("");
+      setSuccess("");
     }
+
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleDeliveredChange = (index, value) => {
@@ -167,6 +186,13 @@ const AddGrnPage = () => {
             </div>
           ) : null}
 
+          {loadingItems ? (
+            <div className="ib ib-i">
+              <span>⏳</span>
+              <div>Loading PO items...</div>
+            </div>
+          ) : null}
+
           {error ? (
             <div className="ib ib-d">
               <span>⚠️</span>
@@ -243,13 +269,6 @@ const AddGrnPage = () => {
               </div>
             </div>
           </div>
-
-          {loadingItems ? (
-            <div className="ib ib-i">
-              <span>⏳</span>
-              <div>Loading PO items...</div>
-            </div>
-          ) : null}
 
           {items.length > 0 ? (
             <div className="fs2">

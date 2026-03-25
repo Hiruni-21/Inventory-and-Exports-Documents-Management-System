@@ -14,7 +14,9 @@ const AddPurchaseOrderPage = () => {
 
   const [suppliers, setSuppliers] = useState([]);
   const [items, setItems] = useState([]);
-  const [poNumber, setPoNumber] = useState(`PO-${new Date().getFullYear()}-${String(Date.now()).slice(-3)}`);
+  const [poNumber] = useState(
+    `PO-${new Date().getFullYear()}-${String(Date.now()).slice(-3)}`
+  );
   const [paymentTerms, setPaymentTerms] = useState("Immediate cash");
   const [priority, setPriority] = useState("Normal");
   const [instructions, setInstructions] = useState("");
@@ -163,13 +165,24 @@ const AddPurchaseOrderPage = () => {
       await api.post("/purchase-orders", {
         supplier_id: Number(form.supplier_id),
         expected_delivery_date: form.expected_delivery_date,
-        remarks: [form.remarks, instructions, internalNotes, `Payment Terms: ${paymentTerms}`, `Priority: ${priority}`, mode === "draft" ? "Saved as Draft" : "Submitted for Approval"]
+        remarks: [
+          form.remarks,
+          instructions,
+          internalNotes,
+          `Payment Terms: ${paymentTerms}`,
+          `Priority: ${priority}`,
+          mode === "draft" ? "Saved as Draft" : "Submitted for Approval",
+        ]
           .filter(Boolean)
           .join("\n"),
         items: cleanItems,
       });
 
-      setSuccess(mode === "draft" ? "Purchase order draft saved successfully" : "Purchase order submitted successfully");
+      setSuccess(
+        mode === "draft"
+          ? "Purchase order draft saved successfully"
+          : "Purchase order submitted successfully"
+      );
       setTimeout(() => navigate("/purchase-orders"), 800);
     } catch (err) {
       setError(err.response?.data?.message || "Failed to create purchase order");
@@ -270,7 +283,11 @@ const AddPurchaseOrderPage = () => {
             <div className="fr">
               <div className="ff">
                 <label className="fl">Payment Terms</label>
-                <select className="fc" value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)}>
+                <select
+                  className="fc"
+                  value={paymentTerms}
+                  onChange={(e) => setPaymentTerms(e.target.value)}
+                >
                   <option>Immediate cash</option>
                   <option>7 days</option>
                   <option>14 days</option>
@@ -444,15 +461,39 @@ const AddPurchaseOrderPage = () => {
 
               <div className="fr">
                 <div>
-                  <div className="sum-r"><span>PO Number</span><span>{poNumber}</span></div>
-                  <div className="sum-r"><span>Supplier</span><span>{suppliers.find((s) => String(s.id) === String(form.supplier_id))?.supplier_name || "—"}</span></div>
-                  <div className="sum-r"><span>Required By</span><span>{form.expected_delivery_date || "—"}</span></div>
-                  <div className="sum-r"><span>Priority</span><span>{priority}</span></div>
+                  <div className="sum-r">
+                    <span>PO Number</span>
+                    <span>{poNumber}</span>
+                  </div>
+                  <div className="sum-r">
+                    <span>Supplier</span>
+                    <span>
+                      {suppliers.find((s) => String(s.id) === String(form.supplier_id))
+                        ?.supplier_name || "—"}
+                    </span>
+                  </div>
+                  <div className="sum-r">
+                    <span>Required By</span>
+                    <span>{form.expected_delivery_date || "—"}</span>
+                  </div>
+                  <div className="sum-r">
+                    <span>Priority</span>
+                    <span>{priority}</span>
+                  </div>
                 </div>
                 <div>
-                  <div className="sum-r"><span>Payment Terms</span><span>{paymentTerms}</span></div>
-                  <div className="sum-r"><span>Line Items</span><span>{validLines.length}</span></div>
-                  <div className="sum-r"><span>Total</span><span>LKR {subtotal.toLocaleString()}</span></div>
+                  <div className="sum-r">
+                    <span>Payment Terms</span>
+                    <span>{paymentTerms}</span>
+                  </div>
+                  <div className="sum-r">
+                    <span>Line Items</span>
+                    <span>{validLines.length}</span>
+                  </div>
+                  <div className="sum-r">
+                    <span>Total</span>
+                    <span>LKR {subtotal.toLocaleString()}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -505,10 +546,20 @@ const AddPurchaseOrderPage = () => {
           </button>
         ) : (
           <>
-            <button type="button" className="btn btn-s" disabled={saving} onClick={() => handleSubmit("draft")}>
+            <button
+              type="button"
+              className="btn btn-s"
+              disabled={saving}
+              onClick={() => handleSubmit("draft")}
+            >
               💾 Save Draft
             </button>
-            <button type="button" className="btn btn-p" disabled={saving} onClick={() => handleSubmit("submit")}>
+            <button
+              type="button"
+              className="btn btn-p"
+              disabled={saving}
+              onClick={() => handleSubmit("submit")}
+            >
               {saving ? "Saving..." : "Submit for Approval →"}
             </button>
           </>
