@@ -39,6 +39,8 @@ import DispatchListPage from "./pages/DispatchListPage";
 import AddDispatchPage from "./pages/AddDispatchPage";
 import DispatchDetailsPage from "./pages/DispatchDetailsPage";
 import DispatchPrintPage from "./pages/DispatchPrintPage";
+import GlobalDispatchListPage from "./pages/GlobalDispatchListPage";
+import AddGlobalDispatchPage from "./pages/AddGlobalDispatchPage";
 
 import ExportDocumentListPage from "./pages/ExportDocumentListPage";
 import AddExportDocumentPage from "./pages/AddExportDocumentPage";
@@ -112,10 +114,12 @@ function App() {
         <Route path="/customers/global" element={<GlobalCustomersPage />} />
 
         <Route path="/dispatch/local" element={<DispatchListPage />} />
-        <Route path="/dispatch/global" element={<DispatchListPage />} />
         <Route path="/dispatch/add" element={<AddDispatchPage />} />
         <Route path="/dispatch/:id" element={<DispatchDetailsPage />} />
         <Route path="/dispatch/print/:id" element={<DispatchPrintPage />} />
+
+        <Route path="/dispatch/global" element={<GlobalDispatchListPage />} />
+        <Route path="/dispatch/global/add" element={<AddGlobalDispatchPage />} />
 
         <Route path="/export-documents" element={<ExportDocumentListPage />} />
         <Route path="/export-documents/add" element={<AddExportDocumentPage />} />
