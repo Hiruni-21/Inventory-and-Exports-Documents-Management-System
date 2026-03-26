@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from "react";
-import { Bell, Search, Truck, Eye, Pencil, X, Download } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { Bell, Search, Truck, Eye, Pencil, X } from "lucide-react";
 
 const initialCustomers = [
   {
@@ -9,7 +9,7 @@ const initialCustomers = [
     group: "Hilton Hotels",
     contact: "Chef Ravi Kumar",
     city: "Colombo 2",
-    deliveryWindow: "05:00-07:00 AM",
+    deliveryWindow: "05:00 – 07:00 AM",
     returnsAllowed: true,
     dispatches: 24,
     email: "chef@hilton.lk",
@@ -25,7 +25,7 @@ const initialCustomers = [
     group: "Cinnamon Hotels",
     contact: "Chef Nilufar",
     city: "Colombo 3",
-    deliveryWindow: "05:30-07:30 AM",
+    deliveryWindow: "05:30 – 07:30 AM",
     returnsAllowed: true,
     dispatches: 18,
     email: "chef@cinnamongrand.lk",
@@ -41,7 +41,7 @@ const initialCustomers = [
     group: "Independent",
     contact: "Chef Sampath",
     city: "Colombo 1",
-    deliveryWindow: "04:30-06:30 AM",
+    deliveryWindow: "04:30 – 06:30 AM",
     returnsAllowed: false,
     dispatches: 12,
     email: "chef@galadari.lk",
@@ -57,7 +57,7 @@ const initialCustomers = [
     group: "Kingsbury",
     contact: "Chef Fernando",
     city: "Colombo 1",
-    deliveryWindow: "05:00-07:00 AM",
+    deliveryWindow: "05:00 – 07:00 AM",
     returnsAllowed: true,
     dispatches: 15,
     email: "chef@kingsbury.lk",
@@ -77,7 +77,7 @@ const emptyForm = {
   phone: "",
   address: "",
   city: "Colombo 1",
-  deliveryWindow: "04:00-06:00 AM",
+  deliveryWindow: "04:00 – 06:00 AM",
   preferredDriver: "",
   returnsAllowed: true,
   notes: "",
@@ -93,6 +93,17 @@ export default function LocalCustomersPage() {
     code: `FW-CLT-${String(initialCustomers.length + 1).padStart(3, "0")}`,
   });
 
+  useEffect(() => {
+    if (!showModal) return;
+
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") setShowModal(false);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showModal]);
+
   const cityOptions = [
     "All Cities",
     "Colombo 1",
@@ -101,19 +112,24 @@ export default function LocalCustomersPage() {
     "Colombo 4",
     "Colombo 5",
     "Colombo 7",
+    "Dehiwala",
+    "Mount Lavinia",
+    "Negombo",
+    "Kandy",
+    "Galle",
+    "Other",
   ];
 
   const filteredCustomers = useMemo(() => {
     return customers.filter((customer) => {
+      const q = search.toLowerCase();
       const matchesSearch =
-        customer.code.toLowerCase().includes(search.toLowerCase()) ||
-        customer.customerName.toLowerCase().includes(search.toLowerCase()) ||
-        customer.group.toLowerCase().includes(search.toLowerCase()) ||
-        customer.contact.toLowerCase().includes(search.toLowerCase());
+        customer.code.toLowerCase().includes(q) ||
+        customer.customerName.toLowerCase().includes(q) ||
+        customer.group.toLowerCase().includes(q) ||
+        customer.contact.toLowerCase().includes(q);
 
-      const matchesCity =
-        cityFilter === "All Cities" ? true : customer.city === cityFilter;
-
+      const matchesCity = cityFilter === "All Cities" || customer.city === cityFilter;
       return matchesSearch && matchesCity;
     });
   }, [customers, search, cityFilter]);
@@ -126,16 +142,11 @@ export default function LocalCustomersPage() {
     setShowModal(true);
   };
 
-  const closeModal = () => {
-    setShowModal(false);
-  };
+  const closeModal = () => setShowModal(false);
 
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setForm((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSaveCustomer = (e) => {
@@ -145,7 +156,7 @@ export default function LocalCustomersPage() {
       id: Date.now(),
       code: form.code,
       customerName: form.customerName,
-      group: form.group,
+      group: form.group || "Independent",
       contact: form.contact,
       city: form.city,
       deliveryWindow: form.deliveryWindow,
@@ -159,7 +170,7 @@ export default function LocalCustomersPage() {
     };
 
     setCustomers((prev) => [...prev, newCustomer]);
-    setShowModal(false);
+    closeModal();
   };
 
   return (
@@ -174,11 +185,9 @@ export default function LocalCustomersPage() {
           <button type="button" className="btn btn-primary" onClick={openAddModal}>
             + Add Local Customer
           </button>
-
           <button type="button" className="btn btn-secondary">
             Export CSV
           </button>
-
           <button type="button" className="icon-btn" aria-label="Notifications">
             <Bell size={20} />
           </button>
@@ -251,11 +260,7 @@ export default function LocalCustomersPage() {
                     <td>{customer.city}</td>
                     <td>{customer.deliveryWindow}</td>
                     <td>
-                      <span
-                        className={
-                          customer.returnsAllowed ? "status-text yes-text" : "status-text no-text"
-                        }
-                      >
+                      <span className={customer.returnsAllowed ? "status-text yes-text" : "status-text no-text"}>
                         {customer.returnsAllowed ? "Yes" : "No"}
                       </span>
                     </td>
@@ -288,8 +293,8 @@ export default function LocalCustomersPage() {
       </div>
 
       {showModal && (
-        <div className="modal-backdrop">
-          <div className="modal-shell modal-lg">
+        <div className="modal-backdrop" onClick={closeModal}>
+          <div className="modal-shell modal-lg" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>🚚 Add Local Customer</h2>
               <button type="button" className="modal-close" onClick={closeModal}>
@@ -316,60 +321,27 @@ export default function LocalCustomersPage() {
 
                 <div className="form-group">
                   <label>CUSTOMER NAME *</label>
-                  <input
-                    type="text"
-                    name="customerName"
-                    placeholder="e.g. Galle Face Hotel"
-                    value={form.customerName}
-                    onChange={handleChange}
-                    required
-                  />
+                  <input type="text" name="customerName" placeholder="e.g. Galle Face Hotel" value={form.customerName} onChange={handleChange} required />
                 </div>
 
                 <div className="form-group">
                   <label>HOTEL / GROUP</label>
-                  <input
-                    type="text"
-                    name="group"
-                    placeholder="e.g. Aitken Spence Hotels"
-                    value={form.group}
-                    onChange={handleChange}
-                  />
+                  <input type="text" name="group" placeholder="e.g. Aitken Spence Hotels" value={form.group} onChange={handleChange} />
                 </div>
 
                 <div className="form-group">
                   <label>CONTACT PERSON *</label>
-                  <input
-                    type="text"
-                    name="contact"
-                    placeholder="e.g. Chef Samantha"
-                    value={form.contact}
-                    onChange={handleChange}
-                    required
-                  />
+                  <input type="text" name="contact" placeholder="e.g. Chef Samantha" value={form.contact} onChange={handleChange} required />
                 </div>
 
                 <div className="form-group">
                   <label>EMAIL</label>
-                  <input
-                    type="email"
-                    name="email"
-                    placeholder="chef@hotel.lk"
-                    value={form.email}
-                    onChange={handleChange}
-                  />
+                  <input type="email" name="email" placeholder="chef@hotel.lk" value={form.email} onChange={handleChange} />
                 </div>
 
                 <div className="form-group">
                   <label>WHATSAPP / MOBILE *</label>
-                  <input
-                    type="text"
-                    name="phone"
-                    placeholder="07XXXXXXX"
-                    value={form.phone}
-                    onChange={handleChange}
-                    required
-                  />
+                  <input type="text" name="phone" placeholder="07XXXXXXX" value={form.phone} onChange={handleChange} required />
                 </div>
               </div>
 
@@ -380,69 +352,42 @@ export default function LocalCustomersPage() {
               <div className="form-grid two-col">
                 <div className="form-group form-group-full">
                   <label>DELIVERY ADDRESS *</label>
-                  <textarea
-                    name="address"
-                    placeholder="Full street address..."
-                    value={form.address}
-                    onChange={handleChange}
-                    rows="3"
-                    required
-                  />
+                  <textarea name="address" placeholder="Full street address..." value={form.address} onChange={handleChange} rows="3" required />
                 </div>
 
                 <div className="form-group">
                   <label>CITY *</label>
                   <select name="city" value={form.city} onChange={handleChange} required>
-                    <option>Colombo 1</option>
-                    <option>Colombo 2</option>
-                    <option>Colombo 3</option>
-                    <option>Colombo 4</option>
-                    <option>Colombo 5</option>
-                    <option>Colombo 7</option>
+                    {cityOptions.filter((x) => x !== "All Cities").map((city) => (
+                      <option key={city}>{city}</option>
+                    ))}
                   </select>
                 </div>
 
                 <div className="form-group">
                   <label>DELIVERY WINDOW *</label>
-                  <select
-                    name="deliveryWindow"
-                    value={form.deliveryWindow}
-                    onChange={handleChange}
-                    required
-                  >
-                    <option>04:00-06:00 AM</option>
-                    <option>05:00-07:00 AM</option>
-                    <option>05:30-07:30 AM</option>
-                    <option>06:00-08:00 AM</option>
+                  <select name="deliveryWindow" value={form.deliveryWindow} onChange={handleChange} required>
+                    <option>04:00 – 06:00 AM</option>
+                    <option>04:30 – 06:30 AM</option>
+                    <option>05:00 – 07:00 AM</option>
+                    <option>05:30 – 07:30 AM</option>
+                    <option>06:00 – 08:00 AM</option>
+                    <option>Custom</option>
                   </select>
                 </div>
 
                 <div className="form-group">
                   <label>PREFERRED DRIVER</label>
-                  <input
-                    type="text"
-                    name="preferredDriver"
-                    placeholder="e.g. Nuwan (optional)"
-                    value={form.preferredDriver}
-                    onChange={handleChange}
-                  />
+                  <input type="text" name="preferredDriver" placeholder="e.g. Nuwan (optional)" value={form.preferredDriver} onChange={handleChange} />
                 </div>
 
                 <div className="form-group">
                   <label>RETURNS ALLOWED?</label>
                   <div className="toggle-row">
-                    <button
-                      type="button"
-                      className={`toggle-btn ${form.returnsAllowed ? "active" : ""}`}
-                      onClick={() => setForm((prev) => ({ ...prev, returnsAllowed: true }))}
-                    >
+                    <button type="button" className={`toggle-btn ${form.returnsAllowed ? "active" : ""}`} onClick={() => setForm((prev) => ({ ...prev, returnsAllowed: true }))}>
                       ✅ Yes — returns accepted
                     </button>
-                    <button
-                      type="button"
-                      className={`toggle-btn ${!form.returnsAllowed ? "active danger" : ""}`}
-                      onClick={() => setForm((prev) => ({ ...prev, returnsAllowed: false }))}
-                    >
+                    <button type="button" className={`toggle-btn ${!form.returnsAllowed ? "active danger" : ""}`} onClick={() => setForm((prev) => ({ ...prev, returnsAllowed: false }))}>
                       ❌ No returns
                     </button>
                   </div>
@@ -450,13 +395,7 @@ export default function LocalCustomersPage() {
 
                 <div className="form-group form-group-full">
                   <label>NOTES</label>
-                  <textarea
-                    name="notes"
-                    placeholder="Special instructions, gate codes, contact on arrival..."
-                    value={form.notes}
-                    onChange={handleChange}
-                    rows="3"
-                  />
+                  <textarea name="notes" placeholder="Special instructions, gate codes, contact on arrival..." value={form.notes} onChange={handleChange} rows="3" />
                 </div>
               </div>
 

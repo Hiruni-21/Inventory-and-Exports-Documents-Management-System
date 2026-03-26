@@ -243,8 +243,8 @@ const pageMeta = {
   "/customers/global": { title: "Global Customers", subtitle: "Export customers" },
   "/dispatch/local": { title: "Local Dispatch", subtitle: "Lorry deliveries · Sri Lanka" },
   "/dispatch/global": { title: "Global Dispatch", subtitle: "Export shipments · Maldives & international" },
-  "/dispatch/add": { title: "Dispatch", subtitle: "Create dispatch" },
-  "/dispatch/global/add": { title: "Dispatch", subtitle: "Create dispatch" },  "/export-documents": { title: "Export Documents", subtitle: "Shipment document sets" },
+  "/dispatch/global/add": { title: "Dispatch", subtitle: "Create dispatch" },
+  "/export-documents": { title: "Export Documents", subtitle: "Shipment document sets" },  "/dispatch/global/add": { title: "Dispatch", subtitle: "Create dispatch" },  "/export-documents": { title: "Export Documents", subtitle: "Shipment document sets" },
   "/export-documents/add": { title: "Export Documents", subtitle: "Create export document" },
   "/reports": { title: "Reports & Analytics", subtitle: "Operational reporting" },
   "/users": { title: "Users & Roles", subtitle: "System access management" },
@@ -265,9 +265,9 @@ const actionButtons = {
     { label: "🗑 Record Wastage", to: "/wastage/add", className: "btn btn-p btn-sm" },
   ],
   "/wastage": [{ label: "🗑 Record Wastage", to: "/wastage/add", className: "btn btn-p btn-sm" }],
-  "/dispatch/local": [{ label: "+ New Dispatch", to: "/dispatch/add", className: "btn btn-p btn-sm" }],
-  "/dispatch/global": [{ label: "+ New Shipment", to: "/dispatch/global/add", className: "btn btn-p btn-sm" }],  "/export-documents": [{ label: "+ Create Export Document", to: "/export-documents/add", className: "btn btn-p btn-sm" }],
-  "/users": [{ label: "+ Add User", to: "/users/add", className: "btn btn-p btn-sm", disabled: true }],
+  "/dispatch/local": [{ label: "+ New Dispatch", to: "/dispatch/local/add", className: "btn btn-p btn-sm" }],
+  "/dispatch/global": [{ label: "+ New Shipment", to: "/dispatch/global/add", className: "btn btn-p btn-sm" }],
+  "/export-documents": [{ label: "+ Create Export Document", to: "/export-documents/add", className: "btn btn-p btn-sm" }],  "/users": [{ label: "+ Add User", to: "/users/add", className: "btn btn-p btn-sm", disabled: true }],
 };
 
 const normalizeRole = (role) => {

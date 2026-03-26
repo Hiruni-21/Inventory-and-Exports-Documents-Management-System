@@ -114,7 +114,7 @@ function App() {
         <Route path="/customers/global" element={<GlobalCustomersPage />} />
 
         <Route path="/dispatch/local" element={<DispatchListPage />} />
-        <Route path="/dispatch/add" element={<AddDispatchPage />} />
+        <Route path="/dispatch/local/add" element={<AddDispatchPage />} />
         <Route path="/dispatch/:id" element={<DispatchDetailsPage />} />
         <Route path="/dispatch/print/:id" element={<DispatchPrintPage />} />
 

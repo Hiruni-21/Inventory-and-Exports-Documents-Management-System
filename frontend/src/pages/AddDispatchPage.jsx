@@ -6,6 +6,13 @@ const emptyLine = {
   item_id: "",
   batch_id: "",
   quantity: "",
+  packaging: "",
+};
+
+const emptyDocs = {
+  delivery_note: true,
+  local_invoice: false,
+  goods_dispatch_note: false,
 };
 
 const AddDispatchPage = () => {
@@ -17,7 +24,11 @@ const AddDispatchPage = () => {
   const [form, setForm] = useState({
     client_name: "",
     dispatch_date: "",
+    driver: "",
+    vehicle_no: "",
+    delivery_window: "",
     remarks: "",
+    docs: emptyDocs,
   });
   const [items, setItems] = useState([{ ...emptyLine }]);
 
@@ -70,7 +81,18 @@ const AddDispatchPage = () => {
   }, [inventory]);
 
   const handleFormChange = (e) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleDocToggle = (name) => {
+    setForm((prev) => ({
+      ...prev,
+      docs: {
+        ...prev.docs,
+        [name]: !prev.docs[name],
+      },
+    }));
   };
 
   const handleItemChange = async (index, field, value) => {
@@ -102,10 +124,7 @@ const AddDispatchPage = () => {
   };
 
   const removeItemRow = (index) => {
-    setItems((prev) => {
-      if (prev.length === 1) return prev;
-      return prev.filter((_, i) => i !== index);
-    });
+    setItems((prev) => (prev.length === 1 ? prev : prev.filter((_, i) => i !== index)));
   };
 
   const totalWeight = useMemo(() => {
@@ -126,7 +145,7 @@ const AddDispatchPage = () => {
       .filter((row) => row.item_id && row.batch_id && row.quantity > 0);
 
     if (!form.client_name || !form.dispatch_date || cleanItems.length === 0) {
-      setError("Client name, dispatch date, and at least one item row are required");
+      setError("Customer, dispatch date, and at least one item row are required");
       return;
     }
 
@@ -136,7 +155,13 @@ const AddDispatchPage = () => {
       await api.post("/dispatch", {
         client_name: form.client_name,
         dispatch_date: form.dispatch_date,
-        remarks: form.remarks,
+        remarks: [
+          form.remarks,
+          form.driver ? `Driver: ${form.driver}` : "",
+          form.vehicle_no ? `Vehicle: ${form.vehicle_no}` : "",
+          form.delivery_window ? `Window: ${form.delivery_window}` : "",
+          `Docs: DN=${form.docs.delivery_note ? "Y" : "N"}, INV=${form.docs.local_invoice ? "Y" : "N"}, GDN=${form.docs.goods_dispatch_note ? "Y" : "N"}`
+        ].filter(Boolean).join(" | "),
         items: cleanItems,
       });
 
@@ -152,7 +177,7 @@ const AddDispatchPage = () => {
   return (
     <div className="md md-xl" style={{ maxWidth: "100%", display: "flex" }}>
       <div className="md-h">
-        <h3>🚚 Create Local Dispatch</h3>
+        <h3>🚚 New Local Dispatch</h3>
         <button type="button" className="md-x" onClick={() => navigate("/dispatch/local")}>
           ✕
         </button>
@@ -161,10 +186,10 @@ const AddDispatchPage = () => {
       <form onSubmit={handleSubmit}>
         <div className="md-b">
           <div className="ib ib-s">
-            <span>📦</span>
+            <span>📍</span>
             <div>
-              Select exact available batches. Stock will be deducted immediately after dispatch is
-              created.
+              Stock deducted when marked Delivered. FEFO batch applied. Delivery Note
+              auto-generated. Returns possible.
             </div>
           </div>
 
@@ -189,67 +214,84 @@ const AddDispatchPage = () => {
             </div>
           ) : null}
 
-          <div className="fs2">
-            <div className="fst">Dispatch Header</div>
-
-            <div className="fr">
-              <div className="ff">
-                <label className="fl">Customer</label>
-                <input
-                  className="fc"
-                  name="client_name"
-                  value={form.client_name}
-                  onChange={handleFormChange}
-                  placeholder="Cinnamon Grand"
-                />
-              </div>
-
-              <div className="ff">
-                <label className="fl">Dispatch Date</label>
-                <input
-                  className="fc"
-                  type="date"
-                  name="dispatch_date"
-                  value={form.dispatch_date}
-                  onChange={handleFormChange}
-                />
-              </div>
+          <div className="fr">
+            <div className="ff">
+              <label className="fl">Customer *</label>
+              <input
+                className="fc"
+                name="client_name"
+                value={form.client_name}
+                onChange={handleFormChange}
+                placeholder="Colombo Hilton — Colombo 2"
+              />
             </div>
 
             <div className="ff">
-              <label className="fl">Remarks</label>
-              <textarea
+              <label className="fl">Dispatch Date *</label>
+              <input
                 className="fc"
-                name="remarks"
-                value={form.remarks}
+                type="date"
+                name="dispatch_date"
+                value={form.dispatch_date}
                 onChange={handleFormChange}
-                placeholder="Delivery notes..."
+              />
+            </div>
+          </div>
+
+          <div className="fr3">
+            <div className="ff">
+              <label className="fl">Driver</label>
+              <input
+                className="fc"
+                name="driver"
+                value={form.driver}
+                onChange={handleFormChange}
+                placeholder="e.g. Nuwan"
+              />
+            </div>
+
+            <div className="ff">
+              <label className="fl">Vehicle No.</label>
+              <input
+                className="fc"
+                name="vehicle_no"
+                value={form.vehicle_no}
+                onChange={handleFormChange}
+                placeholder="WP CAS-XXXX"
+              />
+            </div>
+
+            <div className="ff">
+              <label className="fl">Delivery Window</label>
+              <input
+                className="fc"
+                name="delivery_window"
+                value={form.delivery_window}
+                onChange={handleFormChange}
+                placeholder="05:00 – 07:00 AM"
               />
             </div>
           </div>
 
           <div className="fs2">
-            <div className="fst">Dispatch Items</div>
+            <div className="fst">Items — FEFO Auto-Selected</div>
 
             <table className="it">
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>Item</th>
-                  <th>Batch</th>
-                  <th>Quantity</th>
-                  <th>Unit</th>
+                  <th>ITEM</th>
+                  <th>BATCH (FEFO)</th>
+                  <th>QTY</th>
+                  <th>PACKAGING</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((row, index) => {
                   const itemInfo = inventoryLookup[String(row.item_id)];
-                  const unit = itemInfo?.unit || "";
 
                   return (
                     <tr key={index}>
-                      <td>{index + 1}</td>
                       <td>
                         <select
                           value={row.item_id}
@@ -258,11 +300,12 @@ const AddDispatchPage = () => {
                           <option value="">Select item</option>
                           {inventory.map((item) => (
                             <option key={item.item_id} value={item.item_id}>
-                              {(item.item_name || item.name)} ({item.item_code || item.code})
+                              {item.item_name || item.name}
                             </option>
                           ))}
                         </select>
                       </td>
+
                       <td>
                         <select
                           value={row.batch_id}
@@ -271,12 +314,13 @@ const AddDispatchPage = () => {
                           <option value="">Select batch</option>
                           {(batchOptions[index] || []).map((batch) => (
                             <option key={batch.id} value={batch.id}>
-                              {(batch.batch_code || batch.batch_number)} - Available:{" "}
-                              {batch.available_quantity || batch.qty_remaining} {batch.unit || ""}
+                              {(batch.batch_code || batch.batch_number)} ({batch.available_quantity || batch.qty_remaining || 0}
+                              {batch.unit ? ` ${batch.unit}` : ""})
                             </option>
                           ))}
                         </select>
                       </td>
+
                       <td>
                         <input
                           type="number"
@@ -286,7 +330,15 @@ const AddDispatchPage = () => {
                           onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
                         />
                       </td>
-                      <td>{unit || "—"}</td>
+
+                      <td>
+                        <input
+                          value={row.packaging}
+                          onChange={(e) => handleItemChange(index, "packaging", e.target.value)}
+                          placeholder="Cardboard Box"
+                        />
+                      </td>
+
                       <td>
                         <button type="button" className="ab d" onClick={() => removeItemRow(index)}>
                           ✕
@@ -299,16 +351,52 @@ const AddDispatchPage = () => {
             </table>
 
             <button type="button" className="add-r" onClick={addItemRow}>
-              + Add Line Item
+              + Add Item
             </button>
           </div>
 
-          <div className="ib ib-i">
-            <span>🚚</span>
-            <div>
-              Estimated total dispatch quantity in this document:{" "}
-              <strong>{totalWeight.toFixed(2)}</strong>
+          <div className="fs2">
+            <div className="fst">Documents To Generate</div>
+
+            <div style={{ display: "grid", gap: 10 }}>
+              <label className="ck">
+                <input
+                  type="checkbox"
+                  checked={form.docs.delivery_note}
+                  onChange={() => handleDocToggle("delivery_note")}
+                />
+                <span>Delivery Note (DN)</span>
+              </label>
+
+              <label className="ck">
+                <input
+                  type="checkbox"
+                  checked={form.docs.local_invoice}
+                  onChange={() => handleDocToggle("local_invoice")}
+                />
+                <span>Local Invoice</span>
+              </label>
+
+              <label className="ck">
+                <input
+                  type="checkbox"
+                  checked={form.docs.goods_dispatch_note}
+                  onChange={() => handleDocToggle("goods_dispatch_note")}
+                />
+                <span>Goods Dispatch Note</span>
+              </label>
             </div>
+          </div>
+
+          <div className="ff">
+            <label className="fl">Remarks</label>
+            <textarea
+              className="fc"
+              name="remarks"
+              value={form.remarks}
+              onChange={handleFormChange}
+              placeholder="Delivery notes..."
+            />
           </div>
         </div>
 
@@ -317,7 +405,7 @@ const AddDispatchPage = () => {
             Cancel
           </button>
           <button type="submit" className="btn btn-p" disabled={saving}>
-            {saving ? "Saving..." : "Save Dispatch"}
+            {saving ? "Saving..." : "Create Dispatch + Print DN"}
           </button>
         </div>
       </form>

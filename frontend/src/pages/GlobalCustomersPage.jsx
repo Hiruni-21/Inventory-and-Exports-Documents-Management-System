@@ -1,69 +1,50 @@
-import React, { useMemo, useState } from "react";
-import { Bell, Search, Truck, Eye, Pencil, X, Download } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { Bell, Search, Plane, Eye, Pencil, X } from "lucide-react";
 
 const initialCustomers = [
   {
     id: 1,
-    code: "FW-CLT-001",
-    customerName: "Colombo Hilton",
-    group: "Hilton Hotels",
-    contact: "Chef Ravi Kumar",
-    city: "Colombo 2",
-    deliveryWindow: "05:00-07:00 AM",
-    returnsAllowed: true,
-    dispatches: 24,
-    email: "chef@hilton.lk",
-    phone: "0771234567",
-    address: "Colombo 2, Sri Lanka",
-    preferredDriver: "Nuwan",
+    code: "FW-EXP-001",
+    customerName: "Four Seasons Kuda Huraa",
+    group: "Four Seasons",
+    contact: "Chef Ibrahim",
+    location: "Maldives",
+    airline: "SriLankan Airlines",
+    incoterms: "CIF",
+    shipments: 14,
+    email: "chef@fourseasons.mv",
+    phone: "+9607001111",
+    address: "Kuda Huraa, Maldives",
     notes: "",
   },
   {
     id: 2,
-    code: "FW-CLT-002",
-    customerName: "Cinnamon Grand",
-    group: "Cinnamon Hotels",
-    contact: "Chef Nilufar",
-    city: "Colombo 3",
-    deliveryWindow: "05:30-07:30 AM",
-    returnsAllowed: true,
-    dispatches: 18,
-    email: "chef@cinnamongrand.lk",
-    phone: "0771111111",
-    address: "Colombo 3, Sri Lanka",
-    preferredDriver: "",
+    code: "FW-EXP-002",
+    customerName: "Hilton Maldives Amingiri",
+    group: "Hilton",
+    contact: "Chef Raheem",
+    location: "Maldives",
+    airline: "SriLankan Airlines",
+    incoterms: "DAP",
+    shipments: 10,
+    email: "chef@hilton.mv",
+    phone: "+9607002222",
+    address: "Amingiri, Maldives",
     notes: "",
   },
   {
     id: 3,
-    code: "FW-CLT-003",
-    customerName: "Galadari Hotel",
-    group: "Independent",
-    contact: "Chef Sampath",
-    city: "Colombo 1",
-    deliveryWindow: "04:30-06:30 AM",
-    returnsAllowed: false,
-    dispatches: 12,
-    email: "chef@galadari.lk",
-    phone: "0772222222",
-    address: "Colombo 1, Sri Lanka",
-    preferredDriver: "",
-    notes: "",
-  },
-  {
-    id: 4,
-    code: "FW-CLT-004",
-    customerName: "Kingsbury Hotel",
-    group: "Kingsbury",
-    contact: "Chef Fernando",
-    city: "Colombo 1",
-    deliveryWindow: "05:00-07:00 AM",
-    returnsAllowed: true,
-    dispatches: 15,
-    email: "chef@kingsbury.lk",
-    phone: "0773333333",
-    address: "Colombo 1, Sri Lanka",
-    preferredDriver: "",
+    code: "FW-EXP-003",
+    customerName: "Waldorf Astoria Ithaafushi",
+    group: "Hilton Luxury",
+    contact: "Chef Adam",
+    location: "Maldives",
+    airline: "Qatar Airways",
+    incoterms: "FOB",
+    shipments: 8,
+    email: "chef@waldorf.mv",
+    phone: "+9607003333",
+    address: "Ithaafushi, Maldives",
     notes: "",
   },
 ];
@@ -76,66 +57,61 @@ const emptyForm = {
   email: "",
   phone: "",
   address: "",
-  city: "Colombo 1",
-  deliveryWindow: "04:00-06:00 AM",
-  preferredDriver: "",
-  returnsAllowed: true,
+  location: "Maldives",
+  airline: "SriLankan Airlines",
+  incoterms: "CIF",
   notes: "",
 };
 
-export default function LocalCustomersPage() {
+export default function GlobalCustomersPage() {
   const [customers, setCustomers] = useState(initialCustomers);
   const [search, setSearch] = useState("");
-  const [cityFilter, setCityFilter] = useState("All Cities");
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({
     ...emptyForm,
-    code: `FW-CLT-${String(initialCustomers.length + 1).padStart(3, "0")}`,
+    code: `FW-EXP-${String(initialCustomers.length + 1).padStart(3, "0")}`,
   });
 
-  const cityOptions = [
-    "All Cities",
-    "Colombo 1",
-    "Colombo 2",
-    "Colombo 3",
-    "Colombo 4",
-    "Colombo 5",
-    "Colombo 7",
-  ];
+  useEffect(() => {
+    if (!showModal) return;
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") setShowModal(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showModal]);
 
   const filteredCustomers = useMemo(() => {
-    return customers.filter((customer) => {
-      const matchesSearch =
-        customer.code.toLowerCase().includes(search.toLowerCase()) ||
-        customer.customerName.toLowerCase().includes(search.toLowerCase()) ||
-        customer.group.toLowerCase().includes(search.toLowerCase()) ||
-        customer.contact.toLowerCase().includes(search.toLowerCase());
-
-      const matchesCity =
-        cityFilter === "All Cities" ? true : customer.city === cityFilter;
-
-      return matchesSearch && matchesCity;
-    });
-  }, [customers, search, cityFilter]);
+    const q = search.toLowerCase();
+    return customers.filter((customer) =>
+      [
+        customer.code,
+        customer.customerName,
+        customer.group,
+        customer.contact,
+        customer.location,
+        customer.airline,
+        customer.incoterms,
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(q)
+    );
+  }, [customers, search]);
 
   const openAddModal = () => {
     setForm({
       ...emptyForm,
-      code: `FW-CLT-${String(customers.length + 1).padStart(3, "0")}`,
+      code: `FW-EXP-${String(customers.length + 1).padStart(3, "0")}`,
     });
     setShowModal(true);
   };
 
-  const closeModal = () => {
-    setShowModal(false);
-  };
+  const closeModal = () => setShowModal(false);
 
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setForm((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSaveCustomer = (e) => {
@@ -145,51 +121,48 @@ export default function LocalCustomersPage() {
       id: Date.now(),
       code: form.code,
       customerName: form.customerName,
-      group: form.group,
+      group: form.group || "Independent",
       contact: form.contact,
-      city: form.city,
-      deliveryWindow: form.deliveryWindow,
-      returnsAllowed: form.returnsAllowed,
-      dispatches: 0,
+      location: form.location,
+      airline: form.airline,
+      incoterms: form.incoterms,
+      shipments: 0,
       email: form.email,
       phone: form.phone,
       address: form.address,
-      preferredDriver: form.preferredDriver,
       notes: form.notes,
     };
 
     setCustomers((prev) => [...prev, newCustomer]);
-    setShowModal(false);
+    closeModal();
   };
 
   return (
     <div className="page-shell">
       <div className="page-head">
         <div>
-          <h1 className="page-title">Local Customers</h1>
-          <p className="page-subtitle">Sri Lanka — {filteredCustomers.length} customers</p>
+          <h1 className="page-title">Global Customers</h1>
+          <p className="page-subtitle">Export customers</p>
         </div>
 
         <div className="page-actions">
           <button type="button" className="btn btn-primary" onClick={openAddModal}>
-            + Add Local Customer
+            + Add Global Customer
           </button>
-
           <button type="button" className="btn btn-secondary">
             Export CSV
           </button>
-
           <button type="button" className="icon-btn" aria-label="Notifications">
             <Bell size={20} />
           </button>
         </div>
       </div>
 
-      <div className="notice-banner notice-success">
-        <Truck size={16} />
+      <div className="notice-banner notice-warning">
+        <Plane size={16} />
         <span>
-          Local customers receive lorry deliveries within Sri Lanka. Delivery Note
-          auto-generated. Stock deducted on Delivered status. Returns possible.
+          Global customers are used for export shipments. Airline, incoterms and shipment
+          planning apply. No returns after export departure.
         </span>
       </div>
 
@@ -199,29 +172,17 @@ export default function LocalCustomersPage() {
             <Search size={16} />
             <input
               type="text"
-              placeholder="Search local customers..."
+              placeholder="Search global customers..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-
-          <select
-            className="filter-select"
-            value={cityFilter}
-            onChange={(e) => setCityFilter(e.target.value)}
-          >
-            {cityOptions.map((city) => (
-              <option key={city} value={city}>
-                {city}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
 
       <div className="content-card">
         <div className="card-header-row">
-          <h3>🚚 Local Customers — Sri Lanka</h3>
+          <h3>✈️ Global Customers — Export</h3>
           <span className="count-pill">{filteredCustomers.length} customers</span>
         </div>
 
@@ -233,10 +194,10 @@ export default function LocalCustomersPage() {
                 <th>CUSTOMER NAME</th>
                 <th>GROUP</th>
                 <th>CONTACT</th>
-                <th>CITY</th>
-                <th>DELIVERY WINDOW</th>
-                <th>RETURNS?</th>
-                <th>DISPATCHES</th>
+                <th>LOCATION</th>
+                <th>AIRLINE</th>
+                <th>INCOTERMS</th>
+                <th>SHIPMENTS</th>
                 <th>ACTIONS</th>
               </tr>
             </thead>
@@ -248,25 +209,17 @@ export default function LocalCustomersPage() {
                     <td className="strong-cell">{customer.customerName}</td>
                     <td>{customer.group}</td>
                     <td>{customer.contact}</td>
-                    <td>{customer.city}</td>
-                    <td>{customer.deliveryWindow}</td>
-                    <td>
-                      <span
-                        className={
-                          customer.returnsAllowed ? "status-text yes-text" : "status-text no-text"
-                        }
-                      >
-                        {customer.returnsAllowed ? "Yes" : "No"}
-                      </span>
-                    </td>
-                    <td>{customer.dispatches}</td>
+                    <td>{customer.location}</td>
+                    <td><span className="badge bg-a">{customer.airline}</span></td>
+                    <td><span className="badge bg-x">{customer.incoterms}</span></td>
+                    <td>{customer.shipments}</td>
                     <td>
                       <div className="table-actions">
                         <button type="button" className="table-icon-btn" title="View">
                           <Eye size={15} />
                         </button>
                         <button type="button" className="table-icon-btn" title="Dispatch">
-                          <Truck size={15} />
+                          <Plane size={15} />
                         </button>
                         <button type="button" className="table-icon-btn" title="Edit">
                           <Pencil size={15} />
@@ -278,7 +231,7 @@ export default function LocalCustomersPage() {
               ) : (
                 <tr>
                   <td colSpan="9" className="empty-row">
-                    No local customers found
+                    No global customers found
                   </td>
                 </tr>
               )}
@@ -288,21 +241,20 @@ export default function LocalCustomersPage() {
       </div>
 
       {showModal && (
-        <div className="modal-backdrop">
-          <div className="modal-shell modal-lg">
+        <div className="modal-backdrop" onClick={closeModal}>
+          <div className="modal-shell modal-lg" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>🚚 Add Local Customer</h2>
+              <h2>✈️ Add Global Customer</h2>
               <button type="button" className="modal-close" onClick={closeModal}>
                 <X size={20} />
               </button>
             </div>
 
             <form onSubmit={handleSaveCustomer}>
-              <div className="notice-banner notice-success notice-inside-modal">
-                <Truck size={16} />
+              <div className="notice-banner notice-warning notice-inside-modal">
+                <Plane size={16} />
                 <span>
-                  Local customers receive lorry deliveries within Sri Lanka. A Delivery
-                  Note is auto-generated for every dispatch.
+                  Export customers require airline and incoterm planning for global dispatch.
                 </span>
               </div>
 
@@ -316,147 +268,61 @@ export default function LocalCustomersPage() {
 
                 <div className="form-group">
                   <label>CUSTOMER NAME *</label>
-                  <input
-                    type="text"
-                    name="customerName"
-                    placeholder="e.g. Galle Face Hotel"
-                    value={form.customerName}
-                    onChange={handleChange}
-                    required
-                  />
+                  <input type="text" name="customerName" value={form.customerName} onChange={handleChange} required />
                 </div>
 
                 <div className="form-group">
                   <label>HOTEL / GROUP</label>
-                  <input
-                    type="text"
-                    name="group"
-                    placeholder="e.g. Aitken Spence Hotels"
-                    value={form.group}
-                    onChange={handleChange}
-                  />
+                  <input type="text" name="group" value={form.group} onChange={handleChange} />
                 </div>
 
                 <div className="form-group">
                   <label>CONTACT PERSON *</label>
-                  <input
-                    type="text"
-                    name="contact"
-                    placeholder="e.g. Chef Samantha"
-                    value={form.contact}
-                    onChange={handleChange}
-                    required
-                  />
+                  <input type="text" name="contact" value={form.contact} onChange={handleChange} required />
                 </div>
 
                 <div className="form-group">
                   <label>EMAIL</label>
-                  <input
-                    type="email"
-                    name="email"
-                    placeholder="chef@hotel.lk"
-                    value={form.email}
-                    onChange={handleChange}
-                  />
+                  <input type="email" name="email" value={form.email} onChange={handleChange} />
                 </div>
 
                 <div className="form-group">
                   <label>WHATSAPP / MOBILE *</label>
-                  <input
-                    type="text"
-                    name="phone"
-                    placeholder="07XXXXXXX"
-                    value={form.phone}
-                    onChange={handleChange}
-                    required
-                  />
+                  <input type="text" name="phone" value={form.phone} onChange={handleChange} required />
                 </div>
-              </div>
 
-              <div className="modal-divider" />
-
-              <div className="modal-section-title">DELIVERY INFORMATION</div>
-
-              <div className="form-grid two-col">
                 <div className="form-group form-group-full">
-                  <label>DELIVERY ADDRESS *</label>
-                  <textarea
-                    name="address"
-                    placeholder="Full street address..."
-                    value={form.address}
-                    onChange={handleChange}
-                    rows="3"
-                    required
-                  />
+                  <label>LOCATION *</label>
+                  <input type="text" name="location" value={form.location} onChange={handleChange} required />
                 </div>
 
                 <div className="form-group">
-                  <label>CITY *</label>
-                  <select name="city" value={form.city} onChange={handleChange} required>
-                    <option>Colombo 1</option>
-                    <option>Colombo 2</option>
-                    <option>Colombo 3</option>
-                    <option>Colombo 4</option>
-                    <option>Colombo 5</option>
-                    <option>Colombo 7</option>
+                  <label>PREFERRED AIRLINE *</label>
+                  <select name="airline" value={form.airline} onChange={handleChange} required>
+                    <option>SriLankan Airlines</option>
+                    <option>Qatar Airways</option>
+                    <option>Emirates</option>
+                    <option>Manta Air</option>
                   </select>
                 </div>
 
                 <div className="form-group">
-                  <label>DELIVERY WINDOW *</label>
-                  <select
-                    name="deliveryWindow"
-                    value={form.deliveryWindow}
-                    onChange={handleChange}
-                    required
-                  >
-                    <option>04:00-06:00 AM</option>
-                    <option>05:00-07:00 AM</option>
-                    <option>05:30-07:30 AM</option>
-                    <option>06:00-08:00 AM</option>
+                  <label>INCOTERMS *</label>
+                  <select name="incoterms" value={form.incoterms} onChange={handleChange} required>
+                    <option>CIF</option>
+                    <option>DAP</option>
+                    <option>FOB</option>
                   </select>
                 </div>
 
-                <div className="form-group">
-                  <label>PREFERRED DRIVER</label>
-                  <input
-                    type="text"
-                    name="preferredDriver"
-                    placeholder="e.g. Nuwan (optional)"
-                    value={form.preferredDriver}
-                    onChange={handleChange}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>RETURNS ALLOWED?</label>
-                  <div className="toggle-row">
-                    <button
-                      type="button"
-                      className={`toggle-btn ${form.returnsAllowed ? "active" : ""}`}
-                      onClick={() => setForm((prev) => ({ ...prev, returnsAllowed: true }))}
-                    >
-                      ✅ Yes — returns accepted
-                    </button>
-                    <button
-                      type="button"
-                      className={`toggle-btn ${!form.returnsAllowed ? "active danger" : ""}`}
-                      onClick={() => setForm((prev) => ({ ...prev, returnsAllowed: false }))}
-                    >
-                      ❌ No returns
-                    </button>
-                  </div>
+                <div className="form-group form-group-full">
+                  <label>DELIVERY / SHIPMENT ADDRESS *</label>
+                  <textarea name="address" value={form.address} onChange={handleChange} rows="3" required />
                 </div>
 
                 <div className="form-group form-group-full">
                   <label>NOTES</label>
-                  <textarea
-                    name="notes"
-                    placeholder="Special instructions, gate codes, contact on arrival..."
-                    value={form.notes}
-                    onChange={handleChange}
-                    rows="3"
-                  />
+                  <textarea name="notes" value={form.notes} onChange={handleChange} rows="3" />
                 </div>
               </div>
 
