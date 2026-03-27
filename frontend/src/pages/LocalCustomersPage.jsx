@@ -90,6 +90,8 @@ export default function LocalCustomersPage() {
   const [search, setSearch] = useState("");
   const [cityFilter, setCityFilter] = useState("All Cities");
   const [showModal, setShowModal] = useState(false);
+  const [showDispatchModal, setShowDispatchModal] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [form, setForm] = useState({
     ...emptyForm,
     code: `FW-CLT-${String(initialCustomers.length + 1).padStart(3, "0")}`,
@@ -175,19 +177,20 @@ export default function LocalCustomersPage() {
     closeModal();
   };
 
-  const handleRowOpen = (customer) => {
-    navigate(`/customers/local/${customer.id}`);
-  };
-
+  const handleRowOpen = () => {};
   const handleNewDispatch = (e, customer) => {
-    e.stopPropagation();
-    navigate(`/dispatch/local/add?customer=${encodeURIComponent(customer.customerName)}`);
-  };
-
+  e.stopPropagation();
+  setSelectedCustomer(customer);
+  setShowDispatchModal(true);
+};
   const handleEdit = (e) => {
     e.stopPropagation();
     setShowModal(true);
   };
+  const closeDispatchModal = () => {
+  setShowDispatchModal(false);
+  setSelectedCustomer(null);
+};
 
   return (
     <div className="page-shell">
@@ -251,9 +254,7 @@ export default function LocalCustomersPage() {
                 filteredCustomers.map((customer) => (
                   <tr
                     key={customer.id}
-                    className="row-clickable"
-                    onClick={() => handleRowOpen(customer)}
-                    style={{ cursor: "pointer" }}
+                    
                   >
                     <td className="code-cell">{customer.code}</td>
                     <td className="strong-cell">{customer.customerName}</td>
@@ -431,6 +432,130 @@ export default function LocalCustomersPage() {
           </div>
         </div>
       )}
+      {showDispatchModal && selectedCustomer && (
+  <div className="modal-backdrop" onClick={closeDispatchModal}>
+    <div className="modal-shell modal-lg" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-header">
+        <h2>🚚 New Local Dispatch</h2>
+        <button type="button" className="modal-close" onClick={closeDispatchModal}>
+          <X size={20} />
+        </button>
+      </div>
+
+      <div className="notice-banner notice-success notice-inside-modal">
+        <Truck size={16} />
+        <span>
+          Stock deducted when marked Delivered. FEFO batch applied. Delivery Note
+          auto-generated. Returns possible.
+        </span>
+      </div>
+
+      <div style={{ padding: "20px 24px 0" }}>
+        <div className="form-grid two-col">
+          <div className="form-group">
+            <label>CUSTOMER *</label>
+            <input value={`${selectedCustomer.customerName} — ${selectedCustomer.city}`} readOnly />
+          </div>
+
+          <div className="form-group">
+            <label>DISPATCH DATE *</label>
+            <input type="date" />
+          </div>
+
+          <div className="form-group">
+            <label>DRIVER</label>
+            <input placeholder="e.g. Nuwan" />
+          </div>
+
+          <div className="form-group">
+            <label>VEHICLE NO.</label>
+            <input placeholder="WP CAS-XXXX" />
+          </div>
+
+          <div className="form-group">
+            <label>DELIVERY WINDOW</label>
+            <input value={selectedCustomer.deliveryWindow} readOnly />
+          </div>
+        </div>
+
+        <div className="modal-section-title" style={{ marginTop: 18 }}>
+          ITEMS — FEFO AUTO-SELECTED
+        </div>
+
+        <table className="it">
+          <thead>
+            <tr>
+              <th>ITEM</th>
+              <th>BATCH (FEFO)</th>
+              <th>QTY</th>
+              <th>PACKAGING</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <select>
+                  <option>Dragon Fruit (Red)</option>
+                </select>
+              </td>
+              <td>
+                <select>
+                  <option>BT-089 (18kg, exp 2d)</option>
+                </select>
+              </td>
+              <td>
+                <input type="number" defaultValue="10" />
+              </td>
+              <td>
+                <select>
+                  <option>Cardboard Box</option>
+                </select>
+              </td>
+              <td>
+                <button type="button" className="ab d">✕</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <button type="button" className="add-r" style={{ marginTop: 12 }}>
+          + Add Item
+        </button>
+
+        <div className="modal-section-title" style={{ marginTop: 18 }}>
+          DOCUMENTS TO GENERATE
+        </div>
+
+        <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
+          <label className="ck">
+            <input type="checkbox" defaultChecked />
+            <span>Delivery Note (DN)</span>
+          </label>
+
+          <label className="ck">
+            <input type="checkbox" />
+            <span>Local Invoice</span>
+          </label>
+
+          <label className="ck">
+            <input type="checkbox" />
+            <span>Goods Dispatch Note</span>
+          </label>
+        </div>
+      </div>
+
+      <div className="modal-footer">
+        <button type="button" className="btn btn-secondary" onClick={closeDispatchModal}>
+          Cancel
+        </button>
+        <button type="button" className="btn btn-primary">
+          Create Dispatch + Print DN
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 }

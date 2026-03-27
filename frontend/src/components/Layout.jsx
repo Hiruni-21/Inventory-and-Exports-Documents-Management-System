@@ -239,12 +239,14 @@ const pageMeta = {
   "/returns/add": { title: "Returns & Wastage", subtitle: "Record return" },
   "/wastage": { title: "Returns & Wastage", subtitle: "Wastage records" },
   "/wastage/add": { title: "Returns & Wastage", subtitle: "Record wastage" },
-  "/customers/local": { title: "Local Customers", subtitle: "Sri Lanka customers" },
-  "/customers/global": { title: "Global Customers", subtitle: "Export customers" },
+  "/customers/local": { title: "Local Customers", subtitle: "Sri Lanka — 4 customers" },
+  "/customers/global": { title: "Global Customers", subtitle: "Export customers" },  
   "/dispatch/local": { title: "Local Dispatch", subtitle: "Lorry deliveries · Sri Lanka" },
   "/dispatch/global": { title: "Global Dispatch", subtitle: "Export shipments · Maldives & international" },
   "/dispatch/global/add": { title: "Dispatch", subtitle: "Create dispatch" },
-  "/export-documents": { title: "Export Documents", subtitle: "Shipment document sets" },  "/dispatch/global/add": { title: "Dispatch", subtitle: "Create dispatch" },  "/export-documents": { title: "Export Documents", subtitle: "Shipment document sets" },
+  "/export-documents": { title: "Export Documents", subtitle: "Shipment document sets" },  
+  "/dispatch/global/add": { title: "Dispatch", subtitle: "Create dispatch" },  
+  "/export-documents": { title: "Export Documents", subtitle: "Shipment document sets" },
   "/export-documents/add": { title: "Export Documents", subtitle: "Create export document" },
   "/reports": { title: "Reports & Analytics", subtitle: "Operational reporting" },
   "/users": { title: "Users & Roles", subtitle: "System access management" },
@@ -267,7 +269,17 @@ const actionButtons = {
   "/wastage": [{ label: "🗑 Record Wastage", to: "/wastage/add", className: "btn btn-p btn-sm" }],
   "/dispatch/local": [{ label: "+ New Dispatch", to: "/dispatch/local/add", className: "btn btn-p btn-sm" }],
   "/dispatch/global": [{ label: "+ New Shipment", to: "/dispatch/global/add", className: "btn btn-p btn-sm" }],
-  "/export-documents": [{ label: "+ Create Export Document", to: "/export-documents/add", className: "btn btn-p btn-sm" }],  "/users": [{ label: "+ Add User", to: "/users/add", className: "btn btn-p btn-sm", disabled: true }],
+  "/export-documents": [{ label: "+ Create Export Document", to: "/export-documents/add", className: "btn btn-p btn-sm" }],  
+  "/users": [{ label: "+ Add User", to: "/users/add", className: "btn btn-p btn-sm", disabled: true }],
+
+  "/customers/local": [
+    { label: "+ Add Customer", to: "/customers/local", className: "btn btn-p btn-sm", action: "openLocalCustomerModal" },
+    { label: "Export CSV", to: "#", className: "btn btn-s btn-sm", action: "exportLocalCustomers" },
+  ],
+  "/customers/global": [
+    { label: "+ Add Customer", to: "/customers/global", className: "btn btn-p btn-sm", action: "openGlobalCustomerModal" },
+    { label: "Export CSV", to: "#", className: "btn btn-s btn-sm", action: "exportGlobalCustomers" },
+],
 };
 
 const normalizeRole = (role) => {
