@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Bell, Search, Plane, Eye, Pencil, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Search, Plane, Eye, Pencil, X } from "lucide-react";
 
 const initialCustomers = [
   {
@@ -64,6 +65,7 @@ const emptyForm = {
 };
 
 export default function GlobalCustomersPage() {
+  const navigate = useNavigate();
   const [customers, setCustomers] = useState(initialCustomers);
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
@@ -137,27 +139,22 @@ export default function GlobalCustomersPage() {
     closeModal();
   };
 
+  const handleRowOpen = (customer) => {
+    navigate(`/customers/global/${customer.id}`);
+  };
+
+  const handleNewShipment = (e, customer) => {
+    e.stopPropagation();
+    navigate(`/dispatch/global/add?customer=${encodeURIComponent(customer.customerName)}`);
+  };
+
+  const handleEdit = (e) => {
+    e.stopPropagation();
+    setShowModal(true);
+  };
+
   return (
     <div className="page-shell">
-      <div className="page-head">
-        <div>
-          <h1 className="page-title">Global Customers</h1>
-          <p className="page-subtitle">Export customers</p>
-        </div>
-
-        <div className="page-actions">
-          <button type="button" className="btn btn-primary" onClick={openAddModal}>
-            + Add Global Customer
-          </button>
-          <button type="button" className="btn btn-secondary">
-            Export CSV
-          </button>
-          <button type="button" className="icon-btn" aria-label="Notifications">
-            <Bell size={20} />
-          </button>
-        </div>
-      </div>
-
       <div className="notice-banner notice-warning">
         <Plane size={16} />
         <span>
@@ -204,7 +201,12 @@ export default function GlobalCustomersPage() {
             <tbody>
               {filteredCustomers.length > 0 ? (
                 filteredCustomers.map((customer) => (
-                  <tr key={customer.id}>
+                  <tr
+                    key={customer.id}
+                    className="row-clickable"
+                    onClick={() => handleRowOpen(customer)}
+                    style={{ cursor: "pointer" }}
+                  >
                     <td className="code-cell">{customer.code}</td>
                     <td className="strong-cell">{customer.customerName}</td>
                     <td>{customer.group}</td>
@@ -215,13 +217,31 @@ export default function GlobalCustomersPage() {
                     <td>{customer.shipments}</td>
                     <td>
                       <div className="table-actions">
-                        <button type="button" className="table-icon-btn" title="View">
+                        <button
+                          type="button"
+                          className="table-icon-btn"
+                          title="View details"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRowOpen(customer);
+                          }}
+                        >
                           <Eye size={15} />
                         </button>
-                        <button type="button" className="table-icon-btn" title="Dispatch">
+                        <button
+                          type="button"
+                          className="table-icon-btn"
+                          title="New shipment"
+                          onClick={(e) => handleNewShipment(e, customer)}
+                        >
                           <Plane size={15} />
                         </button>
-                        <button type="button" className="table-icon-btn" title="Edit">
+                        <button
+                          type="button"
+                          className="table-icon-btn"
+                          title="Edit"
+                          onClick={handleEdit}
+                        >
                           <Pencil size={15} />
                         </button>
                       </div>

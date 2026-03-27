@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Bell, Search, Truck, Eye, Pencil, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Search, Truck, Eye, Pencil, X } from "lucide-react";
 
 const initialCustomers = [
   {
@@ -84,6 +85,7 @@ const emptyForm = {
 };
 
 export default function LocalCustomersPage() {
+  const navigate = useNavigate();
   const [customers, setCustomers] = useState(initialCustomers);
   const [search, setSearch] = useState("");
   const [cityFilter, setCityFilter] = useState("All Cities");
@@ -173,27 +175,22 @@ export default function LocalCustomersPage() {
     closeModal();
   };
 
+  const handleRowOpen = (customer) => {
+    navigate(`/customers/local/${customer.id}`);
+  };
+
+  const handleNewDispatch = (e, customer) => {
+    e.stopPropagation();
+    navigate(`/dispatch/local/add?customer=${encodeURIComponent(customer.customerName)}`);
+  };
+
+  const handleEdit = (e) => {
+    e.stopPropagation();
+    setShowModal(true);
+  };
+
   return (
     <div className="page-shell">
-      <div className="page-head">
-        <div>
-          <h1 className="page-title">Local Customers</h1>
-          <p className="page-subtitle">Sri Lanka — {filteredCustomers.length} customers</p>
-        </div>
-
-        <div className="page-actions">
-          <button type="button" className="btn btn-primary" onClick={openAddModal}>
-            + Add Local Customer
-          </button>
-          <button type="button" className="btn btn-secondary">
-            Export CSV
-          </button>
-          <button type="button" className="icon-btn" aria-label="Notifications">
-            <Bell size={20} />
-          </button>
-        </div>
-      </div>
-
       <div className="notice-banner notice-success">
         <Truck size={16} />
         <span>
@@ -252,7 +249,12 @@ export default function LocalCustomersPage() {
             <tbody>
               {filteredCustomers.length > 0 ? (
                 filteredCustomers.map((customer) => (
-                  <tr key={customer.id}>
+                  <tr
+                    key={customer.id}
+                    className="row-clickable"
+                    onClick={() => handleRowOpen(customer)}
+                    style={{ cursor: "pointer" }}
+                  >
                     <td className="code-cell">{customer.code}</td>
                     <td className="strong-cell">{customer.customerName}</td>
                     <td>{customer.group}</td>
@@ -267,13 +269,31 @@ export default function LocalCustomersPage() {
                     <td>{customer.dispatches}</td>
                     <td>
                       <div className="table-actions">
-                        <button type="button" className="table-icon-btn" title="View">
+                        <button
+                          type="button"
+                          className="table-icon-btn"
+                          title="View details"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRowOpen(customer);
+                          }}
+                        >
                           <Eye size={15} />
                         </button>
-                        <button type="button" className="table-icon-btn" title="Dispatch">
+                        <button
+                          type="button"
+                          className="table-icon-btn"
+                          title="New dispatch"
+                          onClick={(e) => handleNewDispatch(e, customer)}
+                        >
                           <Truck size={15} />
                         </button>
-                        <button type="button" className="table-icon-btn" title="Edit">
+                        <button
+                          type="button"
+                          className="table-icon-btn"
+                          title="Edit"
+                          onClick={handleEdit}
+                        >
                           <Pencil size={15} />
                         </button>
                       </div>
