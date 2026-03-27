@@ -852,19 +852,44 @@ textarea.fc{height:78px;padding:10px 12px;resize:vertical}
   font-size: 14px !important;
   color: var(--g900) !important;
 }
-/* --- Local Dispatch modal alignment polish --- */
+
+.it {
+  table-layout: fixed;
+}
+
+.add-r {
+  height: 40px !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+
+.ck span {
+  display: inline-block !important;
+  line-height: 1.4 !important;
+}
+/* ===== Final Local Dispatch modal polish ===== */
 
 .modal-shell.modal-lg {
   width: min(860px, 90vw) !important;
   max-width: 860px !important;
 }
 
-.modal-header h2 {
-  font-size: 17px !important;
+.modal-header {
+  padding: 16px 24px !important;
 }
 
-.form-group label,
+.modal-header h2 {
+  font-size: 17px !important;
+  line-height: 1.2 !important;
+}
+
 .modal-section-title {
+  font-size: 11px !important;
+  letter-spacing: 0.06em !important;
+  padding: 16px 24px 10px !important;
+}
+
+.form-group label {
   font-size: 11px !important;
   letter-spacing: 0.06em !important;
 }
@@ -877,18 +902,26 @@ textarea.fc{height:78px;padding:10px 12px;resize:vertical}
   border-radius: 12px !important;
 }
 
-/* items table a bit cleaner and aligned */
+.form-grid {
+  gap: 14px !important;
+  padding: 0 24px 18px !important;
+}
+
+/* items table */
 .it {
-  table-layout: fixed;
+  width: 100% !important;
+  table-layout: fixed !important;
+  border-collapse: collapse !important;
 }
 
 .it th {
   font-size: 10px !important;
-  padding: 7px 10px !important;
+  padding: 8px 10px !important;
+  vertical-align: middle !important;
 }
 
 .it td {
-  padding: 7px 10px !important;
+  padding: 8px 10px !important;
   vertical-align: middle !important;
 }
 
@@ -896,48 +929,51 @@ textarea.fc{height:78px;padding:10px 12px;resize:vertical}
 .it select {
   height: 34px !important;
   font-size: 13px !important;
+  padding: 0 10px !important;
+  border-radius: 10px !important;
 }
 
-/* add item button */
 .add-r {
   height: 40px !important;
   font-size: 12px !important;
   font-weight: 700 !important;
+  margin-top: 8px !important;
 }
 
-/* documents section spacing */
+/* documents section */
 .ck {
   display: flex !important;
   align-items: center !important;
-  gap: 10px !important;   /* this creates space between checkbox and text */
+  gap: 12px !important;
+  margin: 0 0 10px 0 !important;
   font-size: 14px !important;
+  line-height: 1.4 !important;
   color: var(--g900) !important;
-  margin-bottom: 10px !important;
 }
 
 .ck input[type="checkbox"] {
   width: 16px !important;
   height: 16px !important;
-  accent-color: var(--g600) !important;
-  flex-shrink: 0 !important;
   margin: 0 !important;
+  flex-shrink: 0 !important;
+  accent-color: var(--g600) !important;
 }
 
 .ck span {
   display: inline-block !important;
+  margin: 0 !important;
   line-height: 1.4 !important;
 }
 
-/* if your modal uses plain checkbox rows without .ck */
-.ck-l li {
-  display: flex !important;
-  align-items: center !important;
+/* footer buttons */
+.modal-footer {
+  padding: 16px 24px 22px !important;
   gap: 10px !important;
 }
 
-.ck-l li input[type="checkbox"] {
-  width: 16px !important;
-  height: 16px !important;
-  accent-color: var(--g600) !important;
-  margin: 0 !important;
+.modal-footer .btn {
+  height: 34px !important;
+  padding: 0 14px !important;
+  font-size: 12px !important;
+  border-radius: 10px !important;
 }
