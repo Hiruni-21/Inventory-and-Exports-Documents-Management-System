@@ -315,7 +315,7 @@ export default function LocalCustomersPage() {
 
       {showModal && (
         <div className="modal-backdrop" onClick={closeModal}>
-          <div className="modal-shell modal-lg" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-shell modal-lg customer-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>🚚 Add Local Customer</h2>
               <button type="button" className="modal-close" onClick={closeModal}>
@@ -332,7 +332,7 @@ export default function LocalCustomersPage() {
                 </span>
               </div>
 
-              <div className="modal-section-title">CUSTOMER DETAILS</div>
+              <div className="customer-section-title">Customer Details</div>
 
               <div className="form-grid two-col">
                 <div className="form-group">
@@ -368,7 +368,7 @@ export default function LocalCustomersPage() {
 
               <div className="modal-divider" />
 
-              <div className="modal-section-title">DELIVERY INFORMATION</div>
+              <div className="customer-section-title">Delivery Information</div>
 
               <div className="form-grid two-col">
                 <div className="form-group form-group-full">
@@ -434,7 +434,7 @@ export default function LocalCustomersPage() {
       )}
       {showDispatchModal && selectedCustomer && (
   <div className="modal-backdrop" onClick={closeDispatchModal}>
-    <div className="modal-shell modal-lg" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-shell modal-lg customer-modal" onClick={(e) => e.stopPropagation()}>
       <div className="modal-header">
         <h2>🚚 New Local Dispatch</h2>
         <button type="button" className="modal-close" onClick={closeDispatchModal}>
@@ -450,8 +450,8 @@ export default function LocalCustomersPage() {
         </span>
       </div>
 
-      <div style={{ padding: "20px 24px 0" }}>
-        <div className="form-grid two-col">
+<div className="dispatch-modal-body">        
+  <div className="form-grid two-col">
           <div className="form-group">
             <label>CUSTOMER *</label>
             <input value={`${selectedCustomer.customerName} — ${selectedCustomer.city}`} readOnly />
@@ -523,11 +523,12 @@ export default function LocalCustomersPage() {
           + Add Item
         </button>
 
+        <div className="documents-wrap">
         <div className="modal-section-title" style={{ marginTop: 18 }}>
           DOCUMENTS TO GENERATE
         </div>
 
-        <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
+        <div style={{ display: "grid", gap: 10 }}>
           <label className="ck">
             <input type="checkbox" defaultChecked />
             <span>Delivery Note (DN)</span>
@@ -543,6 +544,7 @@ export default function LocalCustomersPage() {
             <span>Goods Dispatch Note</span>
           </label>
         </div>
+        </div>
       </div>
 
       <div className="modal-footer">
@@ -553,6 +555,7 @@ export default function LocalCustomersPage() {
           Create Dispatch + Print DN
         </button>
       </div>
+      
     </div>
   </div>
 )}
