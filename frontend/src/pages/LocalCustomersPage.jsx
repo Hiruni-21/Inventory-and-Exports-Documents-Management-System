@@ -603,7 +603,7 @@ const handleCreateDispatch = () => {
 <div className="details-panel-footer">
   <button
     type="button"
-    className="btn btn-primary details-panel-btn-main"
+    className="btn btn-primary details-panel-btn-main new-dispatch-btn"
     onClick={() => {
       closeDetailsPanel();
       handleNewDispatch({ stopPropagation: () => {} }, selectedCustomer);

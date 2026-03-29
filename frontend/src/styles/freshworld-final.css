@@ -1450,3 +1450,13 @@ textarea.fc{height:78px;padding:10px 12px;resize:vertical}
   color: #fff;
   border-color: #c84b2f;
 }
+.new-dispatch-btn {
+  background: var(--g700) !important;
+  border-color: var(--g700) !important;
+  color: #fff !important;
+}
+
+.new-dispatch-btn:hover {
+  background: var(--g600) !important;
+  border-color: var(--g600) !important;
+}
