@@ -15,6 +15,8 @@ const grnRoutes = require("./routes/grnRoutes");
 const returnRoutes = require("./routes/returnRoutes");
 const wastageRoutes = require("./routes/wastageRoutes");
 const dispatchRoutes = require("./routes/dispatchRoutes");
+const globalDispatchRoutes = require("./routes/globalDispatchRoutes");
+const exportDocumentRoutes = require("./routes/exportDocumentRoutes");
 
 const app = express();
 
@@ -34,6 +36,8 @@ app.use("/api/grn", grnRoutes);
 app.use("/api/returns", returnRoutes);
 app.use("/api/wastage", wastageRoutes);
 app.use("/api/dispatch", dispatchRoutes);
+app.use("/api/dispatch/global", globalDispatchRoutes);
+app.use("/api/export-docs", exportDocumentRoutes);
 
 app.get("/", (req, res) => {
   res.send("Fresh World ERP backend is running");

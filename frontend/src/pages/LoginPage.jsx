@@ -39,6 +39,8 @@ const LoginPage = () => {
 
   const [selectedRole, setSelectedRole] = useState("manager");
   const [showPassword, setShowPassword] = useState(false);
+  const [modalMode, setModalMode] = useState("add"); // "add" | "edit"
+const [editingCustomerId, setEditingCustomerId] = useState(null);
   const [form, setForm] = useState({
     email: roleConfig.manager.email,
     password: roleConfig.manager.password,

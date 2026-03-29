@@ -65,7 +65,7 @@ const DispatchListPage = () => {
           />
         </div>
 
-        <Link to="/dispatch/add" className="btn btn-p btn-sm">
+        <Link to="/dispatch/local/add" className="btn btn-p btn-sm">
           + Create Dispatch
         </Link>
       </div>

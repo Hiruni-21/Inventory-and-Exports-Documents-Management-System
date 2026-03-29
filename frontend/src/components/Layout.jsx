@@ -272,12 +272,20 @@ const actionButtons = {
   "/export-documents": [{ label: "+ Create Export Document", to: "/export-documents/add", className: "btn btn-p btn-sm" }],  
   "/users": [{ label: "+ Add User", to: "/users/add", className: "btn btn-p btn-sm", disabled: true }],
 
-  "/customers/local": [
-    { label: "+ Add Customer", to: "/customers/local", className: "btn btn-p btn-sm", action: "openLocalCustomerModal" },
-    { label: "Export CSV", to: "#", className: "btn btn-s btn-sm", action: "exportLocalCustomers" },
-  ],
+"/customers/local": [
+  {
+    label: "+ Add Customer",
+    eventName: "fw-open-local-customer-modal",
+    className: "btn btn-p btn-sm",
+  },
+  {
+    label: "Export CSV",
+    className: "btn btn-s btn-sm",
+    disabled: true,
+  },
+],  
   "/customers/global": [
-    { label: "+ Add Customer", to: "/customers/global", className: "btn btn-p btn-sm", action: "openGlobalCustomerModal" },
+    { label: "+ Add Customer", to: "/customers/global/add", className: "btn btn-p btn-sm", action: "openGlobalCustomerModal" },
     { label: "Export CSV", to: "#", className: "btn btn-s btn-sm", action: "exportGlobalCustomers" },
 ],
 };
@@ -383,17 +391,26 @@ const Layout = () => {
             </div>
 
             <div className="tb-a">
-              {pageActions.map((action) =>
-                action.disabled ? (
-                  <button key={action.label} className={action.className} disabled title="Not wired yet">
-                    {action.label}
-                  </button>
-                ) : (
-                  <Link key={action.label} to={action.to} className={action.className}>
-                    {action.label}
-                  </Link>
-                )
-              )}
+    {pageActions.map((action) =>
+  action.disabled ? (
+    <button key={action.label} className={action.className} disabled title="Not wired yet">
+      {action.label}
+    </button>
+  ) : action.eventName ? (
+    <button
+      key={action.label}
+      type="button"
+      className={action.className}
+      onClick={() => window.dispatchEvent(new CustomEvent(action.eventName))}
+    >
+      {action.label}
+    </button>
+  ) : (
+    <Link key={action.label} to={action.to} className={action.className}>
+      {action.label}
+    </Link>
+  )
+)}
 
               <button className="nb-btn" onClick={() => setNotifOpen((p) => !p)}>
                 <svg viewBox="0 0 24 24">

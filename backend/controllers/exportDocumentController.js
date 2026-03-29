@@ -4,29 +4,31 @@ const getAllExportDocuments = (req, res) => {
   const sql = `
     SELECT
       ed.id,
-      ed.document_type,
-      ed.document_number,
-      ed.document_date,
-      ed.consignee_name,
-      ed.destination_country,
-      ed.port_of_loading,
-      ed.port_of_discharge,
-      ed.remarks,
-      ed.created_at,
-      dr.dispatch_number,
-      dr.client_name,
-      u.name AS created_by_name
+      ed.global_dispatch_id,
+      ed.commercial_invoice_status,
+      ed.packing_list_status,
+      ed.phytosanitary_certificate_status,
+      ed.airway_bill_status,
+      ed.certificate_of_origin_status,
+      ed.health_certificate_status,
+      ed.insurance_certificate_status,
+      ed.all_cleared,
+      ed.notes,
+      ed.updated_at,
+      gd.dispatch_number,
+      gd.status AS dispatch_status,
+      c.name AS customer_name
     FROM export_documents ed
-    JOIN dispatch_records dr ON ed.dispatch_id = dr.id
-    LEFT JOIN users u ON ed.created_by = u.id
+    JOIN global_dispatch gd ON gd.id = ed.global_dispatch_id
+    JOIN customers c ON c.id = gd.customer_id
     ORDER BY ed.id DESC
   `;
 
   db.query(sql, (err, results) => {
     if (err) {
+      console.error("getAllExportDocuments error:", err);
       return res.status(500).json({ message: "Database error", error: err.message });
     }
-
     res.json(results);
   });
 };
@@ -34,198 +36,180 @@ const getAllExportDocuments = (req, res) => {
 const getExportDocumentById = (req, res) => {
   const { id } = req.params;
 
-  const exportDocSql = `
+  const sql = `
     SELECT
       ed.*,
-      dr.dispatch_number,
-      dr.client_name,
-      u.name AS created_by_name
+      gd.dispatch_number,
+      gd.dispatch_date,
+      gd.departure_date,
+      gd.status AS dispatch_status,
+      gd.incoterm,
+      c.name AS customer_name,
+      c.customer_code
     FROM export_documents ed
-    JOIN dispatch_records dr ON ed.dispatch_id = dr.id
-    LEFT JOIN users u ON ed.created_by = u.id
+    JOIN global_dispatch gd ON gd.id = ed.global_dispatch_id
+    JOIN customers c ON c.id = gd.customer_id
     WHERE ed.id = ?
+    LIMIT 1
   `;
 
-  const itemsSql = `
-    SELECT
-      edi.id,
-      edi.quantity,
-      edi.unit_price,
-      edi.total_value,
-      i.item_code,
-      i.item_name,
-      i.unit,
-      ib.batch_code
-    FROM export_document_items edi
-    JOIN items i ON edi.item_id = i.id
-    JOIN inventory_batches ib ON edi.batch_id = ib.id
-    WHERE edi.export_document_id = ?
-  `;
-
-  db.query(exportDocSql, [id], (err, docResults) => {
+  db.query(sql, [id], (err, rows) => {
     if (err) {
+      console.error("getExportDocumentById error:", err);
       return res.status(500).json({ message: "Database error", error: err.message });
     }
 
-    if (docResults.length === 0) {
-      return res.status(404).json({ message: "Export document not found" });
+    if (!rows.length) {
+      return res.status(404).json({ message: "Export document record not found" });
     }
 
-    db.query(itemsSql, [id], (itemErr, itemResults) => {
-      if (itemErr) {
-        return res.status(500).json({ message: "Database error", error: itemErr.message });
-      }
-
-      res.json({
-        ...docResults[0],
-        items: itemResults,
-      });
-    });
+    res.json(rows[0]);
   });
 };
 
-const getDispatchListForExport = (req, res) => {
-  const sql = `
-    SELECT
-      id,
-      dispatch_number,
-      client_name,
-      dispatch_date
-    FROM dispatch_records
-    ORDER BY id DESC
-  `;
+const updateExportDocuments = (req, res) => {
+  const { id } = req.params;
+  const userId = req.user?.id || null;
 
-  db.query(sql, (err, results) => {
-    if (err) {
-      return res.status(500).json({ message: "Database error", error: err.message });
-    }
-
-    res.json(results);
-  });
-};
-
-const getDispatchItemsForExport = (req, res) => {
-  const { dispatchId } = req.params;
-
-  const sql = `
-    SELECT
-      di.item_id,
-      di.batch_id,
-      di.quantity,
-      i.item_code,
-      i.item_name,
-      i.unit,
-      ib.batch_code
-    FROM dispatch_items di
-    JOIN items i ON di.item_id = i.id
-    JOIN inventory_batches ib ON di.batch_id = ib.id
-    WHERE di.dispatch_id = ?
-  `;
-
-  db.query(sql, [dispatchId], (err, results) => {
-    if (err) {
-      return res.status(500).json({ message: "Database error", error: err.message });
-    }
-
-    res.json(results);
-  });
-};
-
-const createExportDocument = (req, res) => {
   const {
-    dispatch_id,
-    document_type,
-    document_date,
-    consignee_name,
-    destination_country,
-    port_of_loading,
-    port_of_discharge,
-    remarks,
-    items,
+    commercial_invoice_status,
+    packing_list_status,
+    phytosanitary_certificate_status,
+    airway_bill_status,
+    certificate_of_origin_status,
+    health_certificate_status,
+    insurance_certificate_status,
+    notes,
   } = req.body;
 
-  const created_by = req.user.id;
+  const statuses = {
+    commercial_invoice_status: commercial_invoice_status || "pending",
+    packing_list_status: packing_list_status || "pending",
+    phytosanitary_certificate_status: phytosanitary_certificate_status || "pending",
+    airway_bill_status: airway_bill_status || "pending",
+    certificate_of_origin_status: certificate_of_origin_status || "pending",
+    health_certificate_status: health_certificate_status || "pending",
+    insurance_certificate_status: insurance_certificate_status || "pending",
+  };
 
-  if (!dispatch_id || !document_type || !document_date || !consignee_name || !items || items.length === 0) {
-    return res.status(400).json({ message: "Required fields are missing" });
-  }
+  const allCleared = Object.values(statuses).every((value) => value === "done") ? 1 : 0;
 
-  const documentNumber = `EXP-${Date.now()}`;
-
-  const exportDocSql = `
-    INSERT INTO export_documents
-    (
-      dispatch_id,
-      document_type,
-      document_number,
-      document_date,
-      consignee_name,
-      destination_country,
-      port_of_loading,
-      port_of_discharge,
-      remarks,
-      created_by
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  const sql = `
+    UPDATE export_documents
+    SET
+      commercial_invoice_status = ?,
+      packing_list_status = ?,
+      phytosanitary_certificate_status = ?,
+      airway_bill_status = ?,
+      certificate_of_origin_status = ?,
+      health_certificate_status = ?,
+      insurance_certificate_status = ?,
+      all_cleared = ?,
+      notes = ?,
+      updated_by = ?
+    WHERE id = ?
   `;
 
   db.query(
-    exportDocSql,
+    sql,
     [
-      dispatch_id,
-      document_type,
-      documentNumber,
-      document_date,
-      consignee_name,
-      destination_country || null,
-      port_of_loading || null,
-      port_of_discharge || null,
-      remarks || null,
-      created_by,
+      statuses.commercial_invoice_status,
+      statuses.packing_list_status,
+      statuses.phytosanitary_certificate_status,
+      statuses.airway_bill_status,
+      statuses.certificate_of_origin_status,
+      statuses.health_certificate_status,
+      statuses.insurance_certificate_status,
+      allCleared,
+      notes || null,
+      userId,
+      id,
     ],
-    (err, result) => {
+    (err) => {
       if (err) {
+        console.error("updateExportDocuments error:", err);
         return res.status(500).json({ message: "Database error", error: err.message });
       }
 
-      const exportDocumentId = result.insertId;
+      res.json({
+        message: "Export document statuses updated successfully",
+        all_cleared: !!allCleared,
+      });
+    }
+  );
+};
 
-      let processed = 0;
-      let failed = false;
+const updateExportDocumentsByDispatchId = (req, res) => {
+  const { globalDispatchId } = req.params;
+  const userId = req.user?.id || null;
 
-      items.forEach((item) => {
-        const qty = parseFloat(item.quantity || 0);
-        const price = parseFloat(item.unit_price || 0);
-        const total = qty * price;
+  const {
+    commercial_invoice_status,
+    packing_list_status,
+    phytosanitary_certificate_status,
+    airway_bill_status,
+    certificate_of_origin_status,
+    health_certificate_status,
+    insurance_certificate_status,
+    notes,
+  } = req.body;
 
-        const insertItemSql = `
-          INSERT INTO export_document_items
-          (export_document_id, item_id, batch_id, quantity, unit_price, total_value)
-          VALUES (?, ?, ?, ?, ?, ?)
-        `;
+  const statuses = {
+    commercial_invoice_status: commercial_invoice_status || "pending",
+    packing_list_status: packing_list_status || "pending",
+    phytosanitary_certificate_status: phytosanitary_certificate_status || "pending",
+    airway_bill_status: airway_bill_status || "pending",
+    certificate_of_origin_status: certificate_of_origin_status || "pending",
+    health_certificate_status: health_certificate_status || "pending",
+    insurance_certificate_status: insurance_certificate_status || "pending",
+  };
 
-        db.query(
-          insertItemSql,
-          [exportDocumentId, item.item_id, item.batch_id, qty, price, total],
-          (itemErr) => {
-            if (failed) return;
+  const allCleared = Object.values(statuses).every((value) => value === "done") ? 1 : 0;
 
-            if (itemErr) {
-              failed = true;
-              return res.status(500).json({ message: "Database error", error: itemErr.message });
-            }
+  const sql = `
+    UPDATE export_documents
+    SET
+      commercial_invoice_status = ?,
+      packing_list_status = ?,
+      phytosanitary_certificate_status = ?,
+      airway_bill_status = ?,
+      certificate_of_origin_status = ?,
+      health_certificate_status = ?,
+      insurance_certificate_status = ?,
+      all_cleared = ?,
+      notes = ?,
+      updated_by = ?
+    WHERE global_dispatch_id = ?
+  `;
 
-            processed += 1;
+  db.query(
+    sql,
+    [
+      statuses.commercial_invoice_status,
+      statuses.packing_list_status,
+      statuses.phytosanitary_certificate_status,
+      statuses.airway_bill_status,
+      statuses.certificate_of_origin_status,
+      statuses.health_certificate_status,
+      statuses.insurance_certificate_status,
+      allCleared,
+      notes || null,
+      userId,
+      globalDispatchId,
+    ],
+    (err, result) => {
+      if (err) {
+        console.error("updateExportDocumentsByDispatchId error:", err);
+        return res.status(500).json({ message: "Database error", error: err.message });
+      }
 
-            if (processed === items.length) {
-              return res.status(201).json({
-                message: "Export document created successfully",
-                exportDocumentId,
-                documentNumber,
-              });
-            }
-          }
-        );
+      if (!result.affectedRows) {
+        return res.status(404).json({ message: "Export document record not found for this dispatch" });
+      }
+
+      res.json({
+        message: "Export document statuses updated successfully",
+        all_cleared: !!allCleared,
       });
     }
   );
@@ -234,7 +218,6 @@ const createExportDocument = (req, res) => {
 module.exports = {
   getAllExportDocuments,
   getExportDocumentById,
-  getDispatchListForExport,
-  getDispatchItemsForExport,
-  createExportDocument,
+  updateExportDocuments,
+  updateExportDocumentsByDispatchId,
 };
