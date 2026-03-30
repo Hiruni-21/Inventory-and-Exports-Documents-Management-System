@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import api from "../utils/api";
+import { useToast } from "../context/ToastContext";
 
 const seedRows = [
   {
@@ -39,10 +39,12 @@ const seedRows = [
 ];
 
 const GlobalDispatchListPage = () => {
+  
   const [rows, setRows] = useState([]);
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("All");
   const [loading, setLoading] = useState(true);
+  const toast = useToast();
 const [showShipmentModal, setShowShipmentModal] = useState(false);
 
 const [shipmentForm, setShipmentForm] = useState({
@@ -72,6 +74,17 @@ const [shipmentItems, setShipmentItems] = useState([
     boxes: 4,
   },
 ]);
+const [showDocsModal, setShowDocsModal] = useState(false);
+const [selectedShipment, setSelectedShipment] = useState(null);
+const [docsForm, setDocsForm] = useState({
+  commercialInvoice: false,
+  packingList: false,
+  phytosanitaryCertificate: false,
+  airwayBill: false,
+  certificateOfOrigin: false,
+  healthCertificate: false,
+  insuranceCertificate: false,
+});
   useEffect(() => {
     const loadRows = async () => {
       try {
@@ -179,26 +192,84 @@ const handleRemoveShipmentItem = (index) => {
 const handleCreateShipment = () => {
   const docsDone = Object.values(shipmentForm.documents).filter(Boolean).length;
 
-  const newRow = {
-    id: `SHP-${Date.now().toString().slice(-6)}`,
-    dispatch_number: `SHP-${Date.now().toString().slice(-6)}`,
-    customer_name: shipmentForm.customer.split(",")[0],
-    dispatch_date: shipmentForm.shipmentDate || new Date().toISOString().slice(0, 10),
-    airline:
-      shipmentForm.flightNo ||
-      (shipmentForm.airline.includes("SriLankan") ? "UL225" : "Q2 MLE"),
-    awb: shipmentForm.awbNo || "—",
-    total_qty: `${shipmentForm.totalWeight || 0} kg`,
-    docs_done_count: docsDone,
-    docs_label: `${docsDone}/7`,
-    status: docsDone === 7 ? "Cleared" : "Docs Pending",
-  };
+const shipmentId = `SHP-${Date.now().toString().slice(-6)}`;
 
+const newRow = {
+  id: shipmentId,
+  dispatch_number: shipmentId,
+  customer_name: shipmentForm.customer.split(",")[0],
+  dispatch_date: shipmentForm.shipmentDate || new Date().toISOString().slice(0, 10),
+  airline:
+    shipmentForm.flightNo ||
+    (shipmentForm.airline.includes("SriLankan") ? "UL225" : "Q2 MLE"),
+  awb: shipmentForm.awbNo || "—",
+  total_qty: `${shipmentForm.totalWeight || 0} kg`,
+  docs_done_count: docsDone,
+  docs_label: `${docsDone}/7`,
+  status: docsDone === 7 ? "Cleared" : "Docs Pending",
+  documents: { ...shipmentForm.documents },
+};
   setRows((prev) => [newRow, ...prev]);
   setShowShipmentModal(false);
   toast.success(`Shipment ${newRow.dispatch_number} created. Generate missing documents.`);
 };
+const openDocsModal = (row) => {
+  setSelectedShipment(row);
+  setDocsForm({
+    commercialInvoice: row.documents?.commercialInvoice ?? false,
+    packingList: row.documents?.packingList ?? false,
+    phytosanitaryCertificate: row.documents?.phytosanitaryCertificate ?? false,
+    airwayBill: row.documents?.airwayBill ?? false,
+    certificateOfOrigin: row.documents?.certificateOfOrigin ?? false,
+    healthCertificate: row.documents?.healthCertificate ?? false,
+    insuranceCertificate: row.documents?.insuranceCertificate ?? false,
+  });
+  setShowDocsModal(true);
+};
 
+const closeDocsModal = () => {
+  setShowDocsModal(false);
+  setSelectedShipment(null);
+};
+
+const handleDocsToggle = (name) => {
+  setDocsForm((prev) => ({
+    ...prev,
+    [name]: !prev[name],
+  }));
+};
+
+const handleSaveDocs = () => {
+  if (!selectedShipment) return;
+
+  const doneCount = Object.values(docsForm).filter(Boolean).length;
+
+  setRows((prev) =>
+    prev.map((row) =>
+      row.id === selectedShipment.id
+        ? {
+            ...row,
+            documents: docsForm,
+            docs_done_count: doneCount,
+            docs_label: `${doneCount}/7`,
+            status: doneCount === 7 ? "Cleared" : "Docs Pending",
+          }
+        : row
+    )
+  );
+
+
+  setShowDocsModal(false);
+
+  if (doneCount === 7) {
+    toast.success(`Shipment ${selectedShipment.dispatch_number} cleared successfully.`);
+  } else {
+    toast.info(`Documents updated for ${selectedShipment.dispatch_number}.`);
+  }
+};
+const handleRowOpen = (row) => {
+  openDocsModal(row);
+};
   return (
     <div className="pg">
 
@@ -277,31 +348,31 @@ const handleCreateShipment = () => {
                     <span className={badgeClass(row.status)}>{row.status}</span>
                   </td>
                   <td>
-  <div className="gd-actions">
-    {row.status === "Docs Pending" ? (
-      <button
-        type="button"
-        className="gd-action-btn gd-action-btn-primary"
-        onClick={(e) => {
-          e.stopPropagation();
-          // open upload docs flow
-        }}
-      >
-        📄 Upload Docs
-      </button>
-    ) : (
-      <button
-        type="button"
-        className="gd-action-btn gd-action-btn-secondary"
-        onClick={(e) => {
-          e.stopPropagation();
-          // open docs/details
-        }}
-      >
-        📄 View Docs
-      </button>
-    )}
-  </div>
+<div className="gd-actions">
+  {row.status === "Docs Pending" ? (
+    <button
+      type="button"
+      className="gd-action-btn gd-action-btn-primary"
+      onClick={(e) => {
+        e.stopPropagation();
+        openDocsModal(row);
+      }}
+    >
+      📄 Upload Docs
+    </button>
+  ) : (
+    <button
+      type="button"
+      className="gd-action-btn gd-action-btn-secondary"
+      onClick={(e) => {
+        e.stopPropagation();
+        openDocsModal(row);
+      }}
+    >
+      📄 View Docs
+    </button>
+  )}
+</div>
 </td>
                 </tr>
               ))
@@ -477,6 +548,121 @@ const handleCreateShipment = () => {
         </button>
         <button type="button" className="btn btn-a" onClick={handleCreateShipment}>
           Create Shipment + Generate Docs
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+{showDocsModal && selectedShipment && (
+  <div className="modal-backdrop" onClick={closeDocsModal}>
+    <div className="md md-lg" onClick={(e) => e.stopPropagation()}>
+      <div className="md-h">
+        <h3>📄 Create / Update Export Document Set</h3>
+        <button type="button" className="md-x" onClick={closeDocsModal}>
+          ✕
+        </button>
+      </div>
+
+      <div className="md-b">
+        <div className="ib ib-w" style={{ marginTop: "-4px", marginBottom: "14px" }}>
+          <span>📄</span>
+          <div>
+            Shipment is marked <strong>Cleared</strong> only when all 7 export documents are completed.
+          </div>
+        </div>
+
+        <div className="fr">
+          <div className="ff">
+            <label className="fl">Linked Shipment</label>
+            <input className="fc" value={selectedShipment.dispatch_number || ""} readOnly />
+          </div>
+
+          <div className="ff">
+            <label className="fl">Doc Set No.</label>
+            <input
+              className="fc"
+              value={`DOC-${selectedShipment.dispatch_number || ""}`}
+              readOnly
+            />
+          </div>
+        </div>
+
+        <div className="fst" style={{ margin: "10px 0 12px" }}>
+          Required Export Documents
+        </div>
+
+        <ul className="ck-l">
+          <li>
+            <input
+              type="checkbox"
+              checked={docsForm.commercialInvoice}
+              onChange={() => handleDocsToggle("commercialInvoice")}
+            />{" "}
+            Commercial Invoice
+          </li>
+          <li>
+            <input
+              type="checkbox"
+              checked={docsForm.packingList}
+              onChange={() => handleDocsToggle("packingList")}
+            />{" "}
+            Packing List
+          </li>
+          <li>
+            <input
+              type="checkbox"
+              checked={docsForm.phytosanitaryCertificate}
+              onChange={() => handleDocsToggle("phytosanitaryCertificate")}
+            />{" "}
+            Phytosanitary Certificate
+          </li>
+          <li>
+            <input
+              type="checkbox"
+              checked={docsForm.airwayBill}
+              onChange={() => handleDocsToggle("airwayBill")}
+            />{" "}
+            Airway Bill (AWB)
+          </li>
+          <li>
+            <input
+              type="checkbox"
+              checked={docsForm.certificateOfOrigin}
+              onChange={() => handleDocsToggle("certificateOfOrigin")}
+            />{" "}
+            Certificate of Origin
+          </li>
+          <li>
+            <input
+              type="checkbox"
+              checked={docsForm.healthCertificate}
+              onChange={() => handleDocsToggle("healthCertificate")}
+            />{" "}
+            Health Certificate
+          </li>
+          <li>
+            <input
+              type="checkbox"
+              checked={docsForm.insuranceCertificate}
+              onChange={() => handleDocsToggle("insuranceCertificate")}
+            />{" "}
+            Insurance Certificate
+          </li>
+        </ul>
+
+        <div style={{ marginTop: "14px" }}>
+          <span className={Object.values(docsForm).filter(Boolean).length === 7 ? "badge bg-g" : "badge bg-a"}>
+            {Object.values(docsForm).filter(Boolean).length}/7 completed
+          </span>
+        </div>
+      </div>
+
+      <div className="md-f">
+        <button type="button" className="btn btn-s" onClick={closeDocsModal}>
+          Cancel
+        </button>
+        <button type="button" className="btn btn-a" onClick={handleSaveDocs}>
+          Save Document Set
         </button>
       </div>
     </div>
