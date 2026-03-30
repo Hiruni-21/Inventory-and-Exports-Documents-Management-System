@@ -284,11 +284,18 @@ const actionButtons = {
     disabled: true,
   },
 ],  
-  "/customers/global": [
-    { label: "+ Add Customer", to: "/customers/global/add", className: "btn btn-p btn-sm", action: "openGlobalCustomerModal" },
-    { label: "Export CSV", to: "#", className: "btn btn-s btn-sm", action: "exportGlobalCustomers" },
-],
-};
+"/customers/global": [
+  {
+    label: "+ Add Customer",
+    eventName: "fw-open-global-customer-modal",
+    className: "btn btn-p btn-sm",
+  },
+  {
+    label: "Export CSV",
+    eventName: "fw-export-global-customers",
+    className: "btn btn-s btn-sm",
+  },
+],};
 
 const normalizeRole = (role) => {
   const value = String(role || "manager").toLowerCase();
