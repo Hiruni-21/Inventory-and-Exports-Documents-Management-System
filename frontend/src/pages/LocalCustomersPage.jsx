@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, Truck, Eye, Pencil, X } from "lucide-react";
+import { useToast } from "../context/ToastContext";
 
 
 const initialCustomers = [
@@ -98,6 +99,7 @@ export default function LocalCustomersPage() {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [showDetailsPanel, setShowDetailsPanel] = useState(false);
   const [selectedRowId, setSelectedRowId] = useState(null);
+  const toast = useToast();
 
   const [dispatchForm, setDispatchForm] = useState({
   dispatchDate: "",
@@ -257,6 +259,11 @@ const handleSaveCustomer = (e) => {
   }
 
   closeModal();
+  if (modalMode === "add") {
+  toast.success(`Local customer "${customerData.customerName}" created successfully.`);
+} else {
+  toast.success(`Local customer "${customerData.customerName}" saved successfully.`);
+}
 };
   const handleRowOpen = (customer) => {
   setSelectedCustomer(customer);
@@ -281,6 +288,7 @@ const handleDeleteCustomer = () => {
   );
 
   closeDetailsPanel();
+  toast.warning("Customer removed");
 };
 
 const handleNewDispatch = (e, customer) => {
@@ -369,8 +377,9 @@ const handleCreateDispatch = () => {
     )
   );
 
-  alert("Dispatch created successfully");
+  
   closeDispatchModal();
+  toast.success("Local dispatch created successfully.");
 };
 
   return (
