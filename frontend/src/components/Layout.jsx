@@ -280,10 +280,10 @@ const actionButtons = {
   },
   {
     label: "Export CSV",
+    eventName: "fw-export-local-customers",
     className: "btn btn-s btn-sm",
-    disabled: true,
   },
-],  
+],
 "/customers/global": [
   {
     label: "+ Add Customer",
@@ -451,8 +451,6 @@ const Layout = () => {
           ))}
         </div>
       </div>
-
-      <div id="toast-wrap"></div>
     </>
   );
 };

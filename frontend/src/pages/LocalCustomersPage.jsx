@@ -1,9 +1,7 @@
-
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Truck, Eye, Pencil, X } from "lucide-react";
+import { Search, Truck, X } from "lucide-react";
 import { useToast } from "../context/ToastContext";
-
 
 const initialCustomers = [
   {
@@ -86,7 +84,47 @@ const emptyForm = {
   returnsAllowed: true,
   notes: "",
 };
+const buildLocalExportRows = (rows) => {
+  const headers = [
+    "Code",
+    "Customer Name",
+    "Group",
+    "Contact",
+    "Email",
+    "Phone",
+    "Address",
+    "City",
+    "Delivery Window",
+    "Preferred Driver",
+    "Returns Allowed",
+    "Dispatches",
+    "Notes",
+  ];
 
+  const csvRows = rows.map((customer) => [
+    customer.code,
+    customer.customerName,
+    customer.group,
+    customer.contact,
+    customer.email,
+    customer.phone,
+    customer.address,
+    customer.city,
+    customer.deliveryWindow,
+    customer.preferredDriver,
+    customer.returnsAllowed ? "Yes" : "No",
+    customer.dispatches,
+    customer.notes,
+  ]);
+
+  return [headers, ...csvRows]
+    .map((row) =>
+      row
+        .map((value) => `"${String(value ?? "").replace(/"/g, '""')}"`)
+        .join(",")
+    )
+    .join("\n");
+};
 export default function LocalCustomersPage() {
   const navigate = useNavigate();
   const [customers, setCustomers] = useState(initialCustomers);
@@ -126,6 +164,35 @@ const [dispatchItems, setDispatchItems] = useState([
     ...emptyForm,
     code: `FW-CLT-${String(initialCustomers.length + 1).padStart(3, "0")}`,
   });
+  const cityOptions = [
+  "All Cities",
+  "Colombo 1",
+  "Colombo 2",
+  "Colombo 3",
+  "Colombo 4",
+  "Colombo 5",
+  "Colombo 7",
+  "Dehiwala",
+  "Mount Lavinia",
+  "Negombo",
+  "Kandy",
+  "Galle",
+  "Other",
+];
+
+const filteredCustomers = useMemo(() => {
+  return customers.filter((customer) => {
+    const q = search.toLowerCase();
+    const matchesSearch =
+      customer.code.toLowerCase().includes(q) ||
+      customer.customerName.toLowerCase().includes(q) ||
+      customer.group.toLowerCase().includes(q) ||
+      customer.contact.toLowerCase().includes(q);
+
+    const matchesCity = cityFilter === "All Cities" || customer.city === cityFilter;
+    return matchesSearch && matchesCity;
+  });
+}, [customers, search, cityFilter]);
 
   useEffect(() => {
     if (!showModal) return;
@@ -137,47 +204,33 @@ const [dispatchItems, setDispatchItems] = useState([
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [showModal]);
-  useEffect(() => {
+useEffect(() => {
   const handleOpenFromTopbar = () => {
     openAddModal();
   };
 
+  const handleExportFromTopbar = () => {
+    const csv = buildLocalExportRows(filteredCustomers);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "local-customers.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+
+    toast.info("Local customers CSV exported.");
+  };
+
   window.addEventListener("fw-open-local-customer-modal", handleOpenFromTopbar);
+  window.addEventListener("fw-export-local-customers", handleExportFromTopbar);
 
   return () => {
     window.removeEventListener("fw-open-local-customer-modal", handleOpenFromTopbar);
+    window.removeEventListener("fw-export-local-customers", handleExportFromTopbar);
   };
-}, [customers.length]);
+}, [filteredCustomers, customers.length, toast]);
 
-  const cityOptions = [
-    "All Cities",
-    "Colombo 1",
-    "Colombo 2",
-    "Colombo 3",
-    "Colombo 4",
-    "Colombo 5",
-    "Colombo 7",
-    "Dehiwala",
-    "Mount Lavinia",
-    "Negombo",
-    "Kandy",
-    "Galle",
-    "Other",
-  ];
-
-  const filteredCustomers = useMemo(() => {
-    return customers.filter((customer) => {
-      const q = search.toLowerCase();
-      const matchesSearch =
-        customer.code.toLowerCase().includes(q) ||
-        customer.customerName.toLowerCase().includes(q) ||
-        customer.group.toLowerCase().includes(q) ||
-        customer.contact.toLowerCase().includes(q);
-
-      const matchesCity = cityFilter === "All Cities" || customer.city === cityFilter;
-      return matchesSearch && matchesCity;
-    });
-  }, [customers, search, cityFilter]);
 
 const openAddModal = () => {
   setModalMode("add");
