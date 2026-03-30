@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Search, Plane, X } from "lucide-react";
+import { useToast } from "../context/ToastContext";
 
 const airlineCodeMap = {
   "SriLankan Airlines (UL)": "UL225",
@@ -207,6 +208,7 @@ export default function GlobalCustomersPage() {
   const [showDetailsPanel, setShowDetailsPanel] = useState(false);
   const [selectedRowId, setSelectedRowId] = useState(null);
   const [showShipmentModal, setShowShipmentModal] = useState(false);
+  const toast = useToast();
 
   const [form, setForm] = useState({
     ...emptyForm,
@@ -296,6 +298,7 @@ const [shipmentForm, setShipmentForm] = useState({
       link.download = "global-customers.csv";
       link.click();
       URL.revokeObjectURL(url);
+      toast.info("Global customers CSV exported.");
     };
 
     window.addEventListener("fw-open-global-customer-modal", handleOpenFromTopbar);
@@ -403,6 +406,11 @@ const [shipmentForm, setShipmentForm] = useState({
         }));
       }
     }
+    if (modalMode === "add") {
+  toast.success(`Global customer "${customerData.customerName}" created successfully.`);
+} else {
+  toast.success(`Global customer "${customerData.customerName}" saved successfully.`);
+}
 
     closeModal();
   };
@@ -427,6 +435,7 @@ const [shipmentForm, setShipmentForm] = useState({
     );
 
     closeDetailsPanel();
+    toast.warning("Customer removed");
   };
 
   const openShipmentModal = (customer) => {
@@ -550,6 +559,7 @@ const [shipmentForm, setShipmentForm] = useState({
     );
 
     setShowShipmentModal(false);
+    toast.success(`Shipment ${newShipment.id} created. Generate missing documents.`);
   };
 
   return (
