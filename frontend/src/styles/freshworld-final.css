@@ -1448,3 +1448,88 @@ textarea.fc{height:78px;padding:10px 12px;resize:vertical}
   background: var(--g600) !important;
   border-color: var(--g600) !important;
 }
+.gc-ship-btn{
+  height: 28px !important;
+  padding: 0 10px !important;
+  border-radius: 10px !important;
+  font-size: 11px !important;
+  background: var(--g700) !important;
+  border: none !important;
+  color: #fff !important;
+}
+
+.gc-ship-btn:hover{
+  background: var(--g600) !important;
+}
+.global-customers-table{
+  table-layout: fixed !important;
+}
+
+.global-customers-table thead th,
+.global-customers-table tbody td{
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+}
+
+.global-customers-table th:nth-child(1),
+.global-customers-table td:nth-child(1){
+  width: 11% !important;
+}
+
+.global-customers-table th:nth-child(2),
+.global-customers-table td:nth-child(2){
+  width: 18% !important;
+}
+
+.global-customers-table th:nth-child(3),
+.global-customers-table td:nth-child(3){
+  width: 9% !important;
+}
+
+.global-customers-table th:nth-child(4),
+.global-customers-table td:nth-child(4){
+  width: 9% !important;
+}
+
+.global-customers-table th:nth-child(5),
+.global-customers-table td:nth-child(5){
+  width: 9% !important;
+}
+
+.global-customers-table th:nth-child(6),
+.global-customers-table td:nth-child(6){
+  width: 8% !important;
+}
+
+.global-customers-table th:nth-child(7),
+.global-customers-table td:nth-child(7){
+  width: 8% !important;
+}
+
+.global-customers-table th:nth-child(8),
+.global-customers-table td:nth-child(8){
+  width: 8% !important;
+}
+
+.global-customers-table th:nth-child(9),
+.global-customers-table td:nth-child(9){
+  width: 10% !important;
+}
+
+/* remove the extra column push on this page only */
+.global-customers-table tbody td:nth-child(6),
+.global-customers-table tbody td:nth-child(7),
+.global-customers-table tbody td:nth-child(8){
+  padding-left: 12px !important;
+}
+
+/* make customer name feel like the prototype */
+.global-customers-table .strong-cell{
+  font-weight: 800 !important;
+  line-height: 1.15 !important;
+}
+
+/* location slightly tighter */
+.global-customers-table tbody td:nth-child(5){
+  font-size: 12px !important;
+}
