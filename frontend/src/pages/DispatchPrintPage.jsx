@@ -1,29 +1,50 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import api from "../utils/api";
 
-const DispatchPrintPage = () => {
+const formatDate = (value) => {
+  if (!value) return "—";
+  return String(value).slice(0, 10);
+};
+
+const getWindowStart = (value) => {
+  if (!value) return "—";
+  if (value.includes("–")) return value.split("–")[0].trim();
+  if (value.includes("-")) return value.split("-")[0].trim();
+  return value;
+};
+
+export default function DispatchPrintPage() {
   const { id } = useParams();
   const [dispatchRecord, setDispatchRecord] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const fetchDetails = async () => {
+    const loadDispatch = async () => {
       try {
         const res = await api.get(`/dispatch/${id}`);
         setDispatchRecord(res.data);
-      } catch {
+      } catch (err) {
+        console.error(err);
         setError("Failed to load dispatch details");
       }
     };
 
-    fetchDetails();
+    loadDispatch();
   }, [id]);
 
   useEffect(() => {
     if (dispatchRecord) {
-      setTimeout(() => window.print(), 500);
+      const timer = window.setTimeout(() => window.print(), 500);
+      return () => window.clearTimeout(timer);
     }
+  }, [dispatchRecord]);
+
+  const totalWeight = useMemo(() => {
+    return (dispatchRecord?.items || []).reduce(
+      (sum, row) => sum + Number(row.quantity || 0),
+      0
+    );
   }, [dispatchRecord]);
 
   if (error) return <div className="print-page">{error}</div>;
@@ -33,14 +54,18 @@ const DispatchPrintPage = () => {
     <div className="print-page">
       <div className="print-header">
         <h1>Fresh World Exporters</h1>
-        <h2>Local Dispatch Note</h2>
+        <h2>Delivery Note (DN)</h2>
       </div>
 
       <div className="print-section">
         <p><strong>Dispatch Number:</strong> {dispatchRecord.dispatch_number}</p>
+        <p><strong>Delivery Note:</strong> {dispatchRecord.delivery_note_number || "-"}</p>
         <p><strong>Customer:</strong> {dispatchRecord.client_name}</p>
-        <p><strong>Dispatch Date:</strong> {dispatchRecord.dispatch_date}</p>
-        <p><strong>Created By:</strong> {dispatchRecord.created_by_name || "-"}</p>
+        <p><strong>Dispatch Date:</strong> {formatDate(dispatchRecord.dispatch_date)}</p>
+        <p><strong>Departure Time:</strong> {getWindowStart(dispatchRecord.delivery_window)}</p>
+        <p><strong>Driver:</strong> {dispatchRecord.driver_name || "-"}</p>
+        <p><strong>Vehicle:</strong> {dispatchRecord.vehicle_number || "-"}</p>
+        <p><strong>Status:</strong> {dispatchRecord.status || "-"}</p>
         <p><strong>Remarks:</strong> {dispatchRecord.remarks || "-"}</p>
       </div>
 
@@ -49,7 +74,7 @@ const DispatchPrintPage = () => {
         <table className="print-table">
           <thead>
             <tr>
-              <th>ID</th>
+              <th>#</th>
               <th>Item Code</th>
               <th>Item Name</th>
               <th>Batch</th>
@@ -58,14 +83,14 @@ const DispatchPrintPage = () => {
             </tr>
           </thead>
           <tbody>
-            {dispatchRecord.items?.length > 0 ? (
-              dispatchRecord.items.map((item) => (
+            {(dispatchRecord.items || []).length ? (
+              dispatchRecord.items.map((item, index) => (
                 <tr key={item.id}>
-                  <td>{item.id}</td>
+                  <td>{index + 1}</td>
                   <td>{item.item_code}</td>
                   <td>{item.item_name}</td>
-                  <td>{item.batch_code}</td>
-                  <td>{item.unit}</td>
+                  <td>{item.batch_code || "-"}</td>
+                  <td>{item.unit || "-"}</td>
                   <td>{item.quantity}</td>
                 </tr>
               ))
@@ -78,18 +103,20 @@ const DispatchPrintPage = () => {
         </table>
       </div>
 
+      <div className="print-section">
+        <p><strong>Total Weight:</strong> {totalWeight.toFixed(2)} kg</p>
+      </div>
+
       <div className="print-footer">
         <div>
           <p>Prepared By</p>
           <div className="signature-line"></div>
         </div>
         <div>
-          <p>Approved By</p>
+          <p>Received By</p>
           <div className="signature-line"></div>
         </div>
       </div>
     </div>
   );
-};
-
-export default DispatchPrintPage;
+}
