@@ -15,12 +15,12 @@ const LOCAL_CUSTOMERS = [
     deliveryWindow: "05:30 – 07:30 AM",
   },
   {
-    label: "Galadari Hotel",
+    label: "Galadari Hotel — Colombo 1",
     preferredDriver: "Nuwan",
     deliveryWindow: "04:30 – 06:30 AM",
   },
   {
-    label: "Kingsbury Hotel",
+    label: "Kingsbury Hotel — Colombo 1",
     preferredDriver: "Ajith",
     deliveryWindow: "05:00 – 07:00 AM",
   },
@@ -37,6 +37,139 @@ const emptyDocs = {
   delivery_note: true,
   local_invoice: false,
   goods_dispatch_note: false,
+};
+
+const styles = {
+  modalShell: {
+    width: "100%",
+    maxWidth: "970px",
+    maxHeight: "86vh",
+    display: "flex",
+    flexDirection: "column",
+    overflow: "hidden",
+    borderRadius: "16px",
+  },
+  modalForm: {
+    display: "flex",
+    flexDirection: "column",
+    flex: 1,
+    minHeight: 0,
+  },
+  modalBody: {
+    flex: 1,
+    minHeight: 0,
+    overflowY: "auto",
+    paddingBottom: "14px",
+  },
+  modalFooter: {
+    flexShrink: 0,
+    display: "flex",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: "10px",
+    padding: "14px 24px 18px",
+    borderTop: "1px solid var(--border)",
+    background: "var(--white)",
+  },
+  modalCancel: {
+    height: "38px",
+    minWidth: "84px",
+    padding: "0 18px",
+    borderRadius: "10px",
+    border: "1.5px solid var(--border)",
+    background: "#fff",
+    color: "var(--g700)",
+    fontFamily: "'Plus Jakarta Sans', sans-serif",
+    fontSize: "12px",
+    fontWeight: 700,
+    lineHeight: 1,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    whiteSpace: "nowrap",
+    cursor: "pointer",
+  },
+  modalSubmit: {
+    height: "38px",
+    minWidth: "200px",
+    padding: "0 20px",
+    borderRadius: "10px",
+    border: "none",
+    background: "var(--g800)",
+    color: "#fff",
+    fontFamily: "'Plus Jakarta Sans', sans-serif",
+    fontSize: "12px",
+    fontWeight: 700,
+    lineHeight: 1,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    whiteSpace: "nowrap",
+    cursor: "pointer",
+  },
+  panelFooter: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    padding: "14px 18px 16px",
+    borderTop: "1px solid var(--border)",
+    background: "var(--white)",
+  },
+  panelMainGreen: {
+    flex: "1 1 auto",
+    height: "38px",
+    padding: "0 18px",
+    borderRadius: "11px",
+    border: "none",
+    background: "var(--g600)",
+    color: "#fff",
+    fontFamily: "'Plus Jakarta Sans', sans-serif",
+    fontSize: "12px",
+    fontWeight: 700,
+    lineHeight: 1,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    whiteSpace: "nowrap",
+    cursor: "pointer",
+  },
+  panelMainOutline: {
+    flex: "1 1 auto",
+    height: "38px",
+    padding: "0 18px",
+    borderRadius: "11px",
+    border: "1.5px solid var(--border)",
+    background: "#fff",
+    color: "var(--g700)",
+    fontFamily: "'Plus Jakarta Sans', sans-serif",
+    fontSize: "12px",
+    fontWeight: 700,
+    lineHeight: 1,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    whiteSpace: "nowrap",
+    cursor: "pointer",
+  },
+  panelSide: {
+    flex: "0 0 auto",
+    minWidth: "108px",
+    height: "38px",
+    padding: "0 16px",
+    borderRadius: "11px",
+    border: "1.5px solid var(--border)",
+    background: "#fff",
+    color: "var(--g700)",
+    fontFamily: "'Plus Jakarta Sans', sans-serif",
+    fontSize: "12px",
+    fontWeight: 700,
+    lineHeight: 1,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    whiteSpace: "nowrap",
+    cursor: "pointer",
+  },
 };
 
 const createInitialForm = (customerLabel = "") => {
@@ -108,14 +241,14 @@ const batchOptionLabel = (batch) => {
   const daysLeft = getDaysLeft(batch.expiry_date);
 
   if (daysLeft !== null && daysLeft <= 2) {
-    return `${batchCode} (${qty} kg, exp ${daysLeft}d ⚠️)`;
+    return `${batchCode} (${qty}kg, exp ${daysLeft}d ⚠️)`;
   }
 
   if (daysLeft !== null) {
-    return `${batchCode} (${qty} kg, exp ${daysLeft}d)`;
+    return `${batchCode} (${qty}kg, exp ${daysLeft}d)`;
   }
 
-  return `${batchCode} (${qty} kg)`;
+  return `${batchCode} (${qty}kg)`;
 };
 
 export default function DispatchListPage() {
@@ -426,7 +559,7 @@ export default function DispatchListPage() {
         </button>
       </div>
 
-      <div className="tw">
+      <div className="tw dispatch-local-tw">
         <div className="tw-h">
           <h3>Local Dispatch Records</h3>
         </div>
@@ -445,9 +578,12 @@ export default function DispatchListPage() {
               <th>ACTION</th>
             </tr>
           </thead>
+
           <tbody>
             {loading ? (
-              <tr><td colSpan="9">Loading...</td></tr>
+              <tr>
+                <td colSpan="9">Loading...</td>
+              </tr>
             ) : filteredRows.length ? (
               filteredRows.map((row) => (
                 <tr
@@ -456,26 +592,35 @@ export default function DispatchListPage() {
                   className={selectedRowId === row.id ? "details-row-active" : ""}
                   style={{ cursor: "pointer" }}
                 >
-                  <td className="dispatch-no-cell">{row.dispatch_number}</td>
-                  <td style={{ fontWeight: 600 }}>{row.client_name}</td>
-                  <td>{formatDate(row.dispatch_date)}</td>
-                  <td>{getWindowStart(row.delivery_window)}</td>
-                  <td>{row.driver_name || "—"}</td>
-                  <td><span className="badge bg-x">{row.item_count || 0}</span></td>
-                  <td>{Number(row.total_weight || 0)} kg</td>
-                  <td><span className={badgeClass(row.status)}>{normalizeStatus(row.status)}</span></td>
+                  <td className="ld-dispatch-no">{row.dispatch_number}</td>
+                  <td className="ld-customer">{row.client_name}</td>
+                  <td className="ld-date">{formatDate(row.dispatch_date)}</td>
+                  <td className="ld-time">{getWindowStart(row.delivery_window)}</td>
+                  <td className="ld-driver">{row.driver_name || "—"}</td>
+                  <td>
+                    <span className="badge bg-x">{row.item_count || 0}</span>
+                  </td>
+                  <td className="ld-weight">{Number(row.total_weight || 0)} kg</td>
+                  <td>
+                    <span className={badgeClass(row.status)}>{normalizeStatus(row.status)}</span>
+                  </td>
                   <td onClick={(e) => e.stopPropagation()}>
                     {String(row.status || "").toLowerCase() === "scheduled" ? (
                       <button
                         type="button"
-                        className="btn btn-p btn-sm"
+                        className="btn btn-p btn-xs"
                         style={{ background: "var(--s)", border: "none" }}
                         onClick={(e) => markDelivered(row.id, e)}
                       >
                         ✅ Delivered
                       </button>
                     ) : (
-                      <button type="button" className="ab" onClick={(e) => printDispatch(row.id, e)}>
+                      <button
+                        type="button"
+                        className="ab"
+                        title="Print DN"
+                        onClick={(e) => printDispatch(row.id, e)}
+                      >
                         🖨️
                       </button>
                     )}
@@ -483,7 +628,9 @@ export default function DispatchListPage() {
                 </tr>
               ))
             ) : (
-              <tr><td colSpan="9">No local dispatch records found</td></tr>
+              <tr>
+                <td colSpan="9">No local dispatch records found</td>
+              </tr>
             )}
           </tbody>
         </table>
@@ -492,48 +639,98 @@ export default function DispatchListPage() {
       {showDetailsPanel && (
         <>
           <div className="details-panel-overlay" onClick={closeDetails}></div>
+
           <aside className="details-panel open">
             <div className="details-panel-header">
               <div className="details-panel-icon">🚚</div>
+
               <div className="details-panel-head-text">
                 <h3>{selectedDispatch?.dispatch_number || "Local Dispatch"}</h3>
                 <p>
                   {selectedDispatch
-                    ? `${selectedDispatch.client_name} · ${formatDate(selectedDispatch.dispatch_date)} · ${getWindowStart(selectedDispatch.delivery_window)}`
+                    ? `${selectedDispatch.client_name} · ${formatDate(
+                        selectedDispatch.dispatch_date
+                      )} · ${getWindowStart(selectedDispatch.delivery_window)}`
                     : "Loading..."}
                 </p>
               </div>
-              <button type="button" className="details-panel-close" onClick={closeDetails}>✕</button>
+
+              <button type="button" className="details-panel-close" onClick={closeDetails}>
+                ✕
+              </button>
             </div>
 
             <div className="details-panel-body">
               {panelLoading || !selectedDispatch ? (
-                <div className="ib ib-i"><span>⏳</span><div>Loading dispatch details...</div></div>
+                <div className="ib ib-i">
+                  <span>⏳</span>
+                  <div>Loading dispatch details...</div>
+                </div>
               ) : (
                 <>
                   <div className="details-panel-grid">
-                    <div className="details-stat-card"><label>DISPATCH NO.</label><span>{selectedDispatch.dispatch_number}</span></div>
-                    <div className="details-stat-card"><label>STATUS</label><span>• {normalizeStatus(selectedDispatch.status)}</span></div>
-                    <div className="details-stat-card"><label>CUSTOMER</label><span>{selectedDispatch.client_name}</span></div>
-                    <div className="details-stat-card"><label>DATE</label><span>{formatDate(selectedDispatch.dispatch_date)}</span></div>
-                    <div className="details-stat-card"><label>DEPARTURE TIME</label><span>{getWindowStart(selectedDispatch.delivery_window)}</span></div>
-                    <div className="details-stat-card"><label>DRIVER</label><span>{selectedDispatch.driver_name || "—"}</span></div>
-                    <div className="details-stat-card"><label>ITEM COUNT</label><span>{selectedDispatch.item_count || 0}</span></div>
-                    <div className="details-stat-card"><label>TOTAL WEIGHT</label><span>{Number(selectedDispatch.total_weight || 0)} kg</span></div>
+                    <div className="details-stat-card">
+                      <label>DISPATCH NO.</label>
+                      <span className="ld-panel-dispatch-no">{selectedDispatch.dispatch_number}</span>
+                    </div>
+
+                    <div className="details-stat-card">
+                      <label>STATUS</label>
+                      <span className="ld-panel-status-text">• {normalizeStatus(selectedDispatch.status)}</span>
+                    </div>
+
+                    <div className="details-stat-card">
+                      <label>CUSTOMER</label>
+                      <span className="ld-panel-customer">{selectedDispatch.client_name}</span>
+                    </div>
+
+                    <div className="details-stat-card">
+                      <label>DATE</label>
+                      <span>{formatDate(selectedDispatch.dispatch_date)}</span>
+                    </div>
+
+                    <div className="details-stat-card">
+                      <label>DEPARTURE TIME</label>
+                      <span>{getWindowStart(selectedDispatch.delivery_window)}</span>
+                    </div>
+
+                    <div className="details-stat-card">
+                      <label>DRIVER</label>
+                      <span>{selectedDispatch.driver_name || "—"}</span>
+                    </div>
+
+                    <div className="details-stat-card">
+                      <label>ITEM COUNT</label>
+                      <span className="ld-panel-strong">{selectedDispatch.item_count || 0}</span>
+                    </div>
+
+                    <div className="details-stat-card">
+                      <label>TOTAL WEIGHT</label>
+                      <span className="ld-panel-strong">{Number(selectedDispatch.total_weight || 0)} kg</span>
+                    </div>
                   </div>
 
-                  <div className="fst" style={{ marginTop: 18 }}>Items Dispatched</div>
+                  <div className="fst ld-panel-section-title" style={{ marginTop: 18 }}>
+                    Items Dispatched
+                  </div>
 
-                  <table className="it">
+                  <table className="it ld-panel-mini-table">
                     <thead>
-                      <tr><th>ITEM</th><th>BATCH</th><th>QTY</th><th>FEFO</th></tr>
+                      <tr>
+                        <th>ITEM</th>
+                        <th>BATCH</th>
+                        <th>QTY</th>
+                        <th>FEFO</th>
+                      </tr>
                     </thead>
                     <tbody>
                       {(selectedDispatch.items || []).map((item) => (
                         <tr key={item.id}>
-                          <td style={{ fontWeight: 600 }}>{item.item_name}</td>
-                          <td>{item.batch_code || "—"}</td>
-                          <td>{item.quantity} {item.unit || ""}</td>
+                          <td className="ld-panel-item-name">{item.item_name}</td>
+                          <td className="ld-panel-batch">{item.batch_code || "—"}</td>
+                          <td>
+                            {item.quantity} {item.unit || ""}
+                          </td>
                           <td>{renderFefoBadge(item.expiry_date)}</td>
                         </tr>
                       ))}
@@ -543,31 +740,53 @@ export default function DispatchListPage() {
               )}
             </div>
 
-            <div className="details-panel-footer">
-              {selectedDispatch && String(selectedDispatch.status || "").toLowerCase() === "scheduled" ? (
+            <div style={styles.panelFooter}>
+              {selectedDispatch &&
+              String(selectedDispatch.status || "").toLowerCase() === "scheduled" ? (
                 <>
                   <button
                     type="button"
-                    className="btn btn-p details-panel-btn-main"
-                    style={{ background: "var(--s)", border: "none" }}
+                    style={styles.panelMainGreen}
                     onClick={() => markDelivered(selectedDispatch.id)}
                   >
                     ✅ Mark Delivered
                   </button>
-                  <button type="button" className="btn btn-s" onClick={() => printDispatch(selectedDispatch.id)}>
+
+                  <button
+                    type="button"
+                    style={styles.panelSide}
+                    onClick={() => printDispatch(selectedDispatch.id)}
+                  >
                     🖨️ Print DN
                   </button>
                 </>
-              ) : selectedDispatch ? (
+              ) : (
                 <>
-                  <button type="button" className="btn btn-s details-panel-btn-main" onClick={() => printDispatch(selectedDispatch.id)}>
+                  <button
+                    type="button"
+                    style={styles.panelMainGreen}
+                    onClick={() => {
+                      if (selectedDispatch?.id) {
+                        markDelivered(selectedDispatch.id);
+                      }
+                    }}
+                  >
+                    ✅ Mark Delivered
+                  </button>
+
+                  <button
+                    type="button"
+                    style={styles.panelSide}
+                    onClick={() => {
+                      if (selectedDispatch?.id) {
+                        printDispatch(selectedDispatch.id);
+                      }
+                    }}
+                  >
                     🖨️ Print DN
                   </button>
-                  <button type="button" className="btn btn-s" onClick={() => navigate("/returns/add")}>
-                    ↩️ Record Return
-                  </button>
                 </>
-              ) : null}
+              )}
             </div>
           </aside>
         </>
@@ -575,14 +794,20 @@ export default function DispatchListPage() {
 
       {showModal && (
         <div className="modal-backdrop" onClick={closeModal}>
-          <div className="md md-xl" style={{ maxWidth: 980 }} onClick={(e) => e.stopPropagation()}>
+          <div
+            className="md md-lg local-dispatch-modal-shell"
+            style={styles.modalShell}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="md-h">
               <h3>🚚 New Local Dispatch</h3>
-              <button type="button" className="md-x" onClick={closeModal}>✕</button>
+              <button type="button" className="md-x" onClick={closeModal}>
+                ✕
+              </button>
             </div>
 
-            <form onSubmit={handleCreateDispatch}>
-              <div className="md-b">
+            <form onSubmit={handleCreateDispatch} style={styles.modalForm}>
+              <div className="md-b local-dispatch-modal-body" style={styles.modalBody}>
                 <div className="ib ib-s">
                   <span>📍</span>
                   <div>
@@ -593,46 +818,89 @@ export default function DispatchListPage() {
 
                 <div className="fr">
                   <div className="ff">
-                    <label className="fl">Customer *</label>
+                    <label className="fl">
+                      Customer <span className="rq">*</span>
+                    </label>
                     <select className="fc" name="client_name" value={form.client_name} onChange={handleFormChange}>
                       <option value="">Select customer</option>
                       {LOCAL_CUSTOMERS.map((customer) => (
-                        <option key={customer.label} value={customer.label}>{customer.label}</option>
+                        <option key={customer.label} value={customer.label}>
+                          {customer.label}
+                        </option>
                       ))}
                     </select>
                   </div>
+
                   <div className="ff">
-                    <label className="fl">Dispatch Date *</label>
-                    <input className="fc" type="date" name="dispatch_date" value={form.dispatch_date} onChange={handleFormChange} />
+                    <label className="fl">
+                      Dispatch Date <span className="rq">*</span>
+                    </label>
+                    <input
+                      className="fc"
+                      type="date"
+                      name="dispatch_date"
+                      value={form.dispatch_date}
+                      onChange={handleFormChange}
+                    />
                   </div>
                 </div>
 
                 <div className="fr3">
                   <div className="ff">
                     <label className="fl">Driver</label>
-                    <input className="fc" name="driver_name" value={form.driver_name} onChange={handleFormChange} placeholder="e.g. Nuwan" />
+                    <input
+                      className="fc"
+                      name="driver_name"
+                      value={form.driver_name}
+                      onChange={handleFormChange}
+                      placeholder="e.g. Nuwan"
+                    />
                   </div>
+
                   <div className="ff">
                     <label className="fl">Vehicle No.</label>
-                    <input className="fc" name="vehicle_number" value={form.vehicle_number} onChange={handleFormChange} placeholder="WP CAS-XXXX" />
+                    <input
+                      className="fc"
+                      name="vehicle_number"
+                      value={form.vehicle_number}
+                      onChange={handleFormChange}
+                      placeholder="WP CAS-XXXX"
+                    />
                   </div>
+
                   <div className="ff">
                     <label className="fl">Delivery Window</label>
-                    <input className="fc" name="delivery_window" value={form.delivery_window} onChange={handleFormChange} placeholder="05:00 – 07:00 AM" />
+                    <input
+                      className="fc"
+                      name="delivery_window"
+                      value={form.delivery_window}
+                      onChange={handleFormChange}
+                      placeholder="05:00 – 07:00 AM"
+                    />
                   </div>
                 </div>
 
                 <div className="fs2">
                   <div className="fst">Items — FEFO Auto-Selected</div>
+
                   <table className="it">
                     <thead>
-                      <tr><th>ITEM</th><th>BATCH (FEFO)</th><th>QTY</th><th>PACKAGING</th><th></th></tr>
+                      <tr>
+                        <th>ITEM</th>
+                        <th>BATCH (FEFO)</th>
+                        <th>QTY</th>
+                        <th>PACKAGING</th>
+                        <th></th>
+                      </tr>
                     </thead>
                     <tbody>
                       {itemRows.map((row, index) => (
                         <tr key={index}>
                           <td>
-                            <select value={row.item_id} onChange={(e) => handleItemChange(index, "item_id", e.target.value)}>
+                            <select
+                              value={row.item_id}
+                              onChange={(e) => handleItemChange(index, "item_id", e.target.value)}
+                            >
                               <option value="">Select item</option>
                               {inventory.map((item) => (
                                 <option key={item.item_id || item.id} value={item.item_id || item.id}>
@@ -641,65 +909,115 @@ export default function DispatchListPage() {
                               ))}
                             </select>
                           </td>
+
                           <td>
-                            <select value={row.batch_id} onChange={(e) => handleItemChange(index, "batch_id", e.target.value)}>
+                            <select
+                              value={row.batch_id}
+                              onChange={(e) => handleItemChange(index, "batch_id", e.target.value)}
+                            >
                               <option value="">Select batch</option>
                               {(batchOptions[index] || []).map((batch) => (
-                                <option key={batch.id} value={batch.id}>{batchOptionLabel(batch)}</option>
+                                <option key={batch.id} value={batch.id}>
+                                  {batchOptionLabel(batch)}
+                                </option>
                               ))}
                             </select>
                           </td>
+
                           <td>
-                            <input type="number" min="0" step="0.01" value={row.quantity} onChange={(e) => handleItemChange(index, "quantity", e.target.value)} />
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={row.quantity}
+                              onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
+                            />
                           </td>
+
                           <td>
-                            <select value={row.packaging} onChange={(e) => handleItemChange(index, "packaging", e.target.value)}>
+                            <select
+                              value={row.packaging}
+                              onChange={(e) => handleItemChange(index, "packaging", e.target.value)}
+                            >
                               <option value="Cardboard Box">Cardboard Box</option>
                               <option value="Crate">Crate</option>
                               <option value="Thermocol Box">Thermocol Box</option>
                             </select>
                           </td>
+
                           <td>
-                            <button type="button" className="ab d" onClick={() => removeItemRow(index)}>✕</button>
+                            <button type="button" className="ab d" onClick={() => removeItemRow(index)}>
+                              ✕
+                            </button>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
 
-                  <button type="button" className="add-r" onClick={addItemRow}>＋ Add Item</button>
+                  <button type="button" className="add-r" onClick={addItemRow}>
+                    ＋ Add Item
+                  </button>
                 </div>
 
-                <div className="fs2">
-                  <div className="fst">Documents to Generate</div>
-                  <label className="ck">
-                    <input type="checkbox" checked={form.docs.delivery_note} onChange={() => toggleDocument("delivery_note")} />
-                    <span>Delivery Note (DN)</span>
-                  </label>
-                  <label className="ck">
-                    <input type="checkbox" checked={form.docs.local_invoice} onChange={() => toggleDocument("local_invoice")} />
-                    <span>Local Invoice</span>
-                  </label>
-                  <label className="ck">
-                    <input type="checkbox" checked={form.docs.goods_dispatch_note} onChange={() => toggleDocument("goods_dispatch_note")} />
-                    <span>Goods Dispatch Note</span>
-                  </label>
+                <div className="ff local-dispatch-docs-block">
+                  <label className="fl">Documents to Generate</label>
+
+                  <ul className="ck-l">
+                    <li>
+                      <input
+                        type="checkbox"
+                        checked={form.docs.delivery_note}
+                        onChange={() => toggleDocument("delivery_note")}
+                      />
+                      <span>Delivery Note (DN)</span>
+                    </li>
+
+                    <li>
+                      <input
+                        type="checkbox"
+                        checked={form.docs.local_invoice}
+                        onChange={() => toggleDocument("local_invoice")}
+                      />
+                      <span>Local Invoice</span>
+                    </li>
+
+                    <li>
+                      <input
+                        type="checkbox"
+                        checked={form.docs.goods_dispatch_note}
+                        onChange={() => toggleDocument("goods_dispatch_note")}
+                      />
+                      <span>Goods Dispatch Note</span>
+                    </li>
+                  </ul>
                 </div>
 
                 <div className="ff">
                   <label className="fl">Remarks</label>
-                  <textarea className="fc" name="remarks" value={form.remarks} onChange={handleFormChange} placeholder="Delivery notes..." />
+                  <textarea
+                    className="fc"
+                    name="remarks"
+                    value={form.remarks}
+                    onChange={handleFormChange}
+                    placeholder="Delivery notes..."
+                  />
                 </div>
 
-                <div className="ib ib-i" style={{ marginTop: 12 }}>
+                <div className="ib ib-i local-dispatch-draft-weight">
                   <span>🚚</span>
-                  <div>Draft total weight: <strong>{totalDraftWeight.toFixed(2)} kg</strong></div>
+                  <div>
+                    Draft total weight: <strong>{totalDraftWeight.toFixed(2)} kg</strong>
+                  </div>
                 </div>
               </div>
 
-              <div className="md-f">
-                <button type="button" className="btn btn-s" onClick={closeModal}>Cancel</button>
-                <button type="submit" className="btn btn-p" disabled={saving}>
+              <div style={styles.modalFooter}>
+                <button type="button" style={styles.modalCancel} onClick={closeModal}>
+                  Cancel
+                </button>
+
+                <button type="submit" style={styles.modalSubmit} disabled={saving}>
                   {saving ? "Saving..." : "Create Dispatch + Print DN"}
                 </button>
               </div>
