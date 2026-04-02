@@ -267,7 +267,7 @@ const actionButtons = {
     { label: "🗑 Record Wastage", to: "/wastage/add", className: "btn btn-p btn-sm" },
   ],
   "/wastage": [{ label: "🗑 Record Wastage", to: "/wastage/add", className: "btn btn-p btn-sm" }],
-  "/dispatch/local": [{ label: "+ New Dispatch", to: "/dispatch/local/add", className: "btn btn-p btn-sm" }],
+  "/dispatch/local": [{label: "+ New Dispatch",eventName: "fw-open-local-dispatch-modal",className: "btn btn-p btn-sm",},],  
   "/dispatch/global": [{ label: "+ New Shipment", eventName: "fw-open-global-shipment-modal", className: "btn btn-p btn-sm" }],
   "/export-documents": [{ label: "+ Create Export Document", to: "/export-documents/add", className: "btn btn-p btn-sm" }],  
   "/users": [{ label: "+ Add User", to: "/users/add", className: "btn btn-p btn-sm", disabled: true }],

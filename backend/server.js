@@ -35,8 +35,8 @@ app.use("/api/purchase-orders", purchaseOrderRoutes);
 app.use("/api/grn", grnRoutes);
 app.use("/api/returns", returnRoutes);
 app.use("/api/wastage", wastageRoutes);
-app.use("/api/dispatch", dispatchRoutes);
 app.use("/api/dispatch/global", globalDispatchRoutes);
+app.use("/api/dispatch", dispatchRoutes);
 app.use("/api/export-docs", exportDocumentRoutes);
 
 app.get("/", (req, res) => {
