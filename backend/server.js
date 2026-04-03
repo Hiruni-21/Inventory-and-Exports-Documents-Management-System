@@ -37,7 +37,10 @@ app.use("/api/returns", returnRoutes);
 app.use("/api/wastage", wastageRoutes);
 app.use("/api/dispatch/global", globalDispatchRoutes);
 app.use("/api/dispatch", dispatchRoutes);
+
+/* support both old and new frontend paths */
 app.use("/api/export-docs", exportDocumentRoutes);
+app.use("/api/export-documents", exportDocumentRoutes);
 
 app.get("/", (req, res) => {
   res.send("Fresh World ERP backend is running");
