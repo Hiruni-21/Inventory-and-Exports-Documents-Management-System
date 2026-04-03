@@ -3,6 +3,7 @@ const router = express.Router();
 
 const {
   getAllExportDocuments,
+  getExportDocumentsByDispatchId,
   getExportDocumentById,
   updateExportDocuments,
   updateExportDocumentsByDispatchId,
@@ -11,8 +12,9 @@ const {
 const { verifyToken } = require("../middleware/authMiddleware");
 
 router.get("/", verifyToken, getAllExportDocuments);
-router.get("/:id", verifyToken, getExportDocumentById);
+router.get("/by-dispatch/:globalDispatchId", verifyToken, getExportDocumentsByDispatchId);
 router.put("/by-dispatch/:globalDispatchId", verifyToken, updateExportDocumentsByDispatchId);
+router.get("/:id", verifyToken, getExportDocumentById);
 router.put("/:id", verifyToken, updateExportDocuments);
 
 module.exports = router;
