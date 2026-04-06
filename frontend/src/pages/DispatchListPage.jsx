@@ -3,28 +3,57 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "../context/ToastContext";
 import api from "../utils/api";
 
-const LOCAL_CUSTOMERS = [
-  {
-    label: "Colombo Hilton — Colombo 2",
-    preferredDriver: "Ajith",
-    deliveryWindow: "05:00 – 07:00 AM",
-  },
-  {
-    label: "Cinnamon Grand — Colombo 3",
-    preferredDriver: "Chamara",
-    deliveryWindow: "05:30 – 07:30 AM",
-  },
-  {
-    label: "Galadari Hotel — Colombo 1",
-    preferredDriver: "Nuwan",
-    deliveryWindow: "04:30 – 06:30 AM",
-  },
-  {
-    label: "Kingsbury Hotel — Colombo 1",
-    preferredDriver: "Ajith",
-    deliveryWindow: "05:00 – 07:00 AM",
-  },
-];
+
+const normalizeText = (value) =>
+  String(value || "")
+    .replace(/[—–]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+
+const buildCustomerLabel = (customer) => {
+  const name = customer.customer_name || customer.customerName || "";
+  const city = customer.city || "";
+  return city ? `${name} — ${city}` : name;
+};
+
+const mapApiCustomerOption = (customer) => ({
+  id: customer.id,
+  label: buildCustomerLabel(customer),
+  customerName: customer.customer_name || customer.customerName || "",
+  city: customer.city || "",
+  preferredDriver: customer.driver_preference || customer.preferredDriver || "",
+  deliveryWindow: customer.delivery_window || customer.deliveryWindow || "",
+});
+
+const findCustomerOption = (customerOptions, rawValue) => {
+  const target = normalizeText(rawValue);
+  if (!target) return null;
+
+  return (
+    customerOptions.find((customer) => normalizeText(customer.label) === target) ||
+    customerOptions.find((customer) => normalizeText(customer.customerName) === target) ||
+    customerOptions.find((customer) =>
+      normalizeText(`${customer.customerName} - ${customer.city}`) === target
+    ) ||
+    null
+  );
+};
+
+const buildInitialForm = (customerLabel = "", customerOptions = []) => {
+  const found = findCustomerOption(customerOptions, customerLabel);
+
+  return {
+    customer_id: found?.id ? String(found.id) : "",
+    client_name: found?.label || customerLabel || "",
+    dispatch_date: new Date().toISOString().slice(0, 10),
+    driver_name: found?.preferredDriver || "",
+    vehicle_number: "",
+    delivery_window: found?.deliveryWindow || "05:00 – 07:00 AM",
+    remarks: "",
+    docs: { ...emptyDocs },
+  };
+};
 
 const emptyItemRow = {
   item_id: "",
@@ -172,20 +201,6 @@ const styles = {
   },
 };
 
-const createInitialForm = (customerLabel = "") => {
-  const found = LOCAL_CUSTOMERS.find((c) => c.label === customerLabel);
-
-  return {
-    client_name: customerLabel || "",
-    dispatch_date: new Date().toISOString().slice(0, 10),
-    driver_name: found?.preferredDriver || "",
-    vehicle_number: "",
-    delivery_window: found?.deliveryWindow || "05:00 – 07:00 AM",
-    remarks: "",
-    docs: { ...emptyDocs },
-  };
-};
-
 const formatDate = (value) => {
   if (!value) return "—";
   return String(value).slice(0, 10);
@@ -265,7 +280,8 @@ export default function DispatchListPage() {
 
   const [inventory, setInventory] = useState([]);
   const [batchOptions, setBatchOptions] = useState({});
-  const [form, setForm] = useState(createInitialForm(searchParams.get("customer") || ""));
+  const [localCustomers, setLocalCustomers] = useState([]);
+  const [form, setForm] = useState(buildInitialForm(""));
   const [itemRows, setItemRows] = useState([{ ...emptyItemRow }]);
 
   const [showDetailsPanel, setShowDetailsPanel] = useState(false);
@@ -299,16 +315,29 @@ export default function DispatchListPage() {
       toast.error("Failed to load inventory");
     }
   }, [toast]);
+const loadLocalCustomers = useCallback(async () => {
+  try {
+    const res = await api.get("/customers?type=local");
+    const customerRows = Array.isArray(res.data) ? res.data.map(mapApiCustomerOption) : [];
+    setLocalCustomers(customerRows);
+  } catch (err) {
+    console.error(err);
+    toast.error("Failed to load local customers");
+    setLocalCustomers([]);
+  }
+}, [toast]);
+
 
   useEffect(() => {
     loadDispatches();
     loadInventory();
-  }, [loadDispatches, loadInventory]);
+    loadLocalCustomers();
+  }, [loadDispatches, loadInventory, loadLocalCustomers]);
 
   useEffect(() => {
     const openModalFromTopbar = () => {
       const customerFromQuery = searchParams.get("customer") || "";
-      setForm(createInitialForm(customerFromQuery));
+      setForm(buildInitialForm(customerFromQuery, localCustomers));
       setItemRows([{ ...emptyItemRow }]);
       setBatchOptions({});
       setShowModal(true);
@@ -317,7 +346,7 @@ export default function DispatchListPage() {
     window.addEventListener("fw-open-local-dispatch-modal", openModalFromTopbar);
     return () =>
       window.removeEventListener("fw-open-local-dispatch-modal", openModalFromTopbar);
-  }, [searchParams]);
+  }, [localCustomers, searchParams]);
 
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -330,6 +359,22 @@ export default function DispatchListPage() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+useEffect(() => {
+  const customerFromQuery = searchParams.get("customer") || "";
+  if (!customerFromQuery || !localCustomers.length) return;
+
+  const found = findCustomerOption(localCustomers, customerFromQuery);
+  if (!found) return;
+
+  setForm((prev) => ({
+    ...prev,
+    customer_id: String(found.id),
+    client_name: found.label,
+    driver_name: prev.driver_name || found.preferredDriver || "",
+    delivery_window: prev.delivery_window || found.deliveryWindow || "05:00 – 07:00 AM",
+  }));
+}, [localCustomers, searchParams]);
+
 
   const todayString = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
@@ -392,7 +437,7 @@ export default function DispatchListPage() {
 
   const closeModal = () => {
     setShowModal(false);
-    setForm(createInitialForm(searchParams.get("customer") || ""));
+    setForm(buildInitialForm(searchParams.get("customer") || "", localCustomers));
     setItemRows([{ ...emptyItemRow }]);
     setBatchOptions({});
   };
@@ -400,11 +445,13 @@ export default function DispatchListPage() {
   const handleFormChange = (e) => {
     const { name, value } = e.target;
 
-    if (name === "client_name") {
-      const found = LOCAL_CUSTOMERS.find((c) => c.label === value);
+    if (name === "customer_id") {
+      const found = localCustomers.find((customer) => String(customer.id) === String(value));
+
       setForm((prev) => ({
         ...prev,
-        client_name: value,
+        customer_id: value,
+        client_name: found?.label || "",
         driver_name: found?.preferredDriver || prev.driver_name,
         delivery_window: found?.deliveryWindow || prev.delivery_window,
       }));
@@ -485,6 +532,7 @@ export default function DispatchListPage() {
       setSaving(true);
 
       const res = await api.post("/dispatch", {
+        customer_id: form.customer_id ? Number(form.customer_id) : null,
         client_name: form.client_name,
         dispatch_date: form.dispatch_date,
         driver_name: form.driver_name,
@@ -821,10 +869,15 @@ export default function DispatchListPage() {
                     <label className="fl">
                       Customer <span className="rq">*</span>
                     </label>
-                    <select className="fc" name="client_name" value={form.client_name} onChange={handleFormChange}>
+                    <select
+                      className="fc"
+                      name="customer_id"
+                      value={form.customer_id}
+                      onChange={handleFormChange}
+                    >
                       <option value="">Select customer</option>
-                      {LOCAL_CUSTOMERS.map((customer) => (
-                        <option key={customer.label} value={customer.label}>
+                      {localCustomers.map((customer) => (
+                        <option key={customer.id} value={customer.id}>
                           {customer.label}
                         </option>
                       ))}
