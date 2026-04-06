@@ -149,7 +149,7 @@ export default function LocalCustomersPage() {
   }, []);
 
   const filteredCustomers = useMemo(() => {
-    return customers.filter((customer) => {
+    const rows = customers.filter((customer) => {
       const q = search.toLowerCase().trim();
 
       const matchesSearch =
@@ -162,9 +162,15 @@ export default function LocalCustomersPage() {
       const matchesCity = cityFilter === "All Cities" || customer.city === cityFilter;
       return matchesSearch && matchesCity;
     });
-  }, [customers, search, cityFilter]);
 
-  useEffect(() => {
+    return rows.sort((a, b) =>
+      String(a.code || "").localeCompare(String(b.code || ""), undefined, {
+        numeric: true,
+        sensitivity: "base",
+      })
+    );
+  }, [customers, search, cityFilter]);
+    useEffect(() => {
     if (!showModal) return;
 
     const onKeyDown = (e) => {
