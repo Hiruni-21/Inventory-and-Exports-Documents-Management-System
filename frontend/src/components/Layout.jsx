@@ -244,8 +244,6 @@ const pageMeta = {
   "/dispatch/local": { title: "Local Dispatch", subtitle: "Lorry deliveries · Sri Lanka" },
   "/dispatch/global": { title: "Global Dispatch", subtitle: "Export shipments · Maldives & international" },
   "/dispatch/global/add": { title: "Dispatch", subtitle: "Create dispatch" },
-  "/export-documents": { title: "Export Documents", subtitle: "Shipment document sets" },  
-  "/dispatch/global/add": { title: "Dispatch", subtitle: "Create dispatch" },  
   "/export-documents": { title: "Export Documents", subtitle: "Shipment document sets" },
   "/export-documents/add": { title: "Export Documents", subtitle: "Create export document" },
   "/reports": { title: "Reports & Analytics", subtitle: "Operational reporting" },
@@ -269,8 +267,7 @@ const actionButtons = {
   "/wastage": [{ label: "🗑 Record Wastage", to: "/wastage/add", className: "btn btn-p btn-sm" }],
   "/dispatch/local": [{label: "+ New Dispatch",eventName: "fw-open-local-dispatch-modal",className: "btn btn-p btn-sm",},],  
   "/dispatch/global": [{ label: "+ New Shipment", eventName: "fw-open-global-shipment-modal", className: "btn btn-p btn-sm" }],
-  "/export-documents": [{ label: "+ Create Export Document", to: "/export-documents/add", className: "btn btn-p btn-sm" }],  
-  "/users": [{ label: "+ Add User", to: "/users/add", className: "btn btn-p btn-sm", disabled: true }],
+  "/export-documents": [{ label: "+ Create Document Set", eventName: "fw-open-export-docs-modal", className: "btn btn-p btn-sm" }],  "/users": [{ label: "+ Add User", to: "/users/add", className: "btn btn-p btn-sm", disabled: true }],
 
 "/customers/local": [
   {
