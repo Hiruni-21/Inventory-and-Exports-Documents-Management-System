@@ -8,7 +8,7 @@ const normalizeAirlinePreference = (value) => {
 };
 
 const buildNextCustomerCode = (type, existingRows) => {
-  const prefix = type === "global" ? "FW-CLT-G" : "FW-CLT-";
+  const prefix = type === "global" ? "FW-CLT-G" : "FW-CLT-L";
 
   const maxNum = (existingRows || []).reduce((max, row) => {
     const code = String(row.customer_code || "");
@@ -29,6 +29,7 @@ const getCustomers = (req, res) => {
       c.customer_code,
       c.customer_type,
       c.customer_name,
+      c.group_name,
       c.contact_person,
       c.phone,
       c.whatsapp_number,
@@ -36,8 +37,10 @@ const getCustomers = (req, res) => {
       c.address,
       c.city,
       c.delivery_window,
+      c.payment_terms,
       c.returns_policy,
       c.driver_preference,
+      c.notes,
       c.location_island,
       c.airline_preference,
       c.incoterm,
@@ -79,7 +82,14 @@ const getCustomers = (req, res) => {
       });
     }
 
-    res.json(rows);
+    const normalized = rows.map((row) => ({
+      ...row,
+      whatsapp: row.whatsapp_number || "",
+      orders_count: row.customer_type === "local" ? Number(row.shipment_count || 0) : 0,
+      shipments_count: row.customer_type === "global" ? Number(row.shipment_count || 0) : 0,
+    }));
+
+    res.json(normalized);
   });
 };
 
@@ -92,6 +102,7 @@ const getCustomerById = (req, res) => {
       c.customer_code,
       c.customer_type,
       c.customer_name,
+      c.group_name,
       c.contact_person,
       c.phone,
       c.whatsapp_number,
@@ -99,8 +110,10 @@ const getCustomerById = (req, res) => {
       c.address,
       c.city,
       c.delivery_window,
+      c.payment_terms,
       c.returns_policy,
       c.driver_preference,
+      c.notes,
       c.location_island,
       c.airline_preference,
       c.incoterm,
@@ -139,7 +152,12 @@ const getCustomerById = (req, res) => {
       return res.status(404).json({ message: "Customer not found" });
     }
 
-    const customer = rows[0];
+    const customer = {
+      ...rows[0],
+      whatsapp: rows[0].whatsapp_number || "",
+      orders_count: rows[0].customer_type === "local" ? Number(rows[0].shipment_count || 0) : 0,
+      shipments_count: rows[0].customer_type === "global" ? Number(rows[0].shipment_count || 0) : 0,
+    };
 
     if (customer.customer_type === "global") {
       const shipmentsSql = `
@@ -210,15 +228,19 @@ const createCustomer = (req, res) => {
     customer_code,
     customer_type,
     customer_name,
+    group_name,
     contact_person,
     phone,
     whatsapp_number,
+    whatsapp,
     email,
     address,
     city,
     delivery_window,
+    payment_terms,
     returns_policy,
     driver_preference,
+    notes,
     location_island,
     airline_preference,
     incoterm,
@@ -232,6 +254,8 @@ const createCustomer = (req, res) => {
     });
   }
 
+  const finalWhatsapp = whatsapp_number || whatsapp || phone || null;
+
   const createNow = (finalCode) => {
     const sql = `
       INSERT INTO customers
@@ -239,6 +263,7 @@ const createCustomer = (req, res) => {
         customer_code,
         customer_type,
         customer_name,
+        group_name,
         contact_person,
         phone,
         whatsapp_number,
@@ -246,8 +271,10 @@ const createCustomer = (req, res) => {
         address,
         city,
         delivery_window,
+        payment_terms,
         returns_policy,
         driver_preference,
+        notes,
         location_island,
         airline_preference,
         incoterm,
@@ -255,7 +282,7 @@ const createCustomer = (req, res) => {
         status,
         created_by
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     db.query(
@@ -264,15 +291,18 @@ const createCustomer = (req, res) => {
         finalCode,
         customer_type,
         customer_name,
+        group_name || null,
         contact_person || null,
         phone || null,
-        whatsapp_number || phone || null,
+        finalWhatsapp,
         email || null,
         address || null,
         city || null,
         delivery_window || null,
+        payment_terms || null,
         returns_policy || null,
         driver_preference || null,
+        notes || null,
         location_island || null,
         customer_type === "global" ? normalizeAirlinePreference(airline_preference) : null,
         customer_type === "global" ? (incoterm || "CIF") : null,
@@ -325,15 +355,19 @@ const updateCustomer = (req, res) => {
 
   const {
     customer_name,
+    group_name,
     contact_person,
     phone,
     whatsapp_number,
+    whatsapp,
     email,
     address,
     city,
     delivery_window,
+    payment_terms,
     returns_policy,
     driver_preference,
+    notes,
     location_island,
     airline_preference,
     incoterm,
@@ -341,10 +375,13 @@ const updateCustomer = (req, res) => {
     status,
   } = req.body;
 
+  const finalWhatsapp = whatsapp_number || whatsapp || phone || null;
+
   const sql = `
     UPDATE customers
     SET
       customer_name = ?,
+      group_name = ?,
       contact_person = ?,
       phone = ?,
       whatsapp_number = ?,
@@ -352,8 +389,10 @@ const updateCustomer = (req, res) => {
       address = ?,
       city = ?,
       delivery_window = ?,
+      payment_terms = ?,
       returns_policy = ?,
       driver_preference = ?,
+      notes = ?,
       location_island = ?,
       airline_preference = ?,
       incoterm = ?,
@@ -366,15 +405,18 @@ const updateCustomer = (req, res) => {
     sql,
     [
       customer_name,
+      group_name || null,
       contact_person || null,
       phone || null,
-      whatsapp_number || phone || null,
+      finalWhatsapp,
       email || null,
       address || null,
       city || null,
       delivery_window || null,
+      payment_terms || null,
       returns_policy || null,
       driver_preference || null,
+      notes || null,
       location_island || null,
       airline_preference ? normalizeAirlinePreference(airline_preference) : null,
       incoterm || null,
