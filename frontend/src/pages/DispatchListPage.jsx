@@ -394,18 +394,30 @@ useEffect(() => {
   );
 
   const filteredRows = useMemo(() => {
-    if (tab === "Today") {
-      return rows.filter((row) => formatDate(row.dispatch_date) === todayString);
-    }
-    if (tab === "Scheduled") {
-      return rows.filter((row) => String(row.status || "").toLowerCase() === "scheduled");
-    }
-    if (tab === "Delivered") {
-      return rows.filter((row) => String(row.status || "").toLowerCase() === "delivered");
-    }
-    return rows;
-  }, [rows, tab, todayString]);
+    let list = rows;
 
+    if (tab === "Today") {
+      list = rows.filter((row) => formatDate(row.dispatch_date) === todayString);
+    } else if (tab === "Scheduled") {
+      list = rows.filter((row) => String(row.status || "").toLowerCase() === "scheduled");
+    } else if (tab === "Delivered") {
+      list = rows.filter((row) => String(row.status || "").toLowerCase() === "delivered");
+    }
+
+    return [...list].sort((a, b) => {
+      const dateA = new Date(a.dispatch_date || 0).getTime();
+      const dateB = new Date(b.dispatch_date || 0).getTime();
+
+      if (dateB !== dateA) return dateB - dateA;
+
+      return String(b.dispatch_number || "").localeCompare(
+        String(a.dispatch_number || ""),
+        undefined,
+        { numeric: true, sensitivity: "base" }
+      );
+    });
+  }, [rows, tab, todayString]);
+  
   const totalDraftWeight = useMemo(
     () => itemRows.reduce((sum, row) => sum + Number(row.quantity || 0), 0),
     [itemRows]
