@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
+import { useToast } from "../context/ToastContext";
 
 const AddCategoryPage = () => {
   const navigate = useNavigate();
+  const toast = useToast();
 
   const [form, setForm] = useState({
     category_name: "",
@@ -11,75 +13,97 @@ const AddCategoryPage = () => {
     status: "active",
   });
 
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const handleChange = (e) => {
-    setForm((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
-    setSuccess("");
+
+    if (!form.category_name.trim()) {
+      toast.error("Category name is required");
+      return;
+    }
 
     try {
-      const token = localStorage.getItem("token");
-
-      await api.post("/items/categories", form, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      setSuccess("Category created successfully");
-
-      setTimeout(() => {
-        navigate("/categories");
-      }, 1000);
+      setSaving(true);
+      await api.post("/items/categories", form);
+      toast.success("Category created successfully");
+      navigate("/categories");
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to create category");
+      console.error(err);
+      toast.error(err?.response?.data?.message || "Failed to create category");
+    } finally {
+      setSaving(false);
     }
   };
 
   return (
-    <div className="form-page">
-      <h2>Add Category</h2>
+    <div className="md md-xl" style={{ maxWidth: "100%", display: "flex" }}>
+      <div className="md-h">
+        <h3>🗂️ Add Item Category</h3>
+        <button type="button" className="md-x" onClick={() => navigate("/categories")}>
+          ✕
+        </button>
+      </div>
 
-      {error && <div className="error-box">{error}</div>}
-      {success && <div className="success-box">{success}</div>}
+      <form onSubmit={handleSubmit}>
+        <div className="md-b">
+          <div className="ib ib-i">
+            <span>🗂️</span>
+            <div>
+              Create the categories that match your real product groups like Organic Vegetables,
+              Organic Fruits, Herbs, Dairy Products and Hotel Requirements.
+            </div>
+          </div>
 
-      <form className="custom-form" onSubmit={handleSubmit}>
-        <input
-          type="text"
-          name="category_name"
-          placeholder="Category Name"
-          value={form.category_name}
-          onChange={handleChange}
-          required
-        />
+          <div className="fs2">
+            <div className="fst">Category Details</div>
 
-        <textarea
-          name="description"
-          placeholder="Description"
-          value={form.description}
-          onChange={handleChange}
-          rows="4"
-        />
+            <div className="ff">
+              <label className="fl">Category Name</label>
+              <input
+                className="fc"
+                name="category_name"
+                value={form.category_name}
+                onChange={handleChange}
+                placeholder="Organic Vegetables"
+              />
+            </div>
 
-        <select
-          name="status"
-          value={form.status}
-          onChange={handleChange}
-        >
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </select>
+            <div className="ff">
+              <label className="fl">Description</label>
+              <textarea
+                className="fc"
+                name="description"
+                value={form.description}
+                onChange={handleChange}
+                placeholder="Fresh vegetables and produce items"
+                rows="4"
+              />
+            </div>
 
-        <button type="submit">Save Category</button>
+            <div className="ff">
+              <label className="fl">Status</label>
+              <select className="fc" name="status" value={form.status} onChange={handleChange}>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div className="md-f">
+          <button type="button" className="btn btn-s" onClick={() => navigate("/categories")}>
+            Cancel
+          </button>
+          <button type="submit" className="btn btn-p" disabled={saving}>
+            {saving ? "Saving..." : "Save Category"}
+          </button>
+        </div>
       </form>
     </div>
   );
