@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
+import { useToast } from "../context/ToastContext";
 
 const AddSupplierPage = () => {
   const navigate = useNavigate();
+  const toast = useToast();
 
   const [form, setForm] = useState({
     supplier_name: "",
@@ -15,108 +17,173 @@ const AddSupplierPage = () => {
     rating_score: "",
   });
 
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
-    setSuccess("");
+
+    if (!form.supplier_name.trim() || !form.contact_number.trim()) {
+      toast.error("Supplier name and contact number are required");
+      return;
+    }
 
     try {
-      const token = localStorage.getItem("token");
+      setSaving(true);
 
-      await api.post("/suppliers", form, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      await api.post("/suppliers", {
+        supplier_name: form.supplier_name.trim(),
+        contact_number: form.contact_number.trim(),
+        email: form.email.trim(),
+        address: form.address.trim(),
+        lead_time_days: Number(form.lead_time_days || 0),
+        return_eligibility: form.return_eligibility,
+        rating_score: Number(form.rating_score || 0),
       });
 
-      setSuccess("Supplier added successfully");
-
-      setTimeout(() => {
-        navigate("/suppliers");
-      }, 1000);
+      toast.success("Supplier added successfully");
+      navigate("/suppliers");
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to add supplier");
+      console.error(err);
+      toast.error(err?.response?.data?.message || "Failed to add supplier");
+    } finally {
+      setSaving(false);
     }
   };
 
   return (
-    <div className="form-page">
-      <h2>Add Supplier</h2>
+    <>
+      <div className="ib ib-i">
+        <span>🌿</span>
+        <div>
+          Add suppliers for procurement and receiving. Save their contact details, lead time,
+          return eligibility and rating.
+        </div>
+      </div>
 
-      {error && <div className="error-box">{error}</div>}
-      {success && <div className="success-box">{success}</div>}
+      <form onSubmit={handleSubmit}>
+        <div className="content-card" style={{ marginTop: 16 }}>
+          <div className="card-header-row">
+            <h3>🌿 Add Supplier</h3>
+          </div>
 
-      <form className="custom-form" onSubmit={handleSubmit}>
-        <input
-          type="text"
-          name="supplier_name"
-          placeholder="Supplier Name"
-          value={form.supplier_name}
-          onChange={handleChange}
-          required
-        />
+          <div style={{ padding: 20 }}>
+            <div className="fs2">
+              <div className="fst">Supplier Details</div>
 
-        <input
-          type="text"
-          name="contact_number"
-          placeholder="Contact Number"
-          value={form.contact_number}
-          onChange={handleChange}
-          required
-        />
+              <div className="fr">
+                <div className="ff">
+                  <label className="fl">
+                    Supplier Name <span className="rq">*</span>
+                  </label>
+                  <input
+                    className="fc"
+                    name="supplier_name"
+                    value={form.supplier_name}
+                    onChange={handleChange}
+                    placeholder="e.g. Green Farm Exports"
+                  />
+                </div>
 
-        <input
-          type="email"
-          name="email"
-          placeholder="Email"
-          value={form.email}
-          onChange={handleChange}
-        />
+                <div className="ff">
+                  <label className="fl">
+                    Contact Number <span className="rq">*</span>
+                  </label>
+                  <input
+                    className="fc"
+                    name="contact_number"
+                    value={form.contact_number}
+                    onChange={handleChange}
+                    placeholder="0771234567"
+                  />
+                </div>
+              </div>
 
-        <textarea
-          name="address"
-          placeholder="Address"
-          value={form.address}
-          onChange={handleChange}
-          rows="4"
-        />
+              <div className="fr">
+                <div className="ff">
+                  <label className="fl">Email</label>
+                  <input
+                    className="fc"
+                    type="email"
+                    name="email"
+                    value={form.email}
+                    onChange={handleChange}
+                    placeholder="supplier@email.com"
+                  />
+                </div>
 
-        <input
-          type="number"
-          name="lead_time_days"
-          placeholder="Lead Time (days)"
-          value={form.lead_time_days}
-          onChange={handleChange}
-        />
+                <div className="ff">
+                  <label className="fl">Lead Time (days)</label>
+                  <input
+                    className="fc"
+                    type="number"
+                    name="lead_time_days"
+                    value={form.lead_time_days}
+                    onChange={handleChange}
+                    placeholder="3"
+                  />
+                </div>
+              </div>
 
-        <select
-          name="return_eligibility"
-          value={form.return_eligibility}
-          onChange={handleChange}
-        >
-          <option value="Yes">Yes</option>
-          <option value="No">No</option>
-        </select>
+              <div className="fr">
+                <div className="ff">
+                  <label className="fl">Return Eligibility</label>
+                  <select
+                    className="fc"
+                    name="return_eligibility"
+                    value={form.return_eligibility}
+                    onChange={handleChange}
+                  >
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                  </select>
+                </div>
 
-        <input
-          type="number"
-          step="0.01"
-          name="rating_score"
-          placeholder="Rating Score"
-          value={form.rating_score}
-          onChange={handleChange}
-        />
+                <div className="ff">
+                  <label className="fl">Rating Score</label>
+                  <input
+                    className="fc"
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="5"
+                    name="rating_score"
+                    value={form.rating_score}
+                    onChange={handleChange}
+                    placeholder="4.5"
+                  />
+                </div>
+              </div>
 
-        <button type="submit">Save Supplier</button>
+              <div className="ff">
+                <label className="fl">Address</label>
+                <textarea
+                  className="fc"
+                  name="address"
+                  value={form.address}
+                  onChange={handleChange}
+                  rows="4"
+                  placeholder="Supplier address..."
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="md-f" style={{ padding: "16px 20px 20px" }}>
+            <button type="button" className="btn btn-s" onClick={() => navigate("/suppliers")}>
+              Cancel
+            </button>
+
+            <button type="submit" className="btn btn-p" disabled={saving}>
+              {saving ? "Saving..." : "Save Supplier"}
+            </button>
+          </div>
+        </div>
       </form>
-    </div>
+    </>
   );
 };
 

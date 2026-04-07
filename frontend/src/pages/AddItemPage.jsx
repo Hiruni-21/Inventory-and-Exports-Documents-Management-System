@@ -3,30 +3,36 @@ import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
 import { useToast } from "../context/ToastContext";
 
-const buildNextItemCode = (items, categoryName = "") => {
-  const prefixMap = {
-    "Organic Vegetables": "VEG",
-    "Organic Fruits": "FRT",
-    Herbs: "HRB",
-    "Leafy Items & Lettuce Range": "LFL",
-    "Dairy Products": "DAR",
-    "Pussalla Products": "PUS",
-    "NorFolk Products": "NOR",
-    "Kern & Hundt Products": "KHU",
-    "Munchee Products": "MUN",
-    "Dry Items": "DRY",
-    Mushrooms: "MSH",
-    "Tea & Coffee": "TEA",
-    "Other Products": "OTH",
-    "Hotel Requirements": "HOT",
-  };
+const prefixMap = {
+  "Organic Vegetables": "VEG",
+  Vegetables: "VEG",
+  "Organic Fruits": "FRT",
+  Fruits: "FRT",
+  Herbs: "HRB",
+  "Leafy Items & Lettuce Range": "LFL",
+  "Leafy Greens": "LFL",
+  "Leafy Greens & Lettuce": "LFL",
+  "Dairy Products": "DAR",
+  "Pussalla Products": "PUS",
+  "NorFolk Products": "NOR",
+  "Kern & Hundt Products": "KHU",
+  "Munchee Products": "MUN",
+  "Dry Items": "DRY",
+  Mushrooms: "MSH",
+  "Tea & Coffee": "TEA",
+  "Other Products": "OTH",
+  "Hotel Requirements": "HOT",
+};
 
+const buildNextItemCode = (items, categoryName = "") => {
   const prefix = prefixMap[categoryName] || "ITM";
 
-  const highest = items.reduce((max, row) => {
+  const matching = items.filter((row) => String(row.code || "").includes(`FW-${prefix}-`));
+
+  const highest = matching.reduce((max, row) => {
     const match = String(row.code || "").match(/(\d+)$/);
-    const num = match ? Number(match[1]) : 0;
-    return Math.max(max, num);
+    const value = match ? Number(match[1]) : 0;
+    return Math.max(max, value);
   }, 0);
 
   return `FW-${prefix}-${String(highest + 1).padStart(3, "0")}`;
@@ -38,6 +44,8 @@ const AddItemPage = () => {
 
   const [categories, setCategories] = useState([]);
   const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState({
     code: "",
@@ -55,8 +63,6 @@ const AddItemPage = () => {
     status: "active",
   });
 
-  const [saving, setSaving] = useState(false);
-
   const selectedCategory = useMemo(
     () => categories.find((row) => String(row.id) === String(form.category_id)),
     [categories, form.category_id]
@@ -64,6 +70,8 @@ const AddItemPage = () => {
 
   const loadPage = async () => {
     try {
+      setLoading(true);
+
       const [categoriesRes, itemsRes] = await Promise.all([
         api.get("/items/categories"),
         api.get("/items"),
@@ -77,6 +85,10 @@ const AddItemPage = () => {
     } catch (err) {
       console.error(err);
       toast.error("Failed to load item form data");
+      setCategories([]);
+      setItems([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -89,7 +101,7 @@ const AddItemPage = () => {
 
     setForm((prev) => ({
       ...prev,
-      code: prev.code || buildNextItemCode(items, selectedCategory.category_name),
+      code: buildNextItemCode(items, selectedCategory.category_name),
     }));
   }, [selectedCategory, items]);
 
@@ -98,15 +110,19 @@ const AddItemPage = () => {
 
     if (name === "category_id") {
       const picked = categories.find((row) => String(row.id) === String(value));
+
       setForm((prev) => ({
         ...prev,
         category_id: value,
-        code: buildNextItemCode(items, picked?.category_name),
+        code: buildNextItemCode(items, picked?.category_name || ""),
       }));
       return;
     }
 
-    setForm((prev) => ({ ...prev, [name]: value }));
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -121,12 +137,19 @@ const AddItemPage = () => {
       setSaving(true);
 
       await api.post("/items", {
-        ...form,
+        code: form.code,
+        name: form.name.trim(),
+        botanical_name: form.botanical_name.trim(),
         category_id: Number(form.category_id),
+        type: form.type,
+        unit: form.unit.trim(),
         shelf_life_days: Number(form.shelf_life_days || 0),
         reorder_level: Number(form.reorder_level || 0),
+        storage_temp: form.storage_temp.trim(),
         unit_cost: Number(form.unit_cost || 0),
         returnable: Number(form.returnable),
+        description: form.description.trim(),
+        status: form.status,
       });
 
       toast.success("Item created successfully");
@@ -140,185 +163,229 @@ const AddItemPage = () => {
   };
 
   return (
-    <div className="md md-xl" style={{ maxWidth: "100%", display: "flex" }}>
-      <div className="md-h">
-        <h3>🥬 Add Item</h3>
-        <button type="button" className="md-x" onClick={() => navigate("/items")}>
-          ✕
-        </button>
+    <>
+      <div className="ib ib-i">
+        <span>🥬</span>
+        <div>
+          Add real Fresh World products with botanical names, category mapping, reorder level,
+          shelf life, storage temperature and unit cost.
+        </div>
       </div>
 
       <form onSubmit={handleSubmit}>
-        <div className="md-b">
-          <div className="ib ib-i">
-            <span>🥬</span>
-            <div>
-              Add real products from your Fresh World list such as organic vegetables, fruits,
-              herbs, dairy and hotel requirements.
-            </div>
+        <div className="content-card" style={{ marginTop: 16 }}>
+          <div className="card-header-row">
+            <h3>🥬 Add Item</h3>
           </div>
 
-          <div className="fs2">
-            <div className="fst">Basic Item Details</div>
-
-            <div className="fr">
-              <div className="ff">
-                <label className="fl">Item Code</label>
-                <input className="fc" name="code" value={form.code} onChange={handleChange} />
+          <div style={{ padding: 20 }}>
+            {loading ? (
+              <div className="ib ib-i">
+                <span>⏳</span>
+                <div>Loading item form data...</div>
               </div>
+            ) : (
+              <>
+                <div className="fs2">
+                  <div className="fst">Basic Item Details</div>
 
-              <div className="ff">
-                <label className="fl">Item Name</label>
-                <input
-                  className="fc"
-                  name="name"
-                  value={form.name}
-                  onChange={handleChange}
-                  placeholder="Ash Pumpkin"
-                />
-              </div>
-            </div>
+                  <div className="fr">
+                    <div className="ff">
+                      <label className="fl">
+                        Item Code <span className="rq">*</span>
+                      </label>
+                      <input
+                        className="fc"
+                        name="code"
+                        value={form.code}
+                        onChange={handleChange}
+                        placeholder="FW-VEG-001"
+                      />
+                    </div>
 
-            <div className="fr">
-              <div className="ff">
-                <label className="fl">Botanical Name</label>
-                <input
-                  className="fc"
-                  name="botanical_name"
-                  value={form.botanical_name}
-                  onChange={handleChange}
-                  placeholder="Benincasa hispida"
-                />
-              </div>
+                    <div className="ff">
+                      <label className="fl">
+                        Item Name <span className="rq">*</span>
+                      </label>
+                      <input
+                        className="fc"
+                        name="name"
+                        value={form.name}
+                        onChange={handleChange}
+                        placeholder="e.g. Ash Pumpkin"
+                      />
+                    </div>
+                  </div>
 
-              <div className="ff">
-                <label className="fl">Category</label>
-                <select className="fc" name="category_id" value={form.category_id} onChange={handleChange}>
-                  <option value="">Select category</option>
-                  {categories.map((row) => (
-                    <option key={row.id} value={row.id}>
-                      {row.category_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+                  <div className="fr">
+                    <div className="ff">
+                      <label className="fl">Botanical Name</label>
+                      <input
+                        className="fc"
+                        name="botanical_name"
+                        value={form.botanical_name}
+                        onChange={handleChange}
+                        placeholder="e.g. Benincasa hispida"
+                      />
+                    </div>
+
+                    <div className="ff">
+                      <label className="fl">
+                        Category <span className="rq">*</span>
+                      </label>
+                      <select
+                        className="fc"
+                        name="category_id"
+                        value={form.category_id}
+                        onChange={handleChange}
+                      >
+                        <option value="">Select category</option>
+                        {categories.map((row) => (
+                          <option key={row.id} value={row.id}>
+                            {row.category_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="fs2">
+                  <div className="fst">Inventory Controls</div>
+
+                  <div className="fr3">
+                    <div className="ff">
+                      <label className="fl">
+                        Type <span className="rq">*</span>
+                      </label>
+                      <select className="fc" name="type" value={form.type} onChange={handleChange}>
+                        <option value="Perishable">Perishable</option>
+                        <option value="Non-Perishable">Non-Perishable</option>
+                      </select>
+                    </div>
+
+                    <div className="ff">
+                      <label className="fl">
+                        Unit <span className="rq">*</span>
+                      </label>
+                      <input
+                        className="fc"
+                        name="unit"
+                        value={form.unit}
+                        onChange={handleChange}
+                        placeholder="kg / pcs / pkt"
+                      />
+                    </div>
+
+                    <div className="ff">
+                      <label className="fl">Shelf Life (days)</label>
+                      <input
+                        className="fc"
+                        type="number"
+                        name="shelf_life_days"
+                        value={form.shelf_life_days}
+                        onChange={handleChange}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="fr3">
+                    <div className="ff">
+                      <label className="fl">Reorder Level</label>
+                      <input
+                        className="fc"
+                        type="number"
+                        step="0.01"
+                        name="reorder_level"
+                        value={form.reorder_level}
+                        onChange={handleChange}
+                      />
+                    </div>
+
+                    <div className="ff">
+                      <label className="fl">Unit Cost</label>
+                      <input
+                        className="fc"
+                        type="number"
+                        step="0.01"
+                        name="unit_cost"
+                        value={form.unit_cost}
+                        onChange={handleChange}
+                      />
+                    </div>
+
+                    <div className="ff">
+                      <label className="fl">Returnable</label>
+                      <select
+                        className="fc"
+                        name="returnable"
+                        value={form.returnable}
+                        onChange={handleChange}
+                      >
+                        <option value={1}>Yes</option>
+                        <option value={0}>No</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="fr">
+                    <div className="ff">
+                      <label className="fl">Storage Temp</label>
+                      <input
+                        className="fc"
+                        name="storage_temp"
+                        value={form.storage_temp}
+                        onChange={handleChange}
+                        placeholder="Chilled / Ambient / Frozen"
+                      />
+                    </div>
+
+                    <div className="ff">
+                      <label className="fl">Status</label>
+                      <select
+                        className="fc"
+                        name="status"
+                        value={form.status}
+                        onChange={handleChange}
+                      >
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="ff">
+                    <label className="fl">Description</label>
+                    <textarea
+                      className="fc"
+                      name="description"
+                      value={form.description}
+                      onChange={handleChange}
+                      rows="4"
+                      placeholder="Short item notes..."
+                    />
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
-          <div className="fs2">
-            <div className="fst">Inventory Controls</div>
+          <div className="md-f" style={{ padding: "16px 20px 20px" }}>
+            <button
+              type="button"
+              className="btn btn-s"
+              onClick={() => navigate("/items")}
+            >
+              Cancel
+            </button>
 
-            <div className="fr3">
-              <div className="ff">
-                <label className="fl">Type</label>
-                <select className="fc" name="type" value={form.type} onChange={handleChange}>
-                  <option value="Perishable">Perishable</option>
-                  <option value="Non-Perishable">Non-Perishable</option>
-                </select>
-              </div>
-
-              <div className="ff">
-                <label className="fl">Unit</label>
-                <input
-                  className="fc"
-                  name="unit"
-                  value={form.unit}
-                  onChange={handleChange}
-                  placeholder="kg / pcs / pkt"
-                />
-              </div>
-
-              <div className="ff">
-                <label className="fl">Shelf Life (days)</label>
-                <input
-                  className="fc"
-                  type="number"
-                  name="shelf_life_days"
-                  value={form.shelf_life_days}
-                  onChange={handleChange}
-                />
-              </div>
-            </div>
-
-            <div className="fr3">
-              <div className="ff">
-                <label className="fl">Reorder Level</label>
-                <input
-                  className="fc"
-                  type="number"
-                  step="0.01"
-                  name="reorder_level"
-                  value={form.reorder_level}
-                  onChange={handleChange}
-                />
-              </div>
-
-              <div className="ff">
-                <label className="fl">Unit Cost</label>
-                <input
-                  className="fc"
-                  type="number"
-                  step="0.01"
-                  name="unit_cost"
-                  value={form.unit_cost}
-                  onChange={handleChange}
-                />
-              </div>
-
-              <div className="ff">
-                <label className="fl">Returnable</label>
-                <select className="fc" name="returnable" value={form.returnable} onChange={handleChange}>
-                  <option value={1}>Yes</option>
-                  <option value={0}>No</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="fr">
-              <div className="ff">
-                <label className="fl">Storage Temp</label>
-                <input
-                  className="fc"
-                  name="storage_temp"
-                  value={form.storage_temp}
-                  onChange={handleChange}
-                  placeholder="Chilled / Ambient / Frozen"
-                />
-              </div>
-
-              <div className="ff">
-                <label className="fl">Status</label>
-                <select className="fc" name="status" value={form.status} onChange={handleChange}>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="ff">
-              <label className="fl">Description</label>
-              <textarea
-                className="fc"
-                name="description"
-                value={form.description}
-                onChange={handleChange}
-                rows="4"
-                placeholder="Short item notes..."
-              />
-            </div>
+            <button type="submit" className="btn btn-p" disabled={saving || loading}>
+              {saving ? "Saving..." : "Save Item"}
+            </button>
           </div>
-        </div>
-
-        <div className="md-f">
-          <button type="button" className="btn btn-s" onClick={() => navigate("/items")}>
-            Cancel
-          </button>
-          <button type="submit" className="btn btn-p" disabled={saving}>
-            {saving ? "Saving..." : "Save Item"}
-          </button>
         </div>
       </form>
-    </div>
+    </>
   );
 };
 

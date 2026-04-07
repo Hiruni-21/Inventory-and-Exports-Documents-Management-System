@@ -30,7 +30,13 @@ const AddCategoryPage = () => {
 
     try {
       setSaving(true);
-      await api.post("/items/categories", form);
+
+      await api.post("/items/categories", {
+        category_name: form.category_name.trim(),
+        description: form.description.trim(),
+        status: form.status,
+      });
+
       toast.success("Category created successfully");
       navigate("/categories");
     } catch (err) {
@@ -42,70 +48,76 @@ const AddCategoryPage = () => {
   };
 
   return (
-    <div className="md md-xl" style={{ maxWidth: "100%", display: "flex" }}>
-      <div className="md-h">
-        <h3>🗂️ Add Item Category</h3>
-        <button type="button" className="md-x" onClick={() => navigate("/categories")}>
-          ✕
-        </button>
+    <>
+      <div className="ib ib-i">
+        <span>🗂️</span>
+        <div>
+          Create item categories that match your real Fresh World product groups such as Organic
+          Vegetables, Organic Fruits, Herbs, Dairy Products and Hotel Requirements.
+        </div>
       </div>
 
       <form onSubmit={handleSubmit}>
-        <div className="md-b">
-          <div className="ib ib-i">
-            <span>🗂️</span>
-            <div>
-              Create the categories that match your real product groups like Organic Vegetables,
-              Organic Fruits, Herbs, Dairy Products and Hotel Requirements.
+        <div className="content-card" style={{ marginTop: 16 }}>
+          <div className="card-header-row">
+            <h3>🗂️ Add Item Category</h3>
+          </div>
+
+          <div style={{ padding: 20 }}>
+            <div className="fs2">
+              <div className="fst">Category Details</div>
+
+              <div className="ff">
+                <label className="fl">
+                  Category Name <span className="rq">*</span>
+                </label>
+                <input
+                  className="fc"
+                  name="category_name"
+                  value={form.category_name}
+                  onChange={handleChange}
+                  placeholder="e.g. Organic Vegetables"
+                />
+              </div>
+
+              <div className="ff">
+                <label className="fl">Description</label>
+                <textarea
+                  className="fc"
+                  name="description"
+                  value={form.description}
+                  onChange={handleChange}
+                  placeholder="Short description for this category..."
+                  rows="4"
+                />
+              </div>
+
+              <div className="ff">
+                <label className="fl">Status</label>
+                <select className="fc" name="status" value={form.status} onChange={handleChange}>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
             </div>
           </div>
 
-          <div className="fs2">
-            <div className="fst">Category Details</div>
+          <div className="md-f" style={{ padding: "16px 20px 20px" }}>
+            <button
+              type="button"
+              className="btn btn-s"
+              onClick={() => navigate("/categories")}
+            >
+              Cancel
+            </button>
 
-            <div className="ff">
-              <label className="fl">Category Name</label>
-              <input
-                className="fc"
-                name="category_name"
-                value={form.category_name}
-                onChange={handleChange}
-                placeholder="Organic Vegetables"
-              />
-            </div>
-
-            <div className="ff">
-              <label className="fl">Description</label>
-              <textarea
-                className="fc"
-                name="description"
-                value={form.description}
-                onChange={handleChange}
-                placeholder="Fresh vegetables and produce items"
-                rows="4"
-              />
-            </div>
-
-            <div className="ff">
-              <label className="fl">Status</label>
-              <select className="fc" name="status" value={form.status} onChange={handleChange}>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </div>
+            <button type="submit" className="btn btn-p" disabled={saving}>
+              {saving ? "Saving..." : "Save Category"}
+            </button>
           </div>
-        </div>
-
-        <div className="md-f">
-          <button type="button" className="btn btn-s" onClick={() => navigate("/categories")}>
-            Cancel
-          </button>
-          <button type="submit" className="btn btn-p" disabled={saving}>
-            {saving ? "Saving..." : "Save Category"}
-          </button>
         </div>
       </form>
-    </div>
+    </>
   );
 };
 
