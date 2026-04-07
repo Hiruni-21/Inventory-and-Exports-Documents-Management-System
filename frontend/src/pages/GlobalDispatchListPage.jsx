@@ -53,10 +53,35 @@ const statusBadgeClass = (label) => {
   return "badge bg-a";
 };
 
-const docsDoneCount = (exportDocuments) => {
+const isInsuranceRequired = (incoterm) =>
+  String(incoterm || "").toUpperCase() === "CIF";
+
+const requiredDocsCount = (rowOrIncoterm) =>
+  isInsuranceRequired(
+    typeof rowOrIncoterm === "string" ? rowOrIncoterm : rowOrIncoterm?.incoterm
+  )
+    ? 7
+    : 6;
+
+const docsDoneCount = (exportDocuments, incoterm) => {
   if (!exportDocuments) return 0;
-  return DOC_FIELDS.filter((field) => exportDocuments[field] === "done").length;
+
+  const fields = isInsuranceRequired(incoterm)
+    ? DOC_FIELDS
+    : DOC_FIELDS.filter((field) => field !== "insurance_certificate_status");
+
+  return fields.filter((field) => exportDocuments[field] === "done").length;
 };
+
+const emptyDocuments = (incoterm = "CIF") => ({
+  commercial_invoice: true,
+  packing_list: true,
+  phytosanitary_certificate: false,
+  airway_bill: false,
+  certificate_of_origin: false,
+  health_certificate: false,
+  insurance_certificate: isInsuranceRequired(incoterm) ? false : false,
+});
 
 export default function GlobalDispatchListPage() {
   const navigate = useNavigate();
@@ -64,6 +89,20 @@ export default function GlobalDispatchListPage() {
   const [searchParams] = useSearchParams();
 
   const preselectCustomerId = searchParams.get("customerId") || "";
+
+  const buildShipmentForm = (customer = null) => ({
+    customer_id: customer ? String(customer.id) : "",
+    dispatch_date: new Date().toISOString().slice(0, 10),
+    departure_date: "",
+    airline: customer?.airline_preference || "UL",
+    flight_no: "",
+    awb_number: "",
+    incoterm: customer?.incoterm || "CIF",
+    remarks: "",
+    cold_chain_required:
+      Number(customer?.cold_chain_required || 0) === 1 || customer?.cold_chain_required === true,
+    documents: emptyDocuments(customer?.incoterm || "CIF"),
+  });
 
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -82,26 +121,7 @@ export default function GlobalDispatchListPage() {
   const [detailsShipment, setDetailsShipment] = useState(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
 
-  const [shipmentForm, setShipmentForm] = useState({
-    customer_id: "",
-    dispatch_date: new Date().toISOString().slice(0, 10),
-    departure_date: "",
-    airline: "UL",
-    flight_no: "",
-    awb_number: "",
-    incoterm: "CIF",
-    remarks: "",
-    cold_chain_required: false,
-    documents: {
-      commercial_invoice: true,
-      packing_list: true,
-      phytosanitary_certificate: false,
-      airway_bill: false,
-      certificate_of_origin: false,
-      health_certificate: false,
-      insurance_certificate: false,
-    },
-  });
+  const [shipmentForm, setShipmentForm] = useState(buildShipmentForm());
 
   const [shipmentItems, setShipmentItems] = useState([{ ...emptyItemRow }]);
 
@@ -143,14 +163,7 @@ export default function GlobalDispatchListPage() {
         const picked =
           customerRows.find((c) => String(c.id) === String(preselectCustomerId)) || customerRows[0];
 
-        setShipmentForm((prev) => ({
-          ...prev,
-          customer_id: String(picked.id),
-          airline: picked.airline_preference || "UL",
-          incoterm: picked.incoterm || "CIF",
-          cold_chain_required:
-            Number(picked.cold_chain_required || 0) === 1 || picked.cold_chain_required === true,
-        }));
+        setShipmentForm(buildShipmentForm(picked));
       }
     } catch (err) {
       console.error(err);
@@ -172,6 +185,20 @@ export default function GlobalDispatchListPage() {
     return () => window.removeEventListener("fw-open-global-shipment-modal", openHandler);
   }, []);
 
+  useEffect(() => {
+    if (!showShipmentModal && !detailsShipment) return;
+
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") {
+        if (showShipmentModal) setShowShipmentModal(false);
+        if (detailsShipment) closeDetails();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showShipmentModal, detailsShipment]);
+
   const filteredRows = useMemo(() => {
     let result = rows;
 
@@ -184,22 +211,37 @@ export default function GlobalDispatchListPage() {
     }
 
     const q = search.trim().toLowerCase();
-    if (!q) return result;
 
-    return result.filter((row) =>
-      [
-        row.dispatch_number,
-        row.customer_name,
-        row.flight_no,
-        row.airline,
-        row.awb_number,
-        statusLabel(row),
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-        .includes(q)
-    );
+    if (q) {
+      result = result.filter((row) =>
+        [
+          row.dispatch_number,
+          row.customer_name,
+          row.flight_no,
+          row.airline,
+          row.awb_number,
+          row.incoterm,
+          statusLabel(row),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(q)
+      );
+    }
+
+    return [...result].sort((a, b) => {
+      const dateA = new Date(a.dispatch_date || 0).getTime();
+      const dateB = new Date(b.dispatch_date || 0).getTime();
+
+      if (dateB !== dateA) return dateB - dateA;
+
+      return String(b.dispatch_number || "").localeCompare(
+        String(a.dispatch_number || ""),
+        undefined,
+        { numeric: true, sensitivity: "base" }
+      );
+    });
   }, [rows, tab, search]);
 
   const docsPendingCount = useMemo(
@@ -249,7 +291,13 @@ export default function GlobalDispatchListPage() {
   };
 
   const closeShipmentModal = () => {
+    const selectedCustomer =
+      customers.find((c) => String(c.id) === String(shipmentForm.customer_id)) || customers[0] || null;
+
     setShowShipmentModal(false);
+    setShipmentItems([{ ...emptyItemRow }]);
+    setBatchOptions({});
+    setShipmentForm(buildShipmentForm(selectedCustomer));
   };
 
   const handleShipmentFormChange = (e) => {
@@ -274,6 +322,26 @@ export default function GlobalDispatchListPage() {
         cold_chain_required:
           Number(selectedCustomer?.cold_chain_required || 0) === 1 ||
           selectedCustomer?.cold_chain_required === true,
+        documents: {
+          ...prev.documents,
+          insurance_certificate: isInsuranceRequired(selectedCustomer?.incoterm || prev.incoterm)
+            ? prev.documents.insurance_certificate
+            : false,
+        },
+      }));
+      return;
+    }
+
+    if (name === "incoterm") {
+      setShipmentForm((prev) => ({
+        ...prev,
+        incoterm: value,
+        documents: {
+          ...prev.documents,
+          insurance_certificate: isInsuranceRequired(value)
+            ? prev.documents.insurance_certificate
+            : false,
+        },
       }));
       return;
     }
@@ -285,6 +353,10 @@ export default function GlobalDispatchListPage() {
   };
 
   const handleDocumentToggle = (field) => {
+    if (field === "insurance_certificate" && !isInsuranceRequired(shipmentForm.incoterm)) {
+      return;
+    }
+
     setShipmentForm((prev) => ({
       ...prev,
       documents: {
@@ -367,33 +439,16 @@ export default function GlobalDispatchListPage() {
           airway_bill_status: shipmentForm.documents.airway_bill ? "done" : "pending",
           certificate_of_origin_status: shipmentForm.documents.certificate_of_origin ? "done" : "pending",
           health_certificate_status: shipmentForm.documents.health_certificate ? "done" : "pending",
-          insurance_certificate_status: shipmentForm.documents.insurance_certificate ? "done" : "pending",
+          insurance_certificate_status:
+            isInsuranceRequired(shipmentForm.incoterm) && shipmentForm.documents.insurance_certificate
+              ? "done"
+              : "pending",
           notes: shipmentForm.remarks || "",
         });
       }
 
       toast.success(createRes?.data?.message || "Shipment created successfully");
       closeShipmentModal();
-
-      setShipmentItems([{ ...emptyItemRow }]);
-      setBatchOptions({});
-      setShipmentForm((prev) => ({
-        ...prev,
-        dispatch_date: new Date().toISOString().slice(0, 10),
-        departure_date: "",
-        flight_no: "",
-        awb_number: "",
-        remarks: "",
-        documents: {
-          commercial_invoice: true,
-          packing_list: true,
-          phytosanitary_certificate: false,
-          airway_bill: false,
-          certificate_of_origin: false,
-          health_certificate: false,
-          insurance_certificate: false,
-        },
-      }));
 
       await loadShipments();
 
@@ -438,7 +493,12 @@ export default function GlobalDispatchListPage() {
   };
 
   const detailDocsDone = useMemo(
-    () => docsDoneCount(detailsShipment?.export_documents),
+    () => docsDoneCount(detailsShipment?.export_documents, detailsShipment?.incoterm),
+    [detailsShipment]
+  );
+
+  const detailRequiredDocs = useMemo(
+    () => requiredDocsCount(detailsShipment),
     [detailsShipment]
   );
 
@@ -532,6 +592,9 @@ export default function GlobalDispatchListPage() {
                 filteredRows.map((row) => {
                   const label = statusLabel(row);
                   const docsCount = Number(row.docs_done_count || 0);
+                  const requiredDocs = Number(row.required_docs_count || requiredDocsCount(row));
+                  const docsComplete =
+                    Number(row.all_cleared || 0) === 1 || docsCount >= requiredDocs;
 
                   return (
                     <tr
@@ -551,8 +614,8 @@ export default function GlobalDispatchListPage() {
                       </td>
                       <td>{Number(row.total_weight || 0)} kg</td>
                       <td>
-                        <span className={docsCount === 7 ? "badge bg-g" : "badge bg-a"}>
-                          {docsCount}/7
+                        <span className={docsComplete ? "badge bg-g" : "badge bg-a"}>
+                          {docsCount}/{requiredDocs}
                         </span>
                       </td>
                       <td>
@@ -562,10 +625,14 @@ export default function GlobalDispatchListPage() {
                         <div className="gd-actions" onClick={(e) => e.stopPropagation()}>
                           <button
                             type="button"
-                            className={docsCount === 7 ? "gd-action-btn gd-action-btn-secondary" : "gd-action-btn gd-action-btn-primary"}
+                            className={
+                              docsComplete
+                                ? "gd-action-btn gd-action-btn-secondary"
+                                : "gd-action-btn gd-action-btn-primary"
+                            }
                             onClick={(e) => handleOpenDocs(row.id, e)}
                           >
-                            {docsCount === 7 ? "📄 View Docs" : "📄 Upload Docs"}
+                            {docsComplete ? "📄 View Docs" : "📄 Upload Docs"}
                           </button>
                         </div>
                       </td>
@@ -725,7 +792,11 @@ export default function GlobalDispatchListPage() {
                       <tr>
                         <td>Insurance Certificate</td>
                         <td style={{ textAlign: "right" }}>
-                          {detailsShipment.export_documents?.insurance_certificate_status === "done" ? "✅ Done" : "❌ Missing"}
+                          {isInsuranceRequired(detailsShipment.incoterm)
+                            ? detailsShipment.export_documents?.insurance_certificate_status === "done"
+                              ? "✅ Done"
+                              : "❌ Missing"
+                            : "ℹ️ CIF only"}
                         </td>
                       </tr>
                     </tbody>
@@ -744,7 +815,9 @@ export default function GlobalDispatchListPage() {
                 flexShrink: 0,
               }}
             >
-              {currentDetailStatus === "Docs Pending" && detailDocsDone === 7 ? (
+              {currentDetailStatus === "Docs Pending" &&
+              detailDocsDone === detailRequiredDocs &&
+              detailsShipment.export_documents?.all_cleared ? (
                 <>
                   <button
                     type="button"
@@ -784,11 +857,19 @@ export default function GlobalDispatchListPage() {
                 <>
                   <button
                     type="button"
-                    className={detailDocsDone === 7 ? "btn btn-s" : "btn btn-p"}
+                    className={
+                      detailDocsDone === detailRequiredDocs &&
+                      detailsShipment.export_documents?.all_cleared
+                        ? "btn btn-s"
+                        : "btn btn-p"
+                    }
                     style={{ flex: 1, justifyContent: "center" }}
                     onClick={() => handleOpenDocs(detailsShipment.id)}
                   >
-                    {detailDocsDone === 7 ? "📄 View Docs" : "📄 Upload Docs"}
+                    {detailDocsDone === detailRequiredDocs &&
+                    detailsShipment.export_documents?.all_cleared
+                      ? "📄 View Docs"
+                      : "📄 Upload Docs"}
                   </button>
                   <button type="button" className="btn btn-s" onClick={closeDetails}>
                     Close
@@ -1093,8 +1174,14 @@ export default function GlobalDispatchListPage() {
                         type="checkbox"
                         checked={shipmentForm.documents.insurance_certificate}
                         onChange={() => handleDocumentToggle("insurance_certificate")}
+                        disabled={!isInsuranceRequired(shipmentForm.incoterm)}
                       />
                       <span>Insurance Certificate</span>
+                      {!isInsuranceRequired(shipmentForm.incoterm) && (
+                        <span className="badge bg-a" style={{ marginLeft: "auto" }}>
+                          CIF only
+                        </span>
+                      )}
                     </li>
                   </ul>
                 </div>

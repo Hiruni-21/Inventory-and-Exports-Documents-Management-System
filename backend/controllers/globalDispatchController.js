@@ -17,17 +17,46 @@ const CUSTOMER_DISPLAY_SQL = `
   END
 `;
 
-const DOCS_DONE_SQL = `
+const DOCS_DONE_SQL_CIF = `
   (
-    (ed.commercial_invoice_status = 'done') +
-    (ed.packing_list_status = 'done') +
-    (ed.phytosanitary_certificate_status = 'done') +
-    (ed.airway_bill_status = 'done') +
-    (ed.certificate_of_origin_status = 'done') +
-    (ed.health_certificate_status = 'done') +
-    (ed.insurance_certificate_status = 'done')
+    (COALESCE(ed.commercial_invoice_status, 'pending') = 'done') +
+    (COALESCE(ed.packing_list_status, 'pending') = 'done') +
+    (COALESCE(ed.phytosanitary_certificate_status, 'pending') = 'done') +
+    (COALESCE(ed.airway_bill_status, 'pending') = 'done') +
+    (COALESCE(ed.certificate_of_origin_status, 'pending') = 'done') +
+    (COALESCE(ed.health_certificate_status, 'pending') = 'done') +
+    (COALESCE(ed.insurance_certificate_status, 'pending') = 'done')
   )
 `;
+
+const DOCS_DONE_SQL_NON_CIF = `
+  (
+    (COALESCE(ed.commercial_invoice_status, 'pending') = 'done') +
+    (COALESCE(ed.packing_list_status, 'pending') = 'done') +
+    (COALESCE(ed.phytosanitary_certificate_status, 'pending') = 'done') +
+    (COALESCE(ed.airway_bill_status, 'pending') = 'done') +
+    (COALESCE(ed.certificate_of_origin_status, 'pending') = 'done') +
+    (COALESCE(ed.health_certificate_status, 'pending') = 'done')
+  )
+`;
+
+const isInsuranceRequired = (incoterm) =>
+  String(incoterm || "").toUpperCase() === "CIF";
+
+const requiredDocsCount = (incoterm) => (isInsuranceRequired(incoterm) ? 7 : 6);
+
+const docsDoneCountFromRow = (row, incoterm) => {
+  const total =
+    Number(row.commercial_invoice_status === "done") +
+    Number(row.packing_list_status === "done") +
+    Number(row.phytosanitary_certificate_status === "done") +
+    Number(row.airway_bill_status === "done") +
+    Number(row.certificate_of_origin_status === "done") +
+    Number(row.health_certificate_status === "done") +
+    Number(isInsuranceRequired(incoterm) && row.insurance_certificate_status === "done");
+
+  return total;
+};
 
 const q = (sql, params = []) =>
   new Promise((resolve, reject) => {
@@ -85,16 +114,19 @@ const getAllGlobalDispatches = (req, res) => {
       gd.created_at,
       ${CUSTOMER_DISPLAY_SQL} AS customer_name,
       c.customer_code,
-      COALESCE(ed.docs_done_count, 0) AS docs_done_count
+      CASE
+        WHEN UPPER(COALESCE(gd.incoterm, '')) = 'CIF' THEN ${DOCS_DONE_SQL_CIF}
+        ELSE ${DOCS_DONE_SQL_NON_CIF}
+      END AS docs_done_count,
+      CASE
+        WHEN UPPER(COALESCE(gd.incoterm, '')) = 'CIF' THEN 7
+        ELSE 6
+      END AS required_docs_count,
+      COALESCE(ed.all_cleared, 0) AS all_cleared
     FROM global_dispatch gd
     JOIN customers c ON gd.customer_id = c.id
-    LEFT JOIN (
-      SELECT
-        ed.global_dispatch_id,
-        ${DOCS_DONE_SQL} AS docs_done_count
-      FROM export_documents ed
-    ) ed ON ed.global_dispatch_id = gd.id
-    ORDER BY gd.id DESC
+    LEFT JOIN export_documents ed ON ed.global_dispatch_id = gd.id
+    ORDER BY gd.dispatch_date DESC, gd.id DESC
   `;
 
   db.query(sql, (err, rows) => {
@@ -149,7 +181,11 @@ const getGlobalDispatchById = (req, res) => {
       COALESCE(ed.health_certificate_status, 'pending') AS health_certificate_status,
       COALESCE(ed.insurance_certificate_status, 'pending') AS insurance_certificate_status,
       COALESCE(ed.all_cleared, 0) AS all_cleared,
-      COALESCE(ed.notes, '') AS export_notes
+      COALESCE(ed.notes, '') AS export_notes,
+      CASE
+        WHEN UPPER(COALESCE(gd.incoterm, '')) = 'CIF' THEN 7
+        ELSE 6
+      END AS required_docs_count
     FROM global_dispatch gd
     JOIN customers c ON gd.customer_id = c.id
     LEFT JOIN export_documents ed ON ed.global_dispatch_id = gd.id
@@ -437,7 +473,7 @@ const clearGlobalDispatch = async (req, res) => {
   try {
     const dispatchRows = await q(
       `
-      SELECT gd.id, gd.status, gd.stock_deducted
+      SELECT gd.id, gd.status, gd.stock_deducted, gd.incoterm
       FROM global_dispatch gd
       WHERE gd.id = ?
       LIMIT 1
@@ -467,8 +503,14 @@ const clearGlobalDispatch = async (req, res) => {
       `
       SELECT
         ed.id,
-        ed.all_cleared,
-        ${DOCS_DONE_SQL} AS docs_done_count
+        ed.commercial_invoice_status,
+        ed.packing_list_status,
+        ed.phytosanitary_certificate_status,
+        ed.airway_bill_status,
+        ed.certificate_of_origin_status,
+        ed.health_certificate_status,
+        ed.insurance_certificate_status,
+        ed.all_cleared
       FROM export_documents ed
       WHERE ed.global_dispatch_id = ?
       LIMIT 1
@@ -481,11 +523,15 @@ const clearGlobalDispatch = async (req, res) => {
     }
 
     const docs = docsRows[0];
-    const allDone = Number(docs.docs_done_count || 0) === 7 && Number(docs.all_cleared || 0) === 1;
+    const docsDoneCount = docsDoneCountFromRow(docs, dispatch.incoterm);
+    const requiredCount = requiredDocsCount(dispatch.incoterm);
+    const allDone =
+      docsDoneCount === requiredCount && Number(docs.all_cleared || 0) === 1;
 
     if (!allDone) {
       return res.status(400).json({
-        message: "All 7 export documents must be completed before clearing this shipment",
+        message:
+          "All required export documents must be completed before clearing this shipment",
       });
     }
 
