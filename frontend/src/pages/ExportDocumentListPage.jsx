@@ -7,49 +7,42 @@ const DOCS = [
   {
     key: "commercial_invoice_status",
     label: "Commercial Invoice",
-    purpose: "Price and terms of sale",
     issuedBy: "Fresh World Exporters",
     required: "Always",
   },
   {
     key: "packing_list_status",
     label: "Packing List",
-    purpose: "Itemized shipment contents",
     issuedBy: "Fresh World Exporters",
     required: "Always",
   },
   {
     key: "phytosanitary_certificate_status",
     label: "Phytosanitary Certificate",
-    purpose: "Confirms produce is pest/disease free",
     issuedBy: "Plant Quarantine Dept.",
     required: "Always",
   },
   {
     key: "airway_bill_status",
     label: "Airway Bill (AWB)",
-    purpose: "Air freight contract",
-    issuedBy: "Airline (SriLankan / Q2)",
+    issuedBy: "Airline (SriLankan / Maldivian)",
     required: "Always",
   },
   {
     key: "certificate_of_origin_status",
     label: "Certificate of Origin",
-    purpose: "Confirms goods are from Sri Lanka",
     issuedBy: "Chamber of Commerce",
     required: "Always",
   },
   {
     key: "health_certificate_status",
     label: "Health Certificate",
-    purpose: "Confirms goods are safe to consume",
     issuedBy: "Ministry of Health",
     required: "Always",
   },
   {
     key: "insurance_certificate_status",
     label: "Insurance Certificate",
-    purpose: "Cargo insurance certificate",
     issuedBy: "Insurance Company",
     required: "CIF only",
   },
@@ -82,6 +75,113 @@ const formatDate = (value) => {
   return String(value).slice(0, 10);
 };
 
+const isInsuranceRequired = (shipmentOrIncoterm) =>
+  String(
+    typeof shipmentOrIncoterm === "string"
+      ? shipmentOrIncoterm
+      : shipmentOrIncoterm?.incoterm || ""
+  ).toUpperCase() === "CIF";
+
+const getRequiredCount = (shipmentOrIncoterm) =>
+  isInsuranceRequired(shipmentOrIncoterm) ? 7 : 6;
+
+const getDoneCount = (form, shipment) => {
+  const fields = isInsuranceRequired(shipment)
+    ? DOCS.map((doc) => doc.key)
+    : DOCS.filter((doc) => doc.key !== "insurance_certificate_status").map((doc) => doc.key);
+
+  return fields.filter((field) => form[field] === "done").length;
+};
+
+const getDocSetNo = (shipment) => {
+  if (!shipment?.dispatch_number) return "";
+  return String(shipment.dispatch_number).replace(/^SHP-/, "DOC-");
+};
+
+const getShipmentOptionLabel = (shipment) => {
+  const flight = shipment.flight_no || shipment.airline || "—";
+  return `${shipment.dispatch_number} — ${shipment.customer_name} · ${flight} · ${formatDate(
+    shipment.dispatch_date
+  )}`;
+};
+
+const getDocRowStyle = (doc, status, shipment) => {
+  const insuranceOptional =
+    doc.key === "insurance_certificate_status" && !isInsuranceRequired(shipment);
+
+  if (insuranceOptional) {
+    return {
+      background: "var(--a100)",
+      border: "1px solid rgba(232,168,56,.25)",
+    };
+  }
+
+  if (status === "done") {
+    return {
+      background: "var(--ivory)",
+      border: "1px solid var(--border)",
+    };
+  }
+
+  return {
+    background: "var(--d100)",
+    border: "1px solid rgba(200,75,47,.2)",
+  };
+};
+
+const getDocNumberStyle = (doc, status, shipment) => {
+  const insuranceOptional =
+    doc.key === "insurance_certificate_status" && !isInsuranceRequired(shipment);
+
+  if (insuranceOptional) {
+    return {
+      width: 22,
+      height: 22,
+      background: "var(--a100)",
+      borderRadius: 6,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 11,
+      fontWeight: 800,
+      color: "var(--a600)",
+      flexShrink: 0,
+      border: "1px solid rgba(232,168,56,.3)",
+    };
+  }
+
+  if (status === "done") {
+    return {
+      width: 22,
+      height: 22,
+      background: "var(--s100)",
+      borderRadius: 6,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 11,
+      fontWeight: 800,
+      color: "var(--s)",
+      flexShrink: 0,
+    };
+  }
+
+  return {
+    width: 22,
+    height: 22,
+    background: "var(--d100)",
+    borderRadius: 6,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 11,
+    fontWeight: 800,
+    color: "var(--d)",
+    flexShrink: 0,
+    border: "1px solid rgba(200,75,47,.3)",
+  };
+};
+
 const ExportDocumentListPage = () => {
   const [searchParams] = useSearchParams();
   const toast = useToast();
@@ -100,6 +200,16 @@ const ExportDocumentListPage = () => {
   const selectedShipment = useMemo(
     () => shipments.find((shipment) => String(shipment.id) === String(form.global_dispatch_id)),
     [shipments, form.global_dispatch_id]
+  );
+
+  const doneCount = useMemo(
+    () => getDoneCount(form, selectedShipment),
+    [form, selectedShipment]
+  );
+
+  const requiredCount = useMemo(
+    () => getRequiredCount(selectedShipment),
+    [selectedShipment]
   );
 
   const loadPage = async () => {
@@ -166,6 +276,17 @@ const ExportDocumentListPage = () => {
     }
   }, [dispatchIdFromQuery, rows]);
 
+  useEffect(() => {
+    if (!showModal) return;
+
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") closeModal();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showModal]);
+
   const openForRow = (row) => {
     setForm({
       global_dispatch_id: String(row.global_dispatch_id),
@@ -208,11 +329,19 @@ const ExportDocumentListPage = () => {
     }
   };
 
-  const toggleDoc = (field) => {
+  const setDocStatus = (field, nextValue) => {
+    if (field === "insurance_certificate_status" && !isInsuranceRequired(selectedShipment)) {
+      return;
+    }
+
     setForm((prev) => ({
       ...prev,
-      [field]: prev[field] === "done" ? "pending" : "done",
+      [field]: nextValue,
     }));
+  };
+
+  const handleUploadPlaceholder = (docLabel) => {
+    toast.info(`${docLabel} upload UI is shown. File storage is not changed in this step.`);
   };
 
   const handleSave = async (e) => {
@@ -284,12 +413,36 @@ const ExportDocumentListPage = () => {
                   return (
                     <tr key={row.id} onClick={() => openForRow(row)} style={{ cursor: "pointer" }}>
                       <td style={{ fontWeight: 700 }}>{row.dispatch_number}</td>
-                      <td><span className={statusBadge(row.commercial_invoice_status)}>{row.commercial_invoice_status === "done" ? "Done" : "Pending"}</span></td>
-                      <td><span className={statusBadge(row.packing_list_status)}>{row.packing_list_status === "done" ? "Done" : "Pending"}</span></td>
-                      <td><span className={statusBadge(row.phytosanitary_certificate_status)}>{row.phytosanitary_certificate_status === "done" ? "Done" : "Pending"}</span></td>
-                      <td><span className={statusBadge(row.airway_bill_status)}>{row.airway_bill_status === "done" ? "Done" : "Pending"}</span></td>
-                      <td><span className={statusBadge(row.certificate_of_origin_status)}>{row.certificate_of_origin_status === "done" ? "Done" : "Pending"}</span></td>
-                      <td><span className={statusBadge(row.health_certificate_status)}>{row.health_certificate_status === "done" ? "Done" : "Pending"}</span></td>
+                      <td>
+                        <span className={statusBadge(row.commercial_invoice_status)}>
+                          {row.commercial_invoice_status === "done" ? "Done" : "Pending"}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={statusBadge(row.packing_list_status)}>
+                          {row.packing_list_status === "done" ? "Done" : "Pending"}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={statusBadge(row.phytosanitary_certificate_status)}>
+                          {row.phytosanitary_certificate_status === "done" ? "Done" : "Pending"}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={statusBadge(row.airway_bill_status)}>
+                          {row.airway_bill_status === "done" ? "Done" : "Pending"}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={statusBadge(row.certificate_of_origin_status)}>
+                          {row.certificate_of_origin_status === "done" ? "Done" : "Pending"}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={statusBadge(row.health_certificate_status)}>
+                          {row.health_certificate_status === "done" ? "Done" : "Pending"}
+                        </span>
+                      </td>
                       <td>
                         {insuranceRequired ? (
                           <span className={statusBadge(row.insurance_certificate_status)}>
@@ -339,7 +492,19 @@ const ExportDocumentListPage = () => {
               {DOCS.map((doc) => (
                 <tr key={doc.key}>
                   <td style={{ fontWeight: 700 }}>{doc.label}</td>
-                  <td>{doc.purpose}</td>
+                  <td>
+                    {doc.key === "commercial_invoice_status" && "Price and terms of sale"}
+                    {doc.key === "packing_list_status" && "Itemized shipment contents"}
+                    {doc.key === "phytosanitary_certificate_status" &&
+                      "Confirms produce is pest/disease free"}
+                    {doc.key === "airway_bill_status" && "Air freight contract"}
+                    {doc.key === "certificate_of_origin_status" &&
+                      "Confirms goods are from Sri Lanka"}
+                    {doc.key === "health_certificate_status" &&
+                      "Confirms goods are safe to consume"}
+                    {doc.key === "insurance_certificate_status" &&
+                      "Cargo insurance certificate"}
+                  </td>
                   <td>{doc.issuedBy}</td>
                   <td>
                     <span className={requiredBadge(doc.required)}>{doc.required}</span>
@@ -367,96 +532,193 @@ const ExportDocumentListPage = () => {
           <div
             className="md md-lg"
             onClick={(e) => e.stopPropagation()}
-            style={{ width: "100%", maxWidth: 900 }}
+            style={{ width: "100%", maxWidth: 920, maxHeight: "92vh", display: "flex", flexDirection: "column" }}
           >
             <div className="md-h">
-              <h3>📄 Export Document Set</h3>
+              <h3>📄 Create / Update Export Document Set</h3>
               <button type="button" className="md-x" onClick={closeModal}>
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSave}>
-              <div className="md-b">
+            <form
+              onSubmit={handleSave}
+              style={{ display: "flex", flexDirection: "column", minHeight: 0 }}
+            >
+              <div className="md-b" style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>
                 <div className="ib ib-i">
-                  <span>📎</span>
+                  <span>📄</span>
                   <div>
-                    Complete all required documents for the selected shipment. Insurance is required
-                    only for <strong>CIF</strong> shipments.
+                    All {requiredCount} documents must be marked Done before the shipment can be
+                    Cleared and stock deducted.
                   </div>
                 </div>
 
-                <div className="ff" style={{ marginTop: 16 }}>
-                  <label className="fl">Shipment</label>
-                  <select
-                    className="fc"
-                    value={form.global_dispatch_id}
-                    onChange={(e) => handleShipmentChange(e.target.value)}
-                  >
-                    <option value="">Select shipment</option>
-                    {shipments.map((shipment) => (
-                      <option key={shipment.id} value={shipment.id}>
-                        {shipment.dispatch_number} — {shipment.customer_name}
-                      </option>
-                    ))}
-                  </select>
+                <div className="fr" style={{ marginTop: 16 }}>
+                  <div className="ff">
+                    <label className="fl">
+                      Linked Shipment <span className="rq">*</span>
+                    </label>
+                    <select
+                      className="fc"
+                      value={form.global_dispatch_id}
+                      onChange={(e) => handleShipmentChange(e.target.value)}
+                    >
+                      <option value="">Select shipment</option>
+                      {shipments.map((shipment) => (
+                        <option key={shipment.id} value={shipment.id}>
+                          {getShipmentOptionLabel(shipment)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="ff">
+                    <label className="fl">Doc Set No.</label>
+                    <input
+                      className="fc"
+                      value={getDocSetNo(selectedShipment)}
+                      readOnly
+                      style={{ background: "var(--ivory)" }}
+                    />
+                  </div>
                 </div>
 
-                {selectedShipment && (
-                  <div className="fr3">
-                    <div className="ff">
-                      <label className="fl">Customer</label>
-                      <input className="fc" value={selectedShipment.customer_name || ""} readOnly />
-                    </div>
-                    <div className="ff">
-                      <label className="fl">Shipment Date</label>
-                      <input className="fc" value={formatDate(selectedShipment.dispatch_date)} readOnly />
-                    </div>
-                    <div className="ff">
-                      <label className="fl">Incoterm</label>
-                      <input className="fc" value={selectedShipment.incoterm || ""} readOnly />
-                    </div>
-                  </div>
-                )}
+                <div className="fst" style={{ marginBottom: 11 }}>
+                  {requiredCount} Required Documents
+                </div>
 
-                <div className="fs2" style={{ marginTop: 8 }}>
-                  <div className="fst">Documents to verify</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  {DOCS.map((doc, index) => {
+                    const insuranceOptional =
+                      doc.key === "insurance_certificate_status" &&
+                      !isInsuranceRequired(selectedShipment);
 
-                  <ul className="ck-l">
-                    {DOCS.map((doc) => {
-                      const insuranceOptional =
-                        doc.key === "insurance_certificate_status" &&
-                        String(selectedShipment?.incoterm || "").toUpperCase() !== "CIF";
+                    const status = insuranceOptional ? "pending" : form[doc.key];
+                    const rowStyle = getDocRowStyle(doc, status, selectedShipment);
+                    const numberStyle = getDocNumberStyle(doc, status, selectedShipment);
 
-                      return (
-                        <li key={doc.key}>
-                          <input
-                            type="checkbox"
-                            checked={form[doc.key] === "done"}
-                            onChange={() => toggleDoc(doc.key)}
-                            disabled={insuranceOptional}
-                          />
-                          <span style={{ flex: 1 }}>{doc.label}</span>
-                          {insuranceOptional ? (
-                            <span className="badge bg-a">CIF only</span>
-                          ) : (
-                            <span className={form[doc.key] === "done" ? "badge bg-g" : "badge bg-a"}>
-                              {form[doc.key] === "done" ? "Done" : "Pending"}
+                    return (
+                      <div
+                        key={doc.key}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 11,
+                          padding: "9px 13px",
+                          borderRadius: 9,
+                          ...rowStyle,
+                        }}
+                      >
+                        <div style={numberStyle}>{index + 1}</div>
+
+                        <div
+                          style={{
+                            flex: 1,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: "var(--g900)",
+                          }}
+                        >
+                          {doc.label}{" "}
+                          {doc.key === "insurance_certificate_status" && (
+                            <span
+                              style={{
+                                fontSize: 10,
+                                color: "var(--a600)",
+                                fontWeight: 600,
+                              }}
+                            >
+                              CIF only
                             </span>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
+                          )}{" "}
+                          <span
+                            style={{
+                              fontSize: 10,
+                              color: "var(--text3)",
+                              fontWeight: 400,
+                            }}
+                          >
+                            — {doc.issuedBy}
+                          </span>
+                        </div>
+
+                        <div className="tg" style={{ gap: 5, flexShrink: 0, minWidth: 146 }}>
+                          <button
+                            type="button"
+                            className={`to ${!insuranceOptional && form[doc.key] === "done" ? "on" : ""}`}
+                            style={{ padding: "3px 10px", fontSize: 10 }}
+                            onClick={() => setDocStatus(doc.key, "done")}
+                            disabled={insuranceOptional}
+                          >
+                            ✅ Done
+                          </button>
+
+                          <button
+                            type="button"
+                            className={`to ${
+                              insuranceOptional || form[doc.key] !== "done" ? "on-r" : ""
+                            }`}
+                            style={{ padding: "3px 10px", fontSize: 10 }}
+                            onClick={() => setDocStatus(doc.key, "pending")}
+                          >
+                            ❌ Missing
+                          </button>
+                        </div>
+
+                        <button
+                          type="button"
+                          className="btn btn-s btn-xs"
+                          onClick={() => handleUploadPlaceholder(doc.label)}
+                        >
+                          📎 Upload
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
 
-                <div className="ff">
+                <div
+                  style={{
+                    marginTop: 14,
+                    padding: "12px 16px",
+                    background: "var(--g100)",
+                    borderRadius: 10,
+                    border: "1px solid var(--g200)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "var(--g800)",
+                    }}
+                  >
+                    Document Progress
+                  </span>
+
+                  <span
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 800,
+                      color: doneCount === requiredCount ? "var(--g700)" : "var(--d)",
+                    }}
+                  >
+                    {doneCount} / {requiredCount} complete
+                  </span>
+                </div>
+
+                <div className="ff" style={{ marginTop: 14 }}>
                   <label className="fl">Notes</label>
                   <textarea
                     className="fc"
                     value={form.notes}
                     onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
                     placeholder="Document notes..."
+                    style={{ minHeight: 88 }}
                   />
                 </div>
               </div>
@@ -465,8 +727,9 @@ const ExportDocumentListPage = () => {
                 <button type="button" className="btn btn-s" onClick={closeModal}>
                   Cancel
                 </button>
+
                 <button type="submit" className="btn btn-p" disabled={saving}>
-                  {saving ? "Saving..." : "Save Document Set"}
+                  {saving ? "Saving..." : "💾 Save Document Status"}
                 </button>
               </div>
             </form>
