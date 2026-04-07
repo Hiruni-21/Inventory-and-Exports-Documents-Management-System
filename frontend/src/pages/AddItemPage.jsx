@@ -1,11 +1,44 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
+import { useToast } from "../context/ToastContext";
+
+const buildNextItemCode = (items, categoryName = "") => {
+  const prefixMap = {
+    "Organic Vegetables": "VEG",
+    "Organic Fruits": "FRT",
+    Herbs: "HRB",
+    "Leafy Items & Lettuce Range": "LFL",
+    "Dairy Products": "DAR",
+    "Pussalla Products": "PUS",
+    "NorFolk Products": "NOR",
+    "Kern & Hundt Products": "KHU",
+    "Munchee Products": "MUN",
+    "Dry Items": "DRY",
+    Mushrooms: "MSH",
+    "Tea & Coffee": "TEA",
+    "Other Products": "OTH",
+    "Hotel Requirements": "HOT",
+  };
+
+  const prefix = prefixMap[categoryName] || "ITM";
+
+  const highest = items.reduce((max, row) => {
+    const match = String(row.code || "").match(/(\d+)$/);
+    const num = match ? Number(match[1]) : 0;
+    return Math.max(max, num);
+  }, 0);
+
+  return `FW-${prefix}-${String(highest + 1).padStart(3, "0")}`;
+};
 
 const AddItemPage = () => {
   const navigate = useNavigate();
+  const toast = useToast();
 
   const [categories, setCategories] = useState([]);
+  const [items, setItems] = useState([]);
+
   const [form, setForm] = useState({
     code: "",
     name: "",
@@ -13,201 +46,277 @@ const AddItemPage = () => {
     category_id: "",
     type: "Perishable",
     unit: "kg",
-    shelf_life_days: "",
-    reorder_level: "",
-    storage_temp: "",
-    unit_cost: "",
+    shelf_life_days: 7,
+    reorder_level: 10,
+    storage_temp: "Chilled",
+    unit_cost: 0,
     returnable: 1,
     description: "",
     status: "active",
   });
 
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  const fetchCategories = async () => {
+  const selectedCategory = useMemo(
+    () => categories.find((row) => String(row.id) === String(form.category_id)),
+    [categories, form.category_id]
+  );
+
+  const loadPage = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const [categoriesRes, itemsRes] = await Promise.all([
+        api.get("/items/categories"),
+        api.get("/items"),
+      ]);
 
-      const res = await api.get("/items/categories", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const categoryRows = Array.isArray(categoriesRes.data) ? categoriesRes.data : [];
+      const itemRows = Array.isArray(itemsRes.data) ? itemsRes.data : [];
 
-      setCategories(res.data);
+      setCategories(categoryRows);
+      setItems(itemRows);
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to load categories");
+      console.error(err);
+      toast.error("Failed to load item form data");
     }
   };
 
   useEffect(() => {
-    fetchCategories();
+    loadPage();
   }, []);
 
-  const handleChange = (e) => {
-    const value =
-      e.target.name === "returnable"
-        ? Number(e.target.value)
-        : e.target.value;
+  useEffect(() => {
+    if (!selectedCategory) return;
 
     setForm((prev) => ({
       ...prev,
-      [e.target.name]: value,
+      code: prev.code || buildNextItemCode(items, selectedCategory.category_name),
     }));
+  }, [selectedCategory, items]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+
+    if (name === "category_id") {
+      const picked = categories.find((row) => String(row.id) === String(value));
+      setForm((prev) => ({
+        ...prev,
+        category_id: value,
+        code: buildNextItemCode(items, picked?.category_name),
+      }));
+      return;
+    }
+
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
-    setSuccess("");
+
+    if (!form.code || !form.name || !form.category_id || !form.type || !form.unit) {
+      toast.error("Code, name, category, type and unit are required");
+      return;
+    }
 
     try {
-      const token = localStorage.getItem("token");
+      setSaving(true);
 
-      await api.post("/items", form, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      await api.post("/items", {
+        ...form,
+        category_id: Number(form.category_id),
+        shelf_life_days: Number(form.shelf_life_days || 0),
+        reorder_level: Number(form.reorder_level || 0),
+        unit_cost: Number(form.unit_cost || 0),
+        returnable: Number(form.returnable),
       });
 
-      setSuccess("Item created successfully");
-
-      setTimeout(() => {
-        navigate("/items");
-      }, 1000);
+      toast.success("Item created successfully");
+      navigate("/items");
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to create item");
+      console.error(err);
+      toast.error(err?.response?.data?.message || "Failed to create item");
+    } finally {
+      setSaving(false);
     }
   };
 
   return (
-    <div className="form-page">
-      <h2>Add Item</h2>
+    <div className="md md-xl" style={{ maxWidth: "100%", display: "flex" }}>
+      <div className="md-h">
+        <h3>🥬 Add Item</h3>
+        <button type="button" className="md-x" onClick={() => navigate("/items")}>
+          ✕
+        </button>
+      </div>
 
-      {error && <div className="error-box">{error}</div>}
-      {success && <div className="success-box">{success}</div>}
+      <form onSubmit={handleSubmit}>
+        <div className="md-b">
+          <div className="ib ib-i">
+            <span>🥬</span>
+            <div>
+              Add real products from your Fresh World list such as organic vegetables, fruits,
+              herbs, dairy and hotel requirements.
+            </div>
+          </div>
 
-      <form className="custom-form" onSubmit={handleSubmit}>
-        <input
-          type="text"
-          name="code"
-          placeholder="Item Code"
-          value={form.code}
-          onChange={handleChange}
-          required
-        />
+          <div className="fs2">
+            <div className="fst">Basic Item Details</div>
 
-        <input
-          type="text"
-          name="name"
-          placeholder="Item Name"
-          value={form.name}
-          onChange={handleChange}
-          required
-        />
+            <div className="fr">
+              <div className="ff">
+                <label className="fl">Item Code</label>
+                <input className="fc" name="code" value={form.code} onChange={handleChange} />
+              </div>
 
-        <input
-          type="text"
-          name="botanical_name"
-          placeholder="Botanical Name"
-          value={form.botanical_name}
-          onChange={handleChange}
-        />
+              <div className="ff">
+                <label className="fl">Item Name</label>
+                <input
+                  className="fc"
+                  name="name"
+                  value={form.name}
+                  onChange={handleChange}
+                  placeholder="Ash Pumpkin"
+                />
+              </div>
+            </div>
 
-        <select
-          name="category_id"
-          value={form.category_id}
-          onChange={handleChange}
-          required
-        >
-          <option value="">Select Category</option>
-          {categories.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.category_name}
-            </option>
-          ))}
-        </select>
+            <div className="fr">
+              <div className="ff">
+                <label className="fl">Botanical Name</label>
+                <input
+                  className="fc"
+                  name="botanical_name"
+                  value={form.botanical_name}
+                  onChange={handleChange}
+                  placeholder="Benincasa hispida"
+                />
+              </div>
 
-        <select
-          name="type"
-          value={form.type}
-          onChange={handleChange}
-        >
-          <option value="Perishable">Perishable</option>
-          <option value="Non-Perishable">Non-Perishable</option>
-        </select>
+              <div className="ff">
+                <label className="fl">Category</label>
+                <select className="fc" name="category_id" value={form.category_id} onChange={handleChange}>
+                  <option value="">Select category</option>
+                  {categories.map((row) => (
+                    <option key={row.id} value={row.id}>
+                      {row.category_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
 
-        <input
-          type="text"
-          name="unit"
-          placeholder="Unit (e.g. kg, pcs)"
-          value={form.unit}
-          onChange={handleChange}
-          required
-        />
+          <div className="fs2">
+            <div className="fst">Inventory Controls</div>
 
-        <input
-          type="number"
-          name="shelf_life_days"
-          placeholder="Shelf Life (days)"
-          value={form.shelf_life_days}
-          onChange={handleChange}
-        />
+            <div className="fr3">
+              <div className="ff">
+                <label className="fl">Type</label>
+                <select className="fc" name="type" value={form.type} onChange={handleChange}>
+                  <option value="Perishable">Perishable</option>
+                  <option value="Non-Perishable">Non-Perishable</option>
+                </select>
+              </div>
 
-        <input
-          type="number"
-          step="0.01"
-          name="reorder_level"
-          placeholder="Reorder Level"
-          value={form.reorder_level}
-          onChange={handleChange}
-        />
+              <div className="ff">
+                <label className="fl">Unit</label>
+                <input
+                  className="fc"
+                  name="unit"
+                  value={form.unit}
+                  onChange={handleChange}
+                  placeholder="kg / pcs / pkt"
+                />
+              </div>
 
-        <input
-          type="text"
-          name="storage_temp"
-          placeholder="Storage Temperature"
-          value={form.storage_temp}
-          onChange={handleChange}
-        />
+              <div className="ff">
+                <label className="fl">Shelf Life (days)</label>
+                <input
+                  className="fc"
+                  type="number"
+                  name="shelf_life_days"
+                  value={form.shelf_life_days}
+                  onChange={handleChange}
+                />
+              </div>
+            </div>
 
-        <input
-          type="number"
-          step="0.01"
-          name="unit_cost"
-          placeholder="Unit Cost"
-          value={form.unit_cost}
-          onChange={handleChange}
-        />
+            <div className="fr3">
+              <div className="ff">
+                <label className="fl">Reorder Level</label>
+                <input
+                  className="fc"
+                  type="number"
+                  step="0.01"
+                  name="reorder_level"
+                  value={form.reorder_level}
+                  onChange={handleChange}
+                />
+              </div>
 
-        <select
-          name="returnable"
-          value={form.returnable}
-          onChange={handleChange}
-        >
-          <option value={1}>Returnable</option>
-          <option value={0}>Not Returnable</option>
-        </select>
+              <div className="ff">
+                <label className="fl">Unit Cost</label>
+                <input
+                  className="fc"
+                  type="number"
+                  step="0.01"
+                  name="unit_cost"
+                  value={form.unit_cost}
+                  onChange={handleChange}
+                />
+              </div>
 
-        <textarea
-          name="description"
-          placeholder="Description"
-          value={form.description}
-          onChange={handleChange}
-          rows="4"
-        />
+              <div className="ff">
+                <label className="fl">Returnable</label>
+                <select className="fc" name="returnable" value={form.returnable} onChange={handleChange}>
+                  <option value={1}>Yes</option>
+                  <option value={0}>No</option>
+                </select>
+              </div>
+            </div>
 
-        <select
-          name="status"
-          value={form.status}
-          onChange={handleChange}
-        >
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </select>
+            <div className="fr">
+              <div className="ff">
+                <label className="fl">Storage Temp</label>
+                <input
+                  className="fc"
+                  name="storage_temp"
+                  value={form.storage_temp}
+                  onChange={handleChange}
+                  placeholder="Chilled / Ambient / Frozen"
+                />
+              </div>
 
-        <button type="submit">Save Item</button>
+              <div className="ff">
+                <label className="fl">Status</label>
+                <select className="fc" name="status" value={form.status} onChange={handleChange}>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="ff">
+              <label className="fl">Description</label>
+              <textarea
+                className="fc"
+                name="description"
+                value={form.description}
+                onChange={handleChange}
+                rows="4"
+                placeholder="Short item notes..."
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="md-f">
+          <button type="button" className="btn btn-s" onClick={() => navigate("/items")}>
+            Cancel
+          </button>
+          <button type="submit" className="btn btn-p" disabled={saving}>
+            {saving ? "Saving..." : "Save Item"}
+          </button>
+        </div>
       </form>
     </div>
   );
