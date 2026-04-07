@@ -52,6 +52,9 @@ import SupplierDashboardPage from "./pages/SupplierDashboard";
 import SupplierOrdersPage from "./pages/PurchaseOrderListPage";
 import SupplierReturnsPage from "./pages/ReturnListPage";
 
+import ExpiryItemsPage from "./pages/ExpiryItemsPage";
+import StockValuationPage from "./pages/StockValuationPage";
+
 const DashboardRouter = () => {
   const { user } = useAuth();
   const role = String(user?.role || "").toLowerCase();
@@ -88,9 +91,8 @@ function App() {
 
         <Route path="/inventory" element={<InventoryListPage />} />
         <Route path="/inventory/low-stock" element={<LowStockPage />} />
-        <Route path="/inventory/expiry" element={<InventoryListPage />} />
-        <Route path="/inventory/valuation" element={<InventoryListPage />} />
-        <Route path="/inventory/movements" element={<StockMovementsPage />} />
+        <Route path="/inventory/expiry" element={<ExpiryItemsPage />} />
+        <Route path="/inventory/valuation" element={<StockValuationPage />} />        <Route path="/inventory/movements" element={<StockMovementsPage />} />
 
         <Route path="/stock-adjustments" element={<StockAdjustmentListPage />} />
         <Route path="/stock-adjustments/add" element={<AddStockAdjustmentPage />} />
