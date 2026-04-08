@@ -54,6 +54,7 @@ import SupplierReturnsPage from "./pages/ReturnListPage";
 
 import ExpiryItemsPage from "./pages/ExpiryItemsPage";
 import StockValuationPage from "./pages/StockValuationPage";
+import PhysicalStockCountPage from "./pages/PhysicalStockCountPage";
 
 const DashboardRouter = () => {
   const { user } = useAuth();
@@ -96,8 +97,7 @@ function App() {
 
         <Route path="/stock-adjustments" element={<StockAdjustmentListPage />} />
         <Route path="/stock-adjustments/add" element={<AddStockAdjustmentPage />} />
-        <Route path="/stock-count" element={<InventoryListPage />} />
-        <Route path="/packaging" element={<InventoryListPage />} />
+        <Route path="/stock-count" element={<PhysicalStockCountPage />} />        <Route path="/packaging" element={<InventoryListPage />} />
 
         <Route path="/purchase-orders" element={<PurchaseOrderListPage />} />
         <Route path="/purchase-orders/add" element={<AddPurchaseOrderPage />} />
