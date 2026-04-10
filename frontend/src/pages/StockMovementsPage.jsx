@@ -1,66 +1,119 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import api from "../utils/api";
+import { useToast } from "../context/ToastContext";
+
+const fmtDateTime = (value) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString();
+};
 
 const StockMovementsPage = () => {
-  const [movements, setMovements] = useState([]);
-  const [error, setError] = useState("");
+  const toast = useToast();
 
-  const fetchMovements = async () => {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+
+  const loadRows = async () => {
     try {
-      const token = localStorage.getItem("token");
-
-      const res = await api.get("/inventory/movements", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      setMovements(res.data);
+      setLoading(true);
+      const res = await api.get("/inventory/movements");
+      setRows(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
-      setError("Failed to load stock movements");
+      console.error(err);
+      toast.error(err?.response?.data?.message || "Failed to load stock movements");
+      setRows([]);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchMovements();
+    loadRows();
   }, []);
 
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rows;
+
+    return rows.filter((row) =>
+      [
+        row.item_code,
+        row.item_name,
+        row.movement_type,
+        row.reference_type,
+        row.reference_id,
+        row.notes,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(q))
+    );
+  }, [rows, search]);
+
   return (
-    <div>
-      <div className="page-header-row">
-        <h2>Stock Movements</h2>
+    <>
+      <div className="ib ib-i">
+        <span>📦</span>
+        <div>
+          Full stock movement trail for inventory corrections and batch deductions. This now reads
+          from the real backend route used by the ERP.
+        </div>
       </div>
 
-      {error && <div className="error-box">{error}</div>}
+      <div className="fb">
+        <div className="sw">
+          <input
+            className="si"
+            placeholder="Search stock movements..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+      </div>
 
-      <div className="table-wrapper">
-        <table className="custom-table">
+      <div className="tw">
+        <div className="tw-h">
+          <h3>Stock Movements</h3>
+          <span className="badge bg-b">{filteredRows.length} rows</span>
+        </div>
+
+        <table>
           <thead>
             <tr>
               <th>ID</th>
-              <th>Item Code</th>
-              <th>Item Name</th>
-              <th>Type</th>
-              <th>Reference</th>
-              <th>Reference ID</th>
-              <th>Quantity</th>
-              <th>Notes</th>
-              <th>Date</th>
+              <th>ITEM CODE</th>
+              <th>ITEM NAME</th>
+              <th>TYPE</th>
+              <th>REFERENCE</th>
+              <th>REFERENCE ID</th>
+              <th>QTY</th>
+              <th>NOTES</th>
+              <th>DATE</th>
             </tr>
           </thead>
           <tbody>
-            {movements.length > 0 ? (
-              movements.map((m) => (
-                <tr key={m.id}>
-                  <td>{m.id}</td>
-                  <td>{m.item_code}</td>
-                  <td>{m.item_name}</td>
-                  <td>{m.movement_type}</td>
-                  <td>{m.reference_type}</td>
-                  <td>{m.reference_id}</td>
-                  <td>{m.quantity}</td>
-                  <td>{m.notes || "-"}</td>
-                  <td>{new Date(m.created_at).toLocaleString()}</td>
+            {loading ? (
+              <tr>
+                <td colSpan="9">Loading...</td>
+              </tr>
+            ) : filteredRows.length ? (
+              filteredRows.map((row) => (
+                <tr key={row.id}>
+                  <td>{row.id}</td>
+                  <td style={{ fontFamily: "monospace", fontWeight: 700 }}>{row.item_code}</td>
+                  <td style={{ fontWeight: 600 }}>{row.item_name}</td>
+                  <td>
+                    <span className={`badge ${String(row.movement_type).toUpperCase() === "IN" ? "bg-g" : "bg-r"}`}>
+                      {String(row.movement_type).toUpperCase()}
+                    </span>
+                  </td>
+                  <td>{row.reference_type}</td>
+                  <td>{row.reference_id}</td>
+                  <td>{Number(row.quantity || 0)}</td>
+                  <td>{row.notes || "—"}</td>
+                  <td>{fmtDateTime(row.created_at)}</td>
                 </tr>
               ))
             ) : (
@@ -71,7 +124,7 @@ const StockMovementsPage = () => {
           </tbody>
         </table>
       </div>
-    </div>
+    </>
   );
 };
 

@@ -1,21 +1,39 @@
 const db = require("../config/db");
 
+const CUSTOMER_LOCAL_SQL = `
+  CASE
+    WHEN c.city IS NOT NULL AND TRIM(c.city) <> ''
+      THEN CONCAT(c.customer_name, ' — ', c.city)
+    ELSE c.customer_name
+  END
+`;
+
+const CUSTOMER_GLOBAL_SQL = `
+  CASE
+    WHEN c.location_island IS NOT NULL AND TRIM(c.location_island) <> ''
+      THEN CONCAT(c.customer_name, ' — ', c.location_island)
+    WHEN c.city IS NOT NULL AND TRIM(c.city) <> ''
+      THEN CONCAT(c.customer_name, ' — ', c.city)
+    ELSE c.customer_name
+  END
+`;
+
 const getStockSummaryReport = (req, res) => {
   const sql = `
     SELECT
       ib.id AS batch_id,
-      i.item_code,
-      i.item_name,
+      i.code AS item_code,
+      i.name AS item_name,
       i.unit,
-      c.category_name,
+      ic.category_name,
       ib.batch_code,
       ib.available_quantity,
       ib.status,
       ib.expiry_date
     FROM inventory_batches ib
     JOIN items i ON ib.item_id = i.id
-    LEFT JOIN categories c ON i.category_id = c.id
-    ORDER BY i.item_name ASC, ib.batch_code ASC
+    LEFT JOIN item_categories ic ON i.category_id = ic.id
+    ORDER BY i.name ASC, ib.batch_code ASC
   `;
 
   db.query(sql, (err, results) => {
@@ -29,18 +47,19 @@ const getStockSummaryReport = (req, res) => {
 const getLowStockReport = (req, res) => {
   const sql = `
     SELECT
-      ib.id AS batch_id,
-      i.item_code,
-      i.item_name,
+      i.id AS item_id,
+      i.code AS item_code,
+      i.name AS item_name,
+      ic.category_name,
       i.unit,
-      ib.batch_code,
-      ib.available_quantity,
-      ib.status
-    FROM inventory_batches ib
-    JOIN items i ON ib.item_id = i.id
-    WHERE ib.available_quantity > 0
-      AND ib.available_quantity <= 10
-    ORDER BY ib.available_quantity ASC, i.item_name ASC
+      COALESCE(i.reorder_level, 0) AS reorder_level,
+      COALESCE(inv.qty_available, 0) AS available_quantity,
+      (COALESCE(i.reorder_level, 0) - COALESCE(inv.qty_available, 0)) AS shortage
+    FROM items i
+    LEFT JOIN inventory inv ON inv.item_id = i.id
+    LEFT JOIN item_categories ic ON i.category_id = ic.id
+    WHERE COALESCE(inv.qty_available, 0) <= COALESCE(i.reorder_level, 0)
+    ORDER BY shortage DESC, i.name ASC
   `;
 
   db.query(sql, (err, results) => {
@@ -57,8 +76,8 @@ const getStockMovementsReport = (req, res) => {
   let sql = `
     SELECT
       sm.id,
-      i.item_code,
-      i.item_name,
+      i.code AS item_code,
+      i.name AS item_name,
       i.unit,
       sm.movement_type,
       sm.reference_type,
@@ -92,24 +111,26 @@ const getDispatchReport = (req, res) => {
 
   let sql = `
     SELECT
-      d.id,
-      d.dispatch_number,
-      d.client_name,
-      d.dispatch_date,
-      d.remarks,
-      u.name AS created_by_name
-    FROM dispatch_records d
-    LEFT JOIN users u ON d.created_by = u.id
+      ld.id,
+      ld.dispatch_number,
+      ${CUSTOMER_LOCAL_SQL} AS client_name,
+      ld.dispatch_date,
+      ld.status,
+      ld.notes AS remarks,
+      u.full_name AS created_by_name
+    FROM local_dispatch ld
+    JOIN customers c ON ld.customer_id = c.id
+    LEFT JOIN users u ON ld.created_by = u.id
   `;
 
   const params = [];
 
   if (start_date && end_date) {
-    sql += ` WHERE d.dispatch_date BETWEEN ? AND ? `;
+    sql += ` WHERE ld.dispatch_date BETWEEN ? AND ? `;
     params.push(start_date, end_date);
   }
 
-  sql += ` ORDER BY d.id DESC `;
+  sql += ` ORDER BY ld.id DESC `;
 
   db.query(sql, params, (err, results) => {
     if (err) {
@@ -125,19 +146,26 @@ const getWastageReport = (req, res) => {
   let sql = `
     SELECT
       w.id,
-      w.wastage_number,
-      w.wastage_date,
+      w.item_id,
+      w.batch_id,
+      w.quantity,
       w.reason,
-      w.remarks,
-      u.name AS created_by_name
+      w.notes,
+      w.created_at,
+      i.code AS item_code,
+      i.name AS item_name,
+      ib.batch_code,
+      u.full_name AS created_by_name
     FROM wastage_records w
+    JOIN items i ON w.item_id = i.id
+    LEFT JOIN inventory_batches ib ON w.batch_id = ib.id
     LEFT JOIN users u ON w.created_by = u.id
   `;
 
   const params = [];
 
   if (start_date && end_date) {
-    sql += ` WHERE w.wastage_date BETWEEN ? AND ? `;
+    sql += ` WHERE DATE(w.created_at) BETWEEN ? AND ? `;
     params.push(start_date, end_date);
   }
 
@@ -157,20 +185,29 @@ const getReturnReport = (req, res) => {
   let sql = `
     SELECT
       r.id,
-      r.return_number,
-      r.return_date,
-      r.return_type,
-      r.reference_number,
-      r.remarks,
-      u.name AS created_by_name
-    FROM return_records r
+      r.supplier_id,
+      r.item_id,
+      r.batch_id,
+      r.quantity,
+      r.reason,
+      r.notes,
+      r.created_at,
+      s.supplier_name,
+      i.code AS item_code,
+      i.name AS item_name,
+      ib.batch_code,
+      u.full_name AS created_by_name
+    FROM goods_returns r
+    JOIN suppliers s ON r.supplier_id = s.id
+    JOIN items i ON r.item_id = i.id
+    LEFT JOIN inventory_batches ib ON r.batch_id = ib.id
     LEFT JOIN users u ON r.created_by = u.id
   `;
 
   const params = [];
 
   if (start_date && end_date) {
-    sql += ` WHERE r.return_date BETWEEN ? AND ? `;
+    sql += ` WHERE DATE(r.created_at) BETWEEN ? AND ? `;
     params.push(start_date, end_date);
   }
 
@@ -190,27 +227,37 @@ const getExportDocumentReport = (req, res) => {
   let sql = `
     SELECT
       ed.id,
-      ed.document_type,
-      ed.document_number,
-      ed.document_date,
-      ed.consignee_name,
-      ed.destination_country,
-      dr.dispatch_number,
-      dr.client_name,
-      u.name AS created_by_name
+      gd.dispatch_number,
+      gd.dispatch_date,
+      gd.departure_date,
+      gd.airline,
+      gd.incoterm,
+      gd.status AS shipment_status,
+      ${CUSTOMER_GLOBAL_SQL} AS client_name,
+      ed.commercial_invoice_status,
+      ed.packing_list_status,
+      ed.phytosanitary_certificate_status,
+      ed.airway_bill_status,
+      ed.certificate_of_origin_status,
+      ed.health_certificate_status,
+      ed.insurance_certificate_status,
+      ed.all_cleared,
+      ed.updated_at,
+      u.full_name AS updated_by_name
     FROM export_documents ed
-    JOIN dispatch_records dr ON ed.dispatch_id = dr.id
-    LEFT JOIN users u ON ed.created_by = u.id
+    JOIN global_dispatch gd ON ed.global_dispatch_id = gd.id
+    JOIN customers c ON gd.customer_id = c.id
+    LEFT JOIN users u ON ed.updated_by = u.id
   `;
 
   const params = [];
 
   if (start_date && end_date) {
-    sql += ` WHERE ed.document_date BETWEEN ? AND ? `;
+    sql += ` WHERE gd.dispatch_date BETWEEN ? AND ? `;
     params.push(start_date, end_date);
   }
 
-  sql += ` ORDER BY ed.id DESC `;
+  sql += ` ORDER BY gd.id DESC `;
 
   db.query(sql, params, (err, results) => {
     if (err) {

@@ -229,11 +229,40 @@ const getInventoryValuation = (req, res) => {
   });
 };
 
+const getStockMovements = (req, res) => {
+  const sql = `
+    SELECT
+      sm.id,
+      sm.item_id,
+      i.code AS item_code,
+      i.name AS item_name,
+      i.unit,
+      sm.movement_type,
+      sm.reference_type,
+      sm.reference_id,
+      sm.quantity,
+      sm.notes,
+      sm.created_at
+    FROM stock_movements sm
+    JOIN items i ON sm.item_id = i.id
+    ORDER BY sm.id DESC
+  `;
+
+  db.query(sql, (err, results) => {
+    if (err) {
+      return res.status(500).json({ message: "Database error", error: err.message });
+    }
+
+    res.json(results);
+  });
+};
+
 module.exports = {
   getInventory,
   getLowStockItems,
   getExpiryItems,
   getBatchesByItemId,
   getInventoryValuation,
+  getStockMovements,
   refreshInventorySnapshot,
 };

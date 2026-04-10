@@ -1,41 +1,47 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import api from "../utils/api";
+import { useToast } from "../context/ToastContext";
+
+const REPORT_OPTIONS = [
+  { value: "stock-summary", label: "Stock Summary Report" },
+  { value: "low-stock", label: "Low Stock Report" },
+  { value: "stock-movements", label: "Stock Movements Report" },
+  { value: "dispatch", label: "Dispatch Report" },
+  { value: "wastage", label: "Wastage Report" },
+  { value: "returns", label: "Returns Report" },
+  { value: "export-documents", label: "Export Documents Report" },
+];
+
+const DATE_FILTER_REPORTS = new Set([
+  "stock-movements",
+  "dispatch",
+  "wastage",
+  "returns",
+  "export-documents",
+]);
 
 const ReportsPage = () => {
-  const token = localStorage.getItem("token");
+  const toast = useToast();
 
   const [reportType, setReportType] = useState("stock-summary");
   const [rows, setRows] = useState([]);
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
   const [filters, setFilters] = useState({
     start_date: "",
     end_date: "",
   });
 
+  const needsDateFilter = DATE_FILTER_REPORTS.has(reportType);
+
   const handleFilterChange = (e) => {
-    setFilters({ ...filters, [e.target.name]: e.target.value });
+    setFilters((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   const loadReport = async () => {
-    setError("");
-    setRows([]);
-    setLoading(true);
-
     try {
-      const config = {
-        headers: { Authorization: `Bearer ${token}` },
-      };
+      setLoading(true);
 
-      const needsDateFilter = [
-        "stock-movements",
-        "dispatch",
-        "wastage",
-        "returns",
-        "export-documents",
-      ].includes(reportType);
-
+      const config = {};
       if (needsDateFilter && filters.start_date && filters.end_date) {
         config.params = {
           start_date: filters.start_date,
@@ -44,306 +50,231 @@ const ReportsPage = () => {
       }
 
       const res = await api.get(`/reports/${reportType}`, config);
-      setRows(res.data);
+      setRows(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
-      setError("Failed to load report");
+      console.error(err);
+      toast.error(err?.response?.data?.message || "Failed to load report");
+      setRows([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const needsDateFilter = [
-    "stock-movements",
-    "dispatch",
-    "wastage",
-    "returns",
-    "export-documents",
-  ].includes(reportType);
-
-  const renderRows = () => {
-    if (loading) {
-      return (
-        <tr>
-          <td colSpan="20">Loading...</td>
-        </tr>
-      );
-    }
-
-    if (error) {
-      return (
-        <tr>
-          <td colSpan="20">{error}</td>
-        </tr>
-      );
-    }
-
-    if (rows.length === 0) {
-      return (
-        <tr>
-          <td colSpan="20">No data found</td>
-        </tr>
-      );
-    }
-
+  const headers = useMemo(() => {
     if (reportType === "stock-summary") {
-      return rows.map((r) => (
-        <tr key={r.batch_id}>
-          <td>{r.batch_id}</td>
-          <td>{r.item_code}</td>
-          <td>{r.item_name}</td>
-          <td>{r.category_name || "-"}</td>
-          <td>{r.batch_code}</td>
-          <td>{r.unit}</td>
-          <td>{r.available_quantity}</td>
-          <td>{r.status}</td>
-          <td>{r.expiry_date || "-"}</td>
-        </tr>
-      ));
+      return ["Batch ID", "Item Code", "Item Name", "Category", "Batch Code", "Unit", "Available Qty", "Status", "Expiry Date"];
+    }
+    if (reportType === "low-stock") {
+      return ["Item Code", "Item Name", "Category", "Unit", "Available Qty", "Reorder Level", "Shortage"];
+    }
+    if (reportType === "stock-movements") {
+      return ["ID", "Item Code", "Item Name", "Unit", "Movement Type", "Reference Type", "Reference ID", "Quantity", "Notes", "Created At"];
+    }
+    if (reportType === "dispatch") {
+      return ["ID", "Dispatch Number", "Client Name", "Dispatch Date", "Status", "Created By", "Remarks"];
+    }
+    if (reportType === "wastage") {
+      return ["ID", "Item Code", "Item Name", "Batch", "Quantity", "Reason", "Notes", "Created By", "Created At"];
+    }
+    if (reportType === "returns") {
+      return ["ID", "Supplier", "Item Code", "Item Name", "Batch", "Quantity", "Reason", "Notes", "Created By", "Created At"];
+    }
+    return [
+      "ID",
+      "Shipment",
+      "Client Name",
+      "Dispatch Date",
+      "Airline",
+      "Incoterm",
+      "Shipment Status",
+      "All Cleared",
+      "Updated By",
+      "Updated At",
+    ];
+  }, [reportType]);
+
+  const bodyRows = useMemo(() => {
+    if (reportType === "stock-summary") {
+      return rows.map((r) => [
+        r.batch_id,
+        r.item_code,
+        r.item_name,
+        r.category_name || "-",
+        r.batch_code,
+        r.unit,
+        r.available_quantity,
+        r.status,
+        r.expiry_date || "-",
+      ]);
     }
 
     if (reportType === "low-stock") {
-      return rows.map((r) => (
-        <tr key={r.batch_id}>
-          <td>{r.batch_id}</td>
-          <td>{r.item_code}</td>
-          <td>{r.item_name}</td>
-          <td>{r.batch_code}</td>
-          <td>{r.unit}</td>
-          <td>{r.available_quantity}</td>
-          <td>{r.status}</td>
-        </tr>
-      ));
+      return rows.map((r) => [
+        r.item_code,
+        r.item_name,
+        r.category_name || "-",
+        r.unit,
+        r.available_quantity,
+        r.reorder_level,
+        r.shortage,
+      ]);
     }
 
     if (reportType === "stock-movements") {
-      return rows.map((r) => (
-        <tr key={r.id}>
-          <td>{r.id}</td>
-          <td>{r.item_code}</td>
-          <td>{r.item_name}</td>
-          <td>{r.unit}</td>
-          <td>{r.movement_type}</td>
-          <td>{r.reference_type}</td>
-          <td>{r.reference_id}</td>
-          <td>{r.quantity}</td>
-          <td>{r.notes || "-"}</td>
-          <td>{new Date(r.created_at).toLocaleString()}</td>
-        </tr>
-      ));
+      return rows.map((r) => [
+        r.id,
+        r.item_code,
+        r.item_name,
+        r.unit,
+        r.movement_type,
+        r.reference_type,
+        r.reference_id,
+        r.quantity,
+        r.notes || "-",
+        new Date(r.created_at).toLocaleString(),
+      ]);
     }
 
     if (reportType === "dispatch") {
-      return rows.map((r) => (
-        <tr key={r.id}>
-          <td>{r.id}</td>
-          <td>{r.dispatch_number}</td>
-          <td>{r.client_name}</td>
-          <td>{r.dispatch_date}</td>
-          <td>{r.created_by_name || "-"}</td>
-          <td>{r.remarks || "-"}</td>
-        </tr>
-      ));
+      return rows.map((r) => [
+        r.id,
+        r.dispatch_number,
+        r.client_name,
+        r.dispatch_date,
+        r.status,
+        r.created_by_name || "-",
+        r.remarks || "-",
+      ]);
     }
 
     if (reportType === "wastage") {
-      return rows.map((r) => (
-        <tr key={r.id}>
-          <td>{r.id}</td>
-          <td>{r.wastage_number}</td>
-          <td>{r.wastage_date}</td>
-          <td>{r.reason || "-"}</td>
-          <td>{r.remarks || "-"}</td>
-          <td>{r.created_by_name || "-"}</td>
-        </tr>
-      ));
+      return rows.map((r) => [
+        r.id,
+        r.item_code,
+        r.item_name,
+        r.batch_code || "-",
+        r.quantity,
+        r.reason || "-",
+        r.notes || "-",
+        r.created_by_name || "-",
+        new Date(r.created_at).toLocaleString(),
+      ]);
     }
 
     if (reportType === "returns") {
-      return rows.map((r) => (
-        <tr key={r.id}>
-          <td>{r.id}</td>
-          <td>{r.return_number}</td>
-          <td>{r.return_date}</td>
-          <td>{r.return_type || "-"}</td>
-          <td>{r.reference_number || "-"}</td>
-          <td>{r.remarks || "-"}</td>
-          <td>{r.created_by_name || "-"}</td>
-        </tr>
-      ));
+      return rows.map((r) => [
+        r.id,
+        r.supplier_name,
+        r.item_code,
+        r.item_name,
+        r.batch_code || "-",
+        r.quantity,
+        r.reason || "-",
+        r.notes || "-",
+        r.created_by_name || "-",
+        new Date(r.created_at).toLocaleString(),
+      ]);
     }
 
-    if (reportType === "export-documents") {
-      return rows.map((r) => (
-        <tr key={r.id}>
-          <td>{r.id}</td>
-          <td>{r.document_number}</td>
-          <td>{r.document_type}</td>
-          <td>{r.document_date}</td>
-          <td>{r.dispatch_number}</td>
-          <td>{r.client_name}</td>
-          <td>{r.consignee_name}</td>
-          <td>{r.destination_country || "-"}</td>
-          <td>{r.created_by_name || "-"}</td>
-        </tr>
-      ));
-    }
-
-    return null;
-  };
-
-  const renderHeaders = () => {
-    if (reportType === "stock-summary") {
-      return (
-        <tr>
-          <th>Batch ID</th>
-          <th>Item Code</th>
-          <th>Item Name</th>
-          <th>Category</th>
-          <th>Batch Code</th>
-          <th>Unit</th>
-          <th>Available Qty</th>
-          <th>Status</th>
-          <th>Expiry Date</th>
-        </tr>
-      );
-    }
-
-    if (reportType === "low-stock") {
-      return (
-        <tr>
-          <th>Batch ID</th>
-          <th>Item Code</th>
-          <th>Item Name</th>
-          <th>Batch Code</th>
-          <th>Unit</th>
-          <th>Available Qty</th>
-          <th>Status</th>
-        </tr>
-      );
-    }
-
-    if (reportType === "stock-movements") {
-      return (
-        <tr>
-          <th>ID</th>
-          <th>Item Code</th>
-          <th>Item Name</th>
-          <th>Unit</th>
-          <th>Movement Type</th>
-          <th>Reference Type</th>
-          <th>Reference ID</th>
-          <th>Quantity</th>
-          <th>Notes</th>
-          <th>Created At</th>
-        </tr>
-      );
-    }
-
-    if (reportType === "dispatch") {
-      return (
-        <tr>
-          <th>ID</th>
-          <th>Dispatch Number</th>
-          <th>Client Name</th>
-          <th>Dispatch Date</th>
-          <th>Created By</th>
-          <th>Remarks</th>
-        </tr>
-      );
-    }
-
-    if (reportType === "wastage") {
-      return (
-        <tr>
-          <th>ID</th>
-          <th>Wastage Number</th>
-          <th>Wastage Date</th>
-          <th>Reason</th>
-          <th>Remarks</th>
-          <th>Created By</th>
-        </tr>
-      );
-    }
-
-    if (reportType === "returns") {
-      return (
-        <tr>
-          <th>ID</th>
-          <th>Return Number</th>
-          <th>Return Date</th>
-          <th>Return Type</th>
-          <th>Reference Number</th>
-          <th>Remarks</th>
-          <th>Created By</th>
-        </tr>
-      );
-    }
-
-    if (reportType === "export-documents") {
-      return (
-        <tr>
-          <th>ID</th>
-          <th>Document Number</th>
-          <th>Type</th>
-          <th>Date</th>
-          <th>Dispatch Number</th>
-          <th>Client Name</th>
-          <th>Consignee</th>
-          <th>Destination</th>
-          <th>Created By</th>
-        </tr>
-      );
-    }
-
-    return null;
-  };
+    return rows.map((r) => [
+      r.id,
+      r.dispatch_number,
+      r.client_name,
+      r.dispatch_date,
+      r.airline,
+      r.incoterm,
+      r.shipment_status,
+      Number(r.all_cleared || 0) === 1 ? "Yes" : "No",
+      r.updated_by_name || "-",
+      new Date(r.updated_at).toLocaleString(),
+    ]);
+  }, [rows, reportType]);
 
   return (
-    <div>
-      <div className="page-header-row">
-        <h2>Reports</h2>
+    <>
+      <div className="ib ib-i">
+        <span>📊</span>
+        <div>
+          Analytics reports using the live ERP backend. The UI stays in the same prototype system.
+        </div>
       </div>
 
-      <div className="dashboard-card" style={{ marginBottom: "20px" }}>
-        <div style={{ display: "grid", gap: "12px" }}>
-          <select value={reportType} onChange={(e) => setReportType(e.target.value)}>
-            <option value="stock-summary">Stock Summary Report</option>
-            <option value="low-stock">Low Stock Report</option>
-            <option value="stock-movements">Stock Movements Report</option>
-            <option value="dispatch">Dispatch Report</option>
-            <option value="wastage">Wastage Report</option>
-            <option value="returns">Returns Report</option>
-            <option value="export-documents">Export Documents Report</option>
+      <div className="cc">
+        <h3>Reports & Analytics</h3>
+        <p>Select a report, apply dates when needed, and load the latest data.</p>
+
+        <div className="fb" style={{ marginBottom: 16 }}>
+          <select className="fs" value={reportType} onChange={(e) => setReportType(e.target.value)}>
+            {REPORT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
 
-          {needsDateFilter && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+          {needsDateFilter ? (
+            <>
               <input
+                className="fc"
                 type="date"
                 name="start_date"
                 value={filters.start_date}
                 onChange={handleFilterChange}
+                style={{ width: 170, height: 34 }}
               />
               <input
+                className="fc"
                 type="date"
                 name="end_date"
                 value={filters.end_date}
                 onChange={handleFilterChange}
+                style={{ width: 170, height: 34 }}
               />
-            </div>
-          )}
+            </>
+          ) : null}
 
-          <button onClick={loadReport}>Load Report</button>
+          <button type="button" className="btn btn-p btn-sm" onClick={loadReport}>
+            {loading ? "Loading..." : "Load Report"}
+          </button>
+        </div>
+
+        <div className="tw" style={{ marginBottom: 0 }}>
+          <div className="tw-h">
+            <h3>{REPORT_OPTIONS.find((option) => option.value === reportType)?.label}</h3>
+            <span className="badge bg-b">{bodyRows.length} rows</span>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                {headers.map((header) => (
+                  <th key={header}>{header}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={headers.length}>Loading...</td>
+                </tr>
+              ) : bodyRows.length ? (
+                bodyRows.map((row, index) => (
+                  <tr key={`${reportType}-${index}`}>
+                    {row.map((cell, cellIndex) => (
+                      <td key={`${reportType}-${index}-${cellIndex}`}>{cell}</td>
+                    ))}
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={headers.length}>No data found</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
-
-      <div className="table-wrapper">
-        <table className="custom-table">
-          <thead>{renderHeaders()}</thead>
-          <tbody>{renderRows()}</tbody>
-        </table>
-      </div>
-    </div>
+    </>
   );
 };
 
