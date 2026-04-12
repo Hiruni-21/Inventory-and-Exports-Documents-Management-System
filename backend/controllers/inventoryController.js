@@ -213,11 +213,51 @@ const getBatchesByItemId = (req, res) => {
 const getInventoryValuation = (req, res) => {
   const sql = `
     SELECT
-      COUNT(*) AS total_items,
-      COALESCE(SUM(qty_on_hand), 0) AS total_qty_on_hand,
-      COALESCE(SUM(qty_available), 0) AS total_qty_available,
-      COALESCE(SUM(total_value), 0) AS total_inventory_value
-    FROM inventory
+      i.id AS item_id,
+      i.code,
+      i.code AS item_code,
+      i.name,
+      i.name AS item_name,
+      c.category_name,
+      i.type,
+      i.unit,
+      COALESCE(inv.qty_on_hand, 0) AS qty_on_hand,
+      COALESCE(inv.qty_available, 0) AS qty_available,
+      COALESCE(inv.avg_unit_cost, COALESCE(i.unit_cost, 0)) AS unit_cost,
+      COALESCE(
+        NULLIF(inv.total_value, 0),
+        COALESCE(inv.qty_available, 0) * COALESCE(inv.avg_unit_cost, COALESCE(i.unit_cost, 0))
+      ) AS total_value,
+      MIN(
+        CASE
+          WHEN COALESCE(ib.available_quantity, 0) > 0 THEN ib.expiry_date
+          ELSE NULL
+        END
+      ) AS nearest_expiry_date
+    FROM items i
+    JOIN item_categories c ON i.category_id = c.id
+    LEFT JOIN inventory inv ON inv.item_id = i.id
+    LEFT JOIN inventory_batches ib ON ib.item_id = i.id
+    GROUP BY
+      i.id,
+      i.code,
+      i.name,
+      c.category_name,
+      i.type,
+      i.unit,
+      inv.qty_on_hand,
+      inv.qty_available,
+      inv.avg_unit_cost,
+      inv.total_value,
+      i.unit_cost
+    HAVING
+      COALESCE(inv.qty_on_hand, 0) > 0
+      OR COALESCE(inv.qty_available, 0) > 0
+      OR COALESCE(
+        NULLIF(inv.total_value, 0),
+        COALESCE(inv.qty_available, 0) * COALESCE(inv.avg_unit_cost, COALESCE(i.unit_cost, 0))
+      ) > 0
+    ORDER BY total_value DESC, i.name ASC
   `;
 
   db.query(sql, (err, results) => {
@@ -225,7 +265,7 @@ const getInventoryValuation = (req, res) => {
       return res.status(500).json({ message: "Database error", error: err.message });
     }
 
-    res.json(results[0]);
+    res.json(results);
   });
 };
 
