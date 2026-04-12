@@ -1,126 +1,264 @@
 const db = require("../config/db");
 
+const buildAdjustmentNumber = () => `ADJ-${Date.now().toString().slice(-6)}`;
+
+const refreshInventorySnapshot = (itemId, callback = () => {}) => {
+  const totalsSql = `
+    SELECT
+      COALESCE(SUM(received_quantity), 0) AS qty_on_hand,
+      COALESCE(SUM(available_quantity), 0) AS qty_available
+    FROM inventory_batches
+    WHERE item_id = ?
+  `;
+
+  const itemSql = `
+    SELECT COALESCE(unit_cost, 0) AS unit_cost
+    FROM items
+    WHERE id = ?
+    LIMIT 1
+  `;
+
+  db.query(totalsSql, [itemId], (totalsErr, totalsRows) => {
+    if (totalsErr) return callback(totalsErr);
+
+    db.query(itemSql, [itemId], (itemErr, itemRows) => {
+      if (itemErr) return callback(itemErr);
+
+      const qtyOnHand = Number(totalsRows?.[0]?.qty_on_hand || 0);
+      const qtyAvailable = Number(totalsRows?.[0]?.qty_available || 0);
+      const unitCost = Number(itemRows?.[0]?.unit_cost || 0);
+      const totalValue = qtyAvailable * unitCost;
+
+      const upsertSql = `
+        INSERT INTO inventory
+          (item_id, qty_on_hand, qty_reserved, qty_available, avg_unit_cost, total_value, updated_at)
+        VALUES (?, ?, 0, ?, ?, ?, NOW())
+        ON DUPLICATE KEY UPDATE
+          qty_on_hand = VALUES(qty_on_hand),
+          qty_reserved = 0,
+          qty_available = VALUES(qty_available),
+          avg_unit_cost = VALUES(avg_unit_cost),
+          total_value = VALUES(total_value),
+          updated_at = NOW()
+      `;
+
+      db.query(
+        upsertSql,
+        [itemId, qtyOnHand, qtyAvailable, unitCost, totalValue],
+        (upsertErr) => callback(upsertErr)
+      );
+    });
+  });
+};
+
 const getAllStockAdjustments = (req, res) => {
   const sql = `
     SELECT
       sa.id,
+      sa.adjustment_number,
       sa.adjustment_type,
-      sa.quantity,
+      sa.system_qty,
+      sa.actual_qty,
+      sa.variance_qty,
+      sa.adjustment_qty,
+      sa.adjustment_qty AS quantity,
       sa.reason,
       sa.notes,
       sa.created_at,
-      i.item_name,
-      i.item_code,
+      i.code AS item_code,
+      i.name AS item_name,
       ib.batch_code,
-      u.name AS created_by_name
+      u.full_name AS created_by_name
     FROM stock_adjustments sa
     JOIN items i ON sa.item_id = i.id
-    JOIN inventory_batches ib ON sa.batch_id = ib.id
+    LEFT JOIN inventory_batches ib ON sa.batch_id = ib.id
     LEFT JOIN users u ON sa.created_by = u.id
     ORDER BY sa.id DESC
   `;
 
-  db.query(sql, (err, results) => {
+  db.query(sql, (err, rows) => {
     if (err) {
-      return res.status(500).json({ message: "Database error", error: err.message });
+      console.error("GET /stock-adjustments failed:", err);
+      return res.status(500).json({ message: "Failed to load stock adjustments", error: err.message });
     }
 
-    res.json(results);
+    res.json(rows);
   });
 };
 
 const createStockAdjustment = (req, res) => {
-  const { item_id, batch_id, adjustment_type, quantity, reason, notes } = req.body;
-  const created_by = req.user.id;
+  const createdBy = req.user?.id || null;
 
-  if (!item_id || !batch_id || !adjustment_type || !quantity || !reason) {
-    return res.status(400).json({ message: "Required fields are missing" });
+  const itemId = Number(req.body.item_id);
+  const batchId = Number(req.body.batch_id);
+  const quantity = Number(req.body.quantity || 0);
+  const adjustmentMode = String(req.body.adjustment_mode || "").trim().toLowerCase();
+  const reason = String(req.body.reason || "").trim();
+  const notes = String(req.body.notes || "").trim();
+  const authorizedBy = String(req.body.authorized_by || "").trim();
+
+  if (!itemId || !batchId || !adjustmentMode || !reason) {
+    return res.status(400).json({ message: "Item, batch, adjustment type and reason are required" });
   }
 
-  const getBatchSql = `
-    SELECT available_quantity
-    FROM inventory_batches
-    WHERE id = ? AND item_id = ?
+  if (Number.isNaN(quantity) || quantity < 0) {
+    return res.status(400).json({ message: "Quantity must be a valid non-negative number" });
+  }
+
+  const batchSql = `
+    SELECT
+      ib.id,
+      ib.item_id,
+      ib.batch_code,
+      COALESCE(ib.available_quantity, 0) AS available_quantity
+    FROM inventory_batches ib
+    WHERE ib.id = ? AND ib.item_id = ?
+    LIMIT 1
   `;
 
-  db.query(getBatchSql, [batch_id, item_id], (batchErr, batchResults) => {
+  db.query(batchSql, [batchId, itemId], (batchErr, batchRows) => {
     if (batchErr) {
+      console.error("Batch lookup failed:", batchErr);
       return res.status(500).json({ message: "Database error", error: batchErr.message });
     }
 
-    if (batchResults.length === 0) {
-      return res.status(404).json({ message: "Inventory batch not found" });
+    if (!batchRows.length) {
+      return res.status(404).json({ message: "Selected batch not found" });
     }
 
-    const currentQty = parseFloat(batchResults[0].available_quantity);
-    const changeQty = parseFloat(quantity);
+    const batch = batchRows[0];
+    const currentQty = Number(batch.available_quantity || 0);
 
-    let newQty = currentQty;
+    let adjustmentType = "increase";
+    let adjustmentQty = quantity;
+    let actualQty = currentQty;
+    let varianceQty = 0;
+    let nextQty = currentQty;
 
-    if (adjustment_type === "IN") {
-      newQty = currentQty + changeQty;
-    } else if (adjustment_type === "OUT") {
-      newQty = currentQty - changeQty;
-
-      if (newQty < 0) {
-        return res.status(400).json({ message: "Not enough stock in selected batch" });
+    if (adjustmentMode === "add") {
+      if (!(quantity > 0)) {
+        return res.status(400).json({ message: "Add quantity must be greater than zero" });
       }
+
+      adjustmentType = "increase";
+      actualQty = currentQty + quantity;
+      varianceQty = quantity;
+      nextQty = currentQty + quantity;
+    } else if (adjustmentMode === "remove") {
+      if (!(quantity > 0)) {
+        return res.status(400).json({ message: "Remove quantity must be greater than zero" });
+      }
+
+      if (quantity > currentQty) {
+        return res.status(400).json({ message: "Cannot remove more than current batch quantity" });
+      }
+
+      adjustmentType = "decrease";
+      actualQty = currentQty - quantity;
+      varianceQty = quantity * -1;
+      nextQty = currentQty - quantity;
+    } else if (adjustmentMode === "exact") {
+      adjustmentType = "stock_count";
+      actualQty = quantity;
+      varianceQty = quantity - currentQty;
+      adjustmentQty = Math.abs(varianceQty);
+      nextQty = quantity;
+
+      if (varianceQty === 0) {
+        return res.status(400).json({ message: "Exact quantity is already equal to current stock" });
+      }
+    } else {
+      return res.status(400).json({ message: "Invalid adjustment type" });
     }
 
-    const updateBatchSql = `
-      UPDATE inventory_batches
-      SET available_quantity = ?, status = ?
-      WHERE id = ?
-    `;
+    const nextStatus = nextQty <= 0 ? "Depleted" : "Available";
+    const mergedNotes = [notes, authorizedBy ? `Authorized By: ${authorizedBy}` : ""]
+      .filter(Boolean)
+      .join("\n");
 
-    const newStatus = newQty === 0 ? "Depleted" : "Available";
-
-    db.query(updateBatchSql, [newQty, newStatus, batch_id], (updateErr) => {
-      if (updateErr) {
-        return res.status(500).json({ message: "Database error", error: updateErr.message });
+    db.beginTransaction((txErr) => {
+      if (txErr) {
+        console.error("Transaction start failed:", txErr);
+        return res.status(500).json({ message: "Database error", error: txErr.message });
       }
 
-      const insertAdjustmentSql = `
-        INSERT INTO stock_adjustments
-        (item_id, batch_id, adjustment_type, quantity, reason, notes, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+      const updateBatchSql = `
+        UPDATE inventory_batches
+        SET available_quantity = ?, status = ?
+        WHERE id = ?
       `;
 
-      db.query(
-        insertAdjustmentSql,
-        [item_id, batch_id, adjustment_type, changeQty, reason, notes || null, created_by],
-        (adjustErr, adjustResult) => {
-          if (adjustErr) {
-            return res.status(500).json({ message: "Database error", error: adjustErr.message });
-          }
-
-          const movementSql = `
-            INSERT INTO stock_movements
-            (item_id, movement_type, reference_type, reference_id, quantity, notes)
-            VALUES (?, ?, 'ADJUSTMENT', ?, ?, ?)
-          `;
-
-          db.query(
-            movementSql,
-            [
-              item_id,
-              adjustment_type,
-              adjustResult.insertId,
-              changeQty,
-              notes || `Stock adjusted: ${reason}`,
-            ],
-            (movementErr) => {
-              if (movementErr) {
-                return res.status(500).json({ message: "Database error", error: movementErr.message });
-              }
-
-              res.status(201).json({
-                message: "Stock adjustment created successfully",
-              });
-            }
+      db.query(updateBatchSql, [nextQty, nextStatus, batchId], (updateErr) => {
+        if (updateErr) {
+          console.error("Batch update failed:", updateErr);
+          return db.rollback(() =>
+            res.status(500).json({ message: "Failed to update batch", error: updateErr.message })
           );
         }
-      );
+
+        const insertSql = `
+          INSERT INTO stock_adjustments
+          (
+            adjustment_number,
+            item_id,
+            batch_id,
+            adjustment_type,
+            system_qty,
+            actual_qty,
+            variance_qty,
+            adjustment_qty,
+            reason,
+            notes,
+            created_by
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+
+        db.query(
+          insertSql,
+          [
+            buildAdjustmentNumber(),
+            itemId,
+            batchId,
+            adjustmentType,
+            currentQty,
+            actualQty,
+            varianceQty,
+            adjustmentQty,
+            reason,
+            mergedNotes,
+            createdBy,
+          ],
+          (insertErr) => {
+            if (insertErr) {
+              console.error("Adjustment insert failed:", insertErr);
+              return db.rollback(() =>
+                res.status(500).json({ message: "Failed to save adjustment", error: insertErr.message })
+              );
+            }
+
+            refreshInventorySnapshot(itemId, (refreshErr) => {
+              if (refreshErr) {
+                console.error("Inventory snapshot refresh failed:", refreshErr);
+                return db.rollback(() =>
+                  res.status(500).json({ message: "Failed to refresh inventory", error: refreshErr.message })
+                );
+              }
+
+              db.commit((commitErr) => {
+                if (commitErr) {
+                  console.error("Commit failed:", commitErr);
+                  return db.rollback(() =>
+                    res.status(500).json({ message: "Commit failed", error: commitErr.message })
+                  );
+                }
+
+                res.status(201).json({ message: "Stock adjustment saved successfully" });
+              });
+            });
+          }
+        );
+      });
     });
   });
 };

@@ -257,7 +257,6 @@ const actionButtons = {
   "/suppliers": [{ label: "+ Add Supplier", to: "/suppliers/add", className: "btn btn-p btn-sm" }],
   "/categories": [{ label: "+ Add Category", to: "/categories/add", className: "btn btn-p btn-sm" }],
   "/items": [{ label: "+ New Item", to: "/items/add", className: "btn btn-p btn-sm" }],
-  "/stock-adjustments": [{ label: "+ New Adjustment", to: "/stock-adjustments/add", className: "btn btn-p btn-sm" }],
   "/purchase-orders": [{ label: "+ Create PO", to: "/purchase-orders/add", className: "btn btn-p btn-sm" }],
   "/grn": [{ label: "+ New GRN", to: "/grn/add", className: "btn btn-p btn-sm" }],
   "/returns": [

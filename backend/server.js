@@ -18,6 +18,7 @@ const dispatchRoutes = require("./routes/dispatchRoutes");
 const globalDispatchRoutes = require("./routes/globalDispatchRoutes");
 const exportDocumentRoutes = require("./routes/exportDocumentRoutes");
 const customerRoutes = require("./routes/customerRoutes");
+const stockAdjustmentRoutes = require("./routes/stockAdjustmentRoutes");
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.use("/api/dispatch/global", globalDispatchRoutes);
 app.use("/api/dispatch", dispatchRoutes);
 app.use("/api/export-docs", exportDocumentRoutes);
 app.use("/api/customers", customerRoutes);
+app.use("/api/stock-adjustments", stockAdjustmentRoutes);
 
 app.get("/", (req, res) => {
   res.send("Fresh World ERP backend is running");
