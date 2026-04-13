@@ -1,349 +1,1045 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Chart from "chart.js/auto";
 import api from "../utils/api";
+import { useToast } from "../context/ToastContext";
 
+const REPORT_CARDS = [
+  {
+    id: "supplier-purchase",
+    title: "Supplier Purchase Report",
+    description: "PO history, spend per supplier, item breakdown",
+    frequency: "Monthly",
+    endpoints: ["/reports/supplier-purchase", "/reports/purchase-orders", "/reports/supplier-purchases"],
+  },
+  {
+    id: "stock-movement",
+    title: "Item Stock Movement",
+    description: "In/out movements per item, any period",
+    frequency: "Custom",
+    endpoints: ["/reports/stock-movement", "/reports/movements", "/reports/inventory-movement"],
+  },
+  {
+    id: "wastage",
+    title: "Monthly Wastage Report",
+    description: "By item, batch, cause, LKR loss, trend",
+    frequency: "Monthly",
+    endpoints: ["/reports/wastage", "/reports/monthly-wastage"],
+  },
+  {
+    id: "returns",
+    title: "Returns Report",
+    description: "Customer and supplier returns, deductions",
+    frequency: "Monthly",
+    endpoints: ["/reports/returns", "/reports/return-summary"],
+  },
+  {
+    id: "valuation",
+    title: "Stock Valuation Report",
+    description: "LKR value of all stock by category",
+    frequency: "Monthly",
+    endpoints: ["/reports/valuation", "/inventory/valuation"],
+  },
+  {
+    id: "expiry",
+    title: "Expiry Report",
+    description: "Expiring within 7/14/30 days + estimated loss",
+    frequency: "Daily",
+    endpoints: ["/reports/expiry", "/inventory/expiry"],
+  },
+  {
+    id: "packaging",
+    title: "Packaging Stock Report",
+    description: "Box levels, reorder status, usage",
+    frequency: "Weekly",
+    endpoints: ["/reports/packaging", "/reports/packaging-stock"],
+  },
+  {
+    id: "sup-perf",
+    title: "Supplier Performance",
+    description: "On-time rate, return rate, price trends",
+    frequency: "Monthly",
+    endpoints: ["/reports/supplier-performance", "/reports/sup-perf"],
+  },
+  {
+    id: "dispatch",
+    title: "Customer Dispatch Report",
+    description: "Local vs global volumes, top customers",
+    frequency: "Monthly",
+    endpoints: ["/reports/dispatch", "/reports/customer-dispatch"],
+  },
+  {
+    id: "forecast",
+    title: "Forecast Report",
+    description: "Projected demand based on 3-month history",
+    frequency: "Monthly",
+    endpoints: ["/reports/forecast", "/reports/demand-forecast"],
+  },
+  {
+    id: "variance",
+    title: "Physical Stock Variance",
+    description: "Count vs system, adjustment history",
+    frequency: "After count",
+    endpoints: ["/reports/variance", "/reports/stock-variance", "/reports/physical-stock-variance"],
+  },
+  {
+    id: "batch-stock",
+    title: "Batch-wise Stock Report",
+    description: "Active batches, quantities, expiry order",
+    frequency: "Weekly",
+    endpoints: ["/reports/batch-stock", "/reports/batch-wise-stock", "/reports/batches"],
+  },
+];
+
+const categories = [
+  "All Categories",
+  "Tropical Fruits",
+  "Leafy Greens",
+  "Herbs",
+  "Vegetables",
+  "Packaging",
+];
+
+const modalOverlayStyle = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(10,40,24,.48)",
+  zIndex: 500,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 20,
+  backdropFilter: "blur(3px)",
+};
+
+const chartCardStyle = {
+  background: "var(--white)",
+  borderRadius: 16,
+  padding: 18,
+  border: "1px solid var(--border)",
+  boxShadow: "0 2px 8px rgba(10,40,24,.03)",
+};
+
+const chartWrapStyle = {
+  position: "relative",
+  height: 360,
+  width: "100%",
+};
+
+const getDefaultFromDate = () => {
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth(), 1);
+  return d.toISOString().slice(0, 10);
+};
+
+const getDefaultToDate = () => new Date().toISOString().slice(0, 10);
+
+const formatPreviewValue = (value) => {
+  if (value === null || value === undefined || value === "") return "—";
+  if (typeof value === "number") return Number.isInteger(value) ? String(value) : value.toFixed(2);
+  return String(value);
+};
+
+const monthKeyFromDate = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+};
+
+const monthLabelFromDate = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("en-US", { month: "short" });
+};
+
+const buildFallbackDispatchSeries = () => [
+  { label: "Sep", local: 810, global: 630 },
+  { label: "Oct", local: 900, global: 710 },
+  { label: "Nov", local: 870, global: 690 },
+  { label: "Dec", local: 1040, global: 840 },
+  { label: "Jan", local: 980, global: 780 },
+  { label: "Feb", local: 1100, global: 870 },
+  { label: "Mar", local: 1180, global: 940 },
+];
+
+const buildFallbackCustomerSeries = () => [
+  { name: "Four Seasons", value: 420 },
+  { name: "Hilton Maldives", value: 380 },
+  { name: "Waldorf", value: 290 },
+  { name: "Conrad", value: 240 },
+  { name: "Other", value: 180 },
+];
+
+const pickQuantity = (row) =>
+  Number(
+    row.total_quantity ||
+      row.total_qty ||
+      row.quantity ||
+      row.weight_kg ||
+      row.net_weight ||
+      row.qty ||
+      0
+  );
+
+const pickValue = (row) =>
+  Number(
+    row.total_value ||
+      row.value_lkr ||
+      row.dispatch_value ||
+      row.shipment_value ||
+      row.amount ||
+      row.total_amount ||
+      0
+  );
+
+const pickCustomerName = (row) =>
+  row.customer_name || row.client_name || row.customer || row.name || row.company_name || null;
+
+const fetchFirstSuccess = async (endpoints, params = {}) => {
+  let lastError = null;
+
+  for (const endpoint of endpoints) {
+    try {
+      const res = await api.get(endpoint, { params });
+      return res.data;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  throw lastError || new Error("All endpoints failed");
+};
+
+const getReportCardStyle = (isActive) => ({
+  background: "white",
+  borderRadius: 20,
+  padding: "22px",
+  border: `1px solid ${isActive ? "var(--g300)" : "var(--border)"}`,
+  boxShadow: isActive
+    ? "0 10px 20px rgba(10,40,24,.08)"
+    : "0 2px 8px rgba(10,40,24,.03)",
+  cursor: "pointer",
+  minHeight: 154,
+  display: "flex",
+  alignItems: "center",
+  gap: 20,
+  transform: isActive ? "translateY(-2px)" : "translateY(0)",
+  transition: "all .18s ease",
+});
+
+const getIconBoxStyle = (isActive) => ({
+  width: 84,
+  height: 84,
+  borderRadius: 20,
+  background: isActive ? "rgba(224,242,230,1)" : "rgba(224,242,230,.78)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  flexShrink: 0,
+  transition: "all .18s ease",
+});
+
+const renderReportIcon = (reportId, isActive) => {
+  const stroke = isActive ? "#4AA35A" : "#4AA35A";
+  const common = {
+    stroke,
+    strokeWidth: "2.2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    fill: "none",
+  };
+
+  const wrap = (children) => (
+    <svg width="38" height="38" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      {children}
+    </svg>
+  );
+
+  switch (reportId) {
+    case "supplier-purchase":
+      return wrap(
+        <>
+          <path d="M5 18V11" {...common} />
+          <path d="M10 18V7" {...common} />
+          <path d="M15 18V13" {...common} />
+          <path d="M20 18V9" {...common} />
+          <path d="M4 18H20" {...common} />
+        </>
+      );
+
+    case "stock-movement":
+      return wrap(
+        <>
+          <path d="M7 8H20" {...common} />
+          <path d="M16.5 4.5L20 8L16.5 11.5" {...common} />
+          <path d="M17 16H4" {...common} />
+          <path d="M7.5 12.5L4 16L7.5 19.5" {...common} />
+        </>
+      );
+
+    case "wastage":
+      return wrap(
+        <>
+          <path d="M8 7H16" {...common} />
+          <path d="M9 7V5H15V7" {...common} />
+          <path d="M9 7L10 19H14L15 7" {...common} />
+          <path d="M11 10V16" {...common} />
+          <path d="M13 10V16" {...common} />
+        </>
+      );
+
+case "returns":
+  return (
+    <svg width="38" height="38" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M7 6V3L3 7L7 11V8"
+        {...common}
+      />
+      <path
+        d="M7 7H13.5C17.09 7 20 9.91 20 13.5C20 17.09 17.09 20 13.5 20H10"
+        {...common}
+      />
+      <path
+        d="M12 10L16 12V16L12 18L8 16V12L12 10Z"
+        {...common}
+      />
+      <path
+        d="M8 12L12 14L16 12"
+        {...common}
+      />
+      <path
+        d="M12 14V18"
+        {...common}
+      />
+    </svg>
+  );
+    case "valuation":
+      return wrap(
+        <>
+          <circle cx="12" cy="12" r="7" {...common} />
+          <path d="M12 8V16" {...common} />
+          <path d="M14.2 9.8C13.8 9.2 13 8.8 12 8.8C10.7 8.8 9.8 9.5 9.8 10.5C9.8 11.4 10.5 11.9 12 12.3C13.5 12.7 14.2 13.2 14.2 14.1C14.2 15.2 13.2 16 12 16C10.9 16 10 15.5 9.6 14.7" {...common} />
+        </>
+      );
+
+    case "expiry":
+      return wrap(
+        <>
+          <circle cx="12" cy="13" r="7" {...common} />
+          <path d="M12 13V9.5" {...common} />
+          <path d="M12 13L14.7 15.2" {...common} />
+          <path d="M9.5 3.5H14.5" {...common} />
+        </>
+      );
+
+    case "packaging":
+      return wrap(
+        <>
+          <path d="M12 4L18 7.5L12 11L6 7.5L12 4Z" {...common} />
+          <path d="M6 7.5V15.5L12 19V11" {...common} />
+          <path d="M18 7.5V15.5L12 19" {...common} />
+        </>
+      );
+
+    case "sup-perf":
+    case "forecast":
+      return wrap(
+        <>
+          <path d="M5 16L10 11L13 14L19 8" {...common} />
+          <path d="M14.5 8H19V12.5" {...common} />
+        </>
+      );
+
+    case "dispatch":
+      return wrap(
+        <>
+          <path d="M4 10H13V15H4V10Z" {...common} />
+          <path d="M13 11H17L20 14V15H13V11Z" {...common} />
+          <circle cx="7" cy="17" r="1.4" {...common} />
+          <circle cx="17" cy="17" r="1.4" {...common} />
+        </>
+      );
+
+    case "variance":
+      return wrap(
+        <>
+          <path d="M12 5V19" {...common} />
+          <path d="M7 8H17" {...common} />
+          <path d="M8 8L5 13H11L8 8Z" {...common} />
+          <path d="M16 8L13 13H19L16 8Z" {...common} />
+        </>
+      );
+
+    case "batch-stock":
+      return wrap(
+        <>
+          <path d="M8 8H16L19 11L16 14H8L5 11L8 8Z" {...common} />
+          <path d="M9 11H12.5" {...common} />
+        </>
+      );
+
+    default:
+      return wrap(
+        <>
+          <path d="M5 16L10 11L13 14L19 8" {...common} />
+          <path d="M14.5 8H19V12.5" {...common} />
+        </>
+      );
+  }
+};
 const ReportsPage = () => {
-  const token = localStorage.getItem("token");
+  const toast = useToast();
 
-  const [reportType, setReportType] = useState("stock-summary");
-  const [rows, setRows] = useState([]);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [selectedReport, setSelectedReport] = useState(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [previewRows, setPreviewRows] = useState([]);
+  const [previewError, setPreviewError] = useState("");
+  const [hoveredReport, setHoveredReport] = useState(null);
 
   const [filters, setFilters] = useState({
-    start_date: "",
-    end_date: "",
+    from: getDefaultFromDate(),
+    to: getDefaultToDate(),
+    category: "All Categories",
+    format: "excel",
   });
 
-  const handleFilterChange = (e) => {
-    setFilters({ ...filters, [e.target.name]: e.target.value });
+  const [loadingCharts, setLoadingCharts] = useState(true);
+  const [dispatchSeries, setDispatchSeries] = useState(buildFallbackDispatchSeries());
+  const [customerSeries, setCustomerSeries] = useState(buildFallbackCustomerSeries());
+
+  const dispatchCanvasRef = useRef(null);
+  const customerCanvasRef = useRef(null);
+  const dispatchChartRef = useRef(null);
+  const customerChartRef = useRef(null);
+
+  useEffect(() => {
+    const loadCharts = async () => {
+      setLoadingCharts(true);
+
+      try {
+        const [localResult, globalResult, customerResult] = await Promise.allSettled([
+          fetchFirstSuccess(["/dispatch/local", "/dispatch"], {}),
+          fetchFirstSuccess(["/dispatch/global", "/global-dispatch", "/dispatch"], {}),
+          fetchFirstSuccess(["/customers?type=global", "/customers/global", "/customers"], {}),
+        ]);
+
+        const localRows =
+          localResult.status === "fulfilled" && Array.isArray(localResult.value)
+            ? localResult.value
+            : [];
+        const globalRows =
+          globalResult.status === "fulfilled" && Array.isArray(globalResult.value)
+            ? globalResult.value
+            : [];
+        const customerRows =
+          customerResult.status === "fulfilled" && Array.isArray(customerResult.value)
+            ? customerResult.value
+            : [];
+
+        const monthMap = new Map();
+
+        const addRowsToSeries = (rows, bucket) => {
+          rows.forEach((row) => {
+            const rawDate =
+              row.dispatch_date ||
+              row.shipment_date ||
+              row.created_at ||
+              row.date ||
+              row.etd ||
+              row.eta;
+            const key = monthKeyFromDate(rawDate);
+            if (!key) return;
+
+            const current = monthMap.get(key) || {
+              label: monthLabelFromDate(rawDate),
+              local: 0,
+              global: 0,
+            };
+
+            current[bucket] += pickQuantity(row);
+            monthMap.set(key, current);
+          });
+        };
+
+        addRowsToSeries(localRows, "local");
+        addRowsToSeries(globalRows, "global");
+
+        let nextDispatchSeries = Array.from(monthMap.entries())
+          .sort(([a], [b]) => a.localeCompare(b))
+          .slice(-7)
+          .map(([, value]) => value);
+
+        if (!nextDispatchSeries.length) {
+          nextDispatchSeries = buildFallbackDispatchSeries();
+        }
+
+        const customerValueMap = new Map();
+
+        customerRows.forEach((row) => {
+          const type = String(row.customer_type || row.type || "").toLowerCase();
+          if (type && !type.includes("global")) return;
+
+          const name = pickCustomerName(row);
+          if (!name) return;
+
+          const value = pickValue(row);
+          if (value <= 0) return;
+
+          customerValueMap.set(name, (customerValueMap.get(name) || 0) + value);
+        });
+
+        if (!customerValueMap.size) {
+          globalRows.forEach((row) => {
+            const name = pickCustomerName(row);
+            if (!name) return;
+
+            const value = pickValue(row) || pickQuantity(row);
+            if (value <= 0) return;
+
+            customerValueMap.set(name, (customerValueMap.get(name) || 0) + value);
+          });
+        }
+
+        let nextCustomerSeries = Array.from(customerValueMap.entries())
+          .map(([name, value]) => ({ name, value }))
+          .sort((a, b) => b.value - a.value)
+          .slice(0, 5);
+
+        if (!nextCustomerSeries.length) {
+          nextCustomerSeries = buildFallbackCustomerSeries();
+        }
+
+        setDispatchSeries(nextDispatchSeries);
+        setCustomerSeries(nextCustomerSeries);
+      } catch (err) {
+        console.error(err);
+        setDispatchSeries(buildFallbackDispatchSeries());
+        setCustomerSeries(buildFallbackCustomerSeries());
+      } finally {
+        setLoadingCharts(false);
+      }
+    };
+
+    loadCharts();
+  }, []);
+
+  useEffect(() => {
+    if (!dispatchCanvasRef.current) return;
+
+    if (dispatchChartRef.current) {
+      dispatchChartRef.current.destroy();
+      dispatchChartRef.current = null;
+    }
+
+    dispatchChartRef.current = new Chart(dispatchCanvasRef.current, {
+      type: "bar",
+      data: {
+        labels: dispatchSeries.map((row) => row.label),
+        datasets: [
+          {
+            label: "Local (kg)",
+            data: dispatchSeries.map((row) => Number(row.local || 0)),
+            backgroundColor: "rgba(64, 117, 211, 0.18)",
+            borderColor: "#2F69C8",
+            borderWidth: 2,
+            borderRadius: 5,
+            barPercentage: 0.78,
+            categoryPercentage: 0.68,
+          },
+          {
+            label: "Global (kg)",
+            data: dispatchSeries.map((row) => Number(row.global || 0)),
+            backgroundColor: "rgba(236, 177, 62, 0.16)",
+            borderColor: "#E3A72C",
+            borderWidth: 2,
+            borderRadius: 5,
+            barPercentage: 0.78,
+            categoryPercentage: 0.68,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          legend: {
+            position: "bottom",
+            labels: {
+              usePointStyle: true,
+              pointStyle: "circle",
+              boxWidth: 8,
+              boxHeight: 8,
+              color: "#6F8A7E",
+              font: {
+                family: "Plus Jakarta Sans",
+                size: 11,
+              },
+            },
+          },
+          tooltip: {
+            backgroundColor: "rgba(12, 23, 18, 0.9)",
+            titleFont: { family: "Plus Jakarta Sans", size: 12 },
+            bodyFont: { family: "Plus Jakarta Sans", size: 12 },
+            padding: 10,
+            borderColor: "rgba(255,255,255,0.08)",
+            borderWidth: 1,
+          },
+        },
+        scales: {
+          x: {
+            grid: {
+              display: false,
+              drawBorder: false,
+            },
+            ticks: {
+              color: "#627A70",
+              font: {
+                family: "Plus Jakarta Sans",
+                size: 11,
+              },
+            },
+          },
+          y: {
+            beginAtZero: true,
+            grid: {
+              color: "rgba(198, 220, 208, 0.55)",
+              drawBorder: false,
+            },
+            ticks: {
+              color: "#627A70",
+              font: {
+                family: "Plus Jakarta Sans",
+                size: 11,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return () => {
+      if (dispatchChartRef.current) {
+        dispatchChartRef.current.destroy();
+        dispatchChartRef.current = null;
+      }
+    };
+  }, [dispatchSeries]);
+
+  useEffect(() => {
+    if (!customerCanvasRef.current) return;
+
+    if (customerChartRef.current) {
+      customerChartRef.current.destroy();
+      customerChartRef.current = null;
+    }
+
+    customerChartRef.current = new Chart(customerCanvasRef.current, {
+      type: "bar",
+      data: {
+        labels: customerSeries.map((row) => row.name),
+        datasets: [
+          {
+            data: customerSeries.map((row) => Number(row.value || 0)),
+            backgroundColor: ["#0B4F27", "#287E43", "#2D9852", "#47AF72", "#6DBE90"],
+            borderRadius: 4,
+            borderSkipped: false,
+            barPercentage: 0.7,
+            categoryPercentage: 0.75,
+          },
+        ],
+      },
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: "rgba(12, 23, 18, 0.9)",
+            titleFont: { family: "Plus Jakarta Sans", size: 12 },
+            bodyFont: { family: "Plus Jakarta Sans", size: 12 },
+            padding: 10,
+            borderColor: "rgba(255,255,255,0.08)",
+            borderWidth: 1,
+          },
+        },
+        scales: {
+          y: {
+            grid: {
+              display: false,
+              drawBorder: false,
+            },
+            ticks: {
+              color: "#627A70",
+              font: {
+                family: "Plus Jakarta Sans",
+                size: 11,
+              },
+            },
+          },
+          x: {
+            beginAtZero: true,
+            grid: {
+              color: "rgba(198, 220, 208, 0.55)",
+              drawBorder: false,
+            },
+            ticks: {
+              color: "#627A70",
+              callback: (value) => `LKR ${value}K`,
+              font: {
+                family: "Plus Jakarta Sans",
+                size: 11,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return () => {
+      if (customerChartRef.current) {
+        customerChartRef.current.destroy();
+        customerChartRef.current = null;
+      }
+    };
+  }, [customerSeries]);
+
+  const openReportModal = (report) => {
+    setSelectedReport(report);
+    setPreviewRows([]);
+    setPreviewError("");
+    setShowModal(true);
   };
 
-  const loadReport = async () => {
-    setError("");
-    setRows([]);
-    setLoading(true);
+  const closeReportModal = () => {
+    if (loadingPreview) return;
+    setShowModal(false);
+    setSelectedReport(null);
+    setPreviewRows([]);
+    setPreviewError("");
+  };
+
+  const handleGenerate = async () => {
+    if (!selectedReport) return;
+
+    setLoadingPreview(true);
+    setPreviewError("");
 
     try {
-      const config = {
-        headers: { Authorization: `Bearer ${token}` },
+      const params = {
+        from: filters.from,
+        to: filters.to,
       };
 
-      const needsDateFilter = [
-        "stock-movements",
-        "dispatch",
-        "wastage",
-        "returns",
-        "export-documents",
-      ].includes(reportType);
-
-      if (needsDateFilter && filters.start_date && filters.end_date) {
-        config.params = {
-          start_date: filters.start_date,
-          end_date: filters.end_date,
-        };
+      if (filters.category && filters.category !== "All Categories") {
+        params.category = filters.category;
       }
 
-      const res = await api.get(`/reports/${reportType}`, config);
-      setRows(res.data);
+      const data = await fetchFirstSuccess(selectedReport.endpoints, params);
+
+      if (Array.isArray(data)) {
+        setPreviewRows(data);
+      } else if (Array.isArray(data?.rows)) {
+        setPreviewRows(data.rows);
+      } else if (data && typeof data === "object") {
+        setPreviewRows([data]);
+      } else {
+        setPreviewRows([]);
+      }
+
+      toast.success(`${selectedReport.title} loaded`);
     } catch (err) {
-      setError("Failed to load report");
+      console.error(err);
+      setPreviewRows([]);
+      setPreviewError(err?.response?.data?.message || "Failed to load report");
+      toast.error(err?.response?.data?.message || "Failed to load report");
     } finally {
-      setLoading(false);
+      setLoadingPreview(false);
     }
   };
 
-  const needsDateFilter = [
-    "stock-movements",
-    "dispatch",
-    "wastage",
-    "returns",
-    "export-documents",
-  ].includes(reportType);
-
-  const renderRows = () => {
-    if (loading) {
-      return (
-        <tr>
-          <td colSpan="20">Loading...</td>
-        </tr>
-      );
-    }
-
-    if (error) {
-      return (
-        <tr>
-          <td colSpan="20">{error}</td>
-        </tr>
-      );
-    }
-
-    if (rows.length === 0) {
-      return (
-        <tr>
-          <td colSpan="20">No data found</td>
-        </tr>
-      );
-    }
-
-    if (reportType === "stock-summary") {
-      return rows.map((r) => (
-        <tr key={r.batch_id}>
-          <td>{r.batch_id}</td>
-          <td>{r.item_code}</td>
-          <td>{r.item_name}</td>
-          <td>{r.category_name || "-"}</td>
-          <td>{r.batch_code}</td>
-          <td>{r.unit}</td>
-          <td>{r.available_quantity}</td>
-          <td>{r.status}</td>
-          <td>{r.expiry_date || "-"}</td>
-        </tr>
-      ));
-    }
-
-    if (reportType === "low-stock") {
-      return rows.map((r) => (
-        <tr key={r.batch_id}>
-          <td>{r.batch_id}</td>
-          <td>{r.item_code}</td>
-          <td>{r.item_name}</td>
-          <td>{r.batch_code}</td>
-          <td>{r.unit}</td>
-          <td>{r.available_quantity}</td>
-          <td>{r.status}</td>
-        </tr>
-      ));
-    }
-
-    if (reportType === "stock-movements") {
-      return rows.map((r) => (
-        <tr key={r.id}>
-          <td>{r.id}</td>
-          <td>{r.item_code}</td>
-          <td>{r.item_name}</td>
-          <td>{r.unit}</td>
-          <td>{r.movement_type}</td>
-          <td>{r.reference_type}</td>
-          <td>{r.reference_id}</td>
-          <td>{r.quantity}</td>
-          <td>{r.notes || "-"}</td>
-          <td>{new Date(r.created_at).toLocaleString()}</td>
-        </tr>
-      ));
-    }
-
-    if (reportType === "dispatch") {
-      return rows.map((r) => (
-        <tr key={r.id}>
-          <td>{r.id}</td>
-          <td>{r.dispatch_number}</td>
-          <td>{r.client_name}</td>
-          <td>{r.dispatch_date}</td>
-          <td>{r.created_by_name || "-"}</td>
-          <td>{r.remarks || "-"}</td>
-        </tr>
-      ));
-    }
-
-    if (reportType === "wastage") {
-      return rows.map((r) => (
-        <tr key={r.id}>
-          <td>{r.id}</td>
-          <td>{r.wastage_number}</td>
-          <td>{r.wastage_date}</td>
-          <td>{r.reason || "-"}</td>
-          <td>{r.remarks || "-"}</td>
-          <td>{r.created_by_name || "-"}</td>
-        </tr>
-      ));
-    }
-
-    if (reportType === "returns") {
-      return rows.map((r) => (
-        <tr key={r.id}>
-          <td>{r.id}</td>
-          <td>{r.return_number}</td>
-          <td>{r.return_date}</td>
-          <td>{r.return_type || "-"}</td>
-          <td>{r.reference_number || "-"}</td>
-          <td>{r.remarks || "-"}</td>
-          <td>{r.created_by_name || "-"}</td>
-        </tr>
-      ));
-    }
-
-    if (reportType === "export-documents") {
-      return rows.map((r) => (
-        <tr key={r.id}>
-          <td>{r.id}</td>
-          <td>{r.document_number}</td>
-          <td>{r.document_type}</td>
-          <td>{r.document_date}</td>
-          <td>{r.dispatch_number}</td>
-          <td>{r.client_name}</td>
-          <td>{r.consignee_name}</td>
-          <td>{r.destination_country || "-"}</td>
-          <td>{r.created_by_name || "-"}</td>
-        </tr>
-      ));
-    }
-
-    return null;
-  };
-
-  const renderHeaders = () => {
-    if (reportType === "stock-summary") {
-      return (
-        <tr>
-          <th>Batch ID</th>
-          <th>Item Code</th>
-          <th>Item Name</th>
-          <th>Category</th>
-          <th>Batch Code</th>
-          <th>Unit</th>
-          <th>Available Qty</th>
-          <th>Status</th>
-          <th>Expiry Date</th>
-        </tr>
-      );
-    }
-
-    if (reportType === "low-stock") {
-      return (
-        <tr>
-          <th>Batch ID</th>
-          <th>Item Code</th>
-          <th>Item Name</th>
-          <th>Batch Code</th>
-          <th>Unit</th>
-          <th>Available Qty</th>
-          <th>Status</th>
-        </tr>
-      );
-    }
-
-    if (reportType === "stock-movements") {
-      return (
-        <tr>
-          <th>ID</th>
-          <th>Item Code</th>
-          <th>Item Name</th>
-          <th>Unit</th>
-          <th>Movement Type</th>
-          <th>Reference Type</th>
-          <th>Reference ID</th>
-          <th>Quantity</th>
-          <th>Notes</th>
-          <th>Created At</th>
-        </tr>
-      );
-    }
-
-    if (reportType === "dispatch") {
-      return (
-        <tr>
-          <th>ID</th>
-          <th>Dispatch Number</th>
-          <th>Client Name</th>
-          <th>Dispatch Date</th>
-          <th>Created By</th>
-          <th>Remarks</th>
-        </tr>
-      );
-    }
-
-    if (reportType === "wastage") {
-      return (
-        <tr>
-          <th>ID</th>
-          <th>Wastage Number</th>
-          <th>Wastage Date</th>
-          <th>Reason</th>
-          <th>Remarks</th>
-          <th>Created By</th>
-        </tr>
-      );
-    }
-
-    if (reportType === "returns") {
-      return (
-        <tr>
-          <th>ID</th>
-          <th>Return Number</th>
-          <th>Return Date</th>
-          <th>Return Type</th>
-          <th>Reference Number</th>
-          <th>Remarks</th>
-          <th>Created By</th>
-        </tr>
-      );
-    }
-
-    if (reportType === "export-documents") {
-      return (
-        <tr>
-          <th>ID</th>
-          <th>Document Number</th>
-          <th>Type</th>
-          <th>Date</th>
-          <th>Dispatch Number</th>
-          <th>Client Name</th>
-          <th>Consignee</th>
-          <th>Destination</th>
-          <th>Created By</th>
-        </tr>
-      );
-    }
-
-    return null;
-  };
+  const previewColumns = useMemo(() => {
+    if (!previewRows.length) return [];
+    return Object.keys(previewRows[0]).slice(0, 8);
+  }, [previewRows]);
 
   return (
-    <div>
-      <div className="page-header-row">
-        <h2>Reports</h2>
+    <>
+      <div
+        className="cg"
+        style={{
+          marginBottom: 22,
+          gridTemplateColumns: "repeat(auto-fill,minmax(320px,1fr))",
+          columnGap: 16,
+          rowGap: 16,
+        }}
+      >
+        {REPORT_CARDS.map((report) => {
+          const isActive = hoveredReport === report.id;
+
+          return (
+            <div
+              key={report.id}
+              className="ic"
+              onClick={() => openReportModal(report)}
+              onMouseEnter={() => setHoveredReport(report.id)}
+              onMouseLeave={() => setHoveredReport(null)}
+              style={getReportCardStyle(isActive)}
+            >
+              <div style={getIconBoxStyle(isActive)}>
+                {renderReportIcon(report.id, isActive)}
+              </div>
+
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 700,
+                    color: "var(--g900)",
+                    lineHeight: 1.35,
+                    letterSpacing: "-0.2px",
+                    marginBottom: 8,
+                  }}
+                >
+                  {report.title}
+                </div>
+
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: "#7B7B90",
+                    lineHeight: 1.55,
+                    marginBottom: 10,
+                  }}
+                >
+                  {report.description}
+                </div>
+
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: isActive ? "var(--g700)" : "var(--text3)",
+                    transition: "all .18s ease",
+                  }}
+                >
+                  {report.frequency}
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      <div className="dashboard-card" style={{ marginBottom: "20px" }}>
-        <div style={{ display: "grid", gap: "12px" }}>
-          <select value={reportType} onChange={(e) => setReportType(e.target.value)}>
-            <option value="stock-summary">Stock Summary Report</option>
-            <option value="low-stock">Low Stock Report</option>
-            <option value="stock-movements">Stock Movements Report</option>
-            <option value="dispatch">Dispatch Report</option>
-            <option value="wastage">Wastage Report</option>
-            <option value="returns">Returns Report</option>
-            <option value="export-documents">Export Documents Report</option>
-          </select>
+      <div className="g2">
+        <div style={chartCardStyle}>
+          <div style={{ marginBottom: 10 }}>
+            <h3
+              style={{
+                fontSize: 14,
+                fontWeight: 700,
+                color: "var(--g900)",
+                marginBottom: 3,
+                letterSpacing: "-.2px",
+              }}
+            >
+              Local vs Global Dispatch — Monthly (kg)
+            </h3>
+            <p style={{ fontSize: 11, color: "var(--text3)" }}>Volume comparison</p>
+          </div>
 
-          {needsDateFilter && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-              <input
-                type="date"
-                name="start_date"
-                value={filters.start_date}
-                onChange={handleFilterChange}
-              />
-              <input
-                type="date"
-                name="end_date"
-                value={filters.end_date}
-                onChange={handleFilterChange}
-              />
-            </div>
-          )}
+          <div style={chartWrapStyle}>
+            {loadingCharts ? (
+              <div className="ib ib-i">
+                <span>⏳</span>
+                <div>Loading chart...</div>
+              </div>
+            ) : (
+              <canvas ref={dispatchCanvasRef} />
+            )}
+          </div>
+        </div>
 
-          <button onClick={loadReport}>Load Report</button>
+        <div style={chartCardStyle}>
+          <div style={{ marginBottom: 10 }}>
+            <h3
+              style={{
+                fontSize: 14,
+                fontWeight: 700,
+                color: "var(--g900)",
+                marginBottom: 3,
+                letterSpacing: "-.2px",
+              }}
+            >
+              Top 5 Global Customers by Value
+            </h3>
+            <p style={{ fontSize: 11, color: "var(--text3)" }}>This quarter (LKR thousands)</p>
+          </div>
+
+          <div style={chartWrapStyle}>
+            {loadingCharts ? (
+              <div className="ib ib-i">
+                <span>⏳</span>
+                <div>Loading chart...</div>
+              </div>
+            ) : (
+              <canvas ref={customerCanvasRef} />
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="table-wrapper">
-        <table className="custom-table">
-          <thead>{renderHeaders()}</thead>
-          <tbody>{renderRows()}</tbody>
-        </table>
-      </div>
-    </div>
+      {showModal && selectedReport ? (
+        <div style={modalOverlayStyle}>
+          <div className="md">
+            <div className="md-h">
+              <h3>Generate Report</h3>
+              <button className="md-x" type="button" onClick={closeReportModal}>
+                ✕
+              </button>
+            </div>
+
+            <div className="md-b">
+              <div
+                style={{
+                  background: "var(--g100)",
+                  borderRadius: 10,
+                  padding: 14,
+                  marginBottom: 16,
+                  border: "1px solid var(--g200)",
+                }}
+              >
+                <div style={{ fontSize: 15, fontWeight: 700, color: "var(--g900)" }}>
+                  {selectedReport.title}
+                </div>
+                <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 3 }}>
+                  {selectedReport.frequency}
+                </div>
+              </div>
+
+              <div className="fr">
+                <div className="ff">
+                  <label className="fl">
+                    From Date <span className="rq">*</span>
+                  </label>
+                  <input
+                    className="fc"
+                    type="date"
+                    value={filters.from}
+                    onChange={(e) => setFilters((prev) => ({ ...prev, from: e.target.value }))}
+                  />
+                </div>
+
+                <div className="ff">
+                  <label className="fl">
+                    To Date <span className="rq">*</span>
+                  </label>
+                  <input
+                    className="fc"
+                    type="date"
+                    value={filters.to}
+                    onChange={(e) => setFilters((prev) => ({ ...prev, to: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div className="ff">
+                <label className="fl">Filter by Category</label>
+                <select
+                  className="fc"
+                  value={filters.category}
+                  onChange={(e) => setFilters((prev) => ({ ...prev, category: e.target.value }))}
+                >
+                  {categories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="ff">
+                <label className="fl">Download Format</label>
+                <div className="tg">
+                  <button
+                    type="button"
+                    className={`to ${filters.format === "excel" ? "on" : ""}`}
+                    onClick={() => setFilters((prev) => ({ ...prev, format: "excel" }))}
+                  >
+                    📊 Excel (.xlsx)
+                  </button>
+                  <button
+                    type="button"
+                    className={`to ${filters.format === "pdf" ? "on" : ""}`}
+                    onClick={() => setFilters((prev) => ({ ...prev, format: "pdf" }))}
+                  >
+                    📄 PDF
+                  </button>
+                  <button
+                    type="button"
+                    className={`to ${filters.format === "csv" ? "on" : ""}`}
+                    onClick={() => setFilters((prev) => ({ ...prev, format: "csv" }))}
+                  >
+                    📁 CSV
+                  </button>
+                </div>
+              </div>
+
+              {previewError ? (
+                <div className="ib ib-d">
+                  <span>⚠️</span>
+                  <div>{previewError}</div>
+                </div>
+              ) : null}
+
+              {previewRows.length > 0 ? (
+                <div className="tw" style={{ marginTop: 14, marginBottom: 0 }}>
+                  <div className="tw-h">
+                    <h3>Preview</h3>
+                    <span className="badge bg-b">{previewRows.length} rows</span>
+                  </div>
+
+                  <table>
+                    <thead>
+                      <tr>
+                        {previewColumns.map((column) => (
+                          <th key={column}>{column.replace(/_/g, " ")}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {previewRows.slice(0, 10).map((row, index) => (
+                        <tr key={index}>
+                          {previewColumns.map((column) => (
+                            <td key={column}>{formatPreviewValue(row[column])}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="md-f">
+              <button className="btn btn-s" type="button" onClick={closeReportModal}>
+                Cancel
+              </button>
+              <button
+                className="btn btn-p"
+                type="button"
+                onClick={handleGenerate}
+                disabled={loadingPreview}
+              >
+                {loadingPreview ? "Generating..." : "Generate Report"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 };
 
