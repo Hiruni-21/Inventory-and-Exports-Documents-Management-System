@@ -256,7 +256,6 @@ const pageMeta = {
 const actionButtons = {
   "/suppliers": [{ label: "+ Add Supplier", to: "/suppliers/add", className: "btn btn-p btn-sm" }],
   "/categories": [{ label: "+ Add Category", to: "/categories/add", className: "btn btn-p btn-sm" }],
-  "/items": [{ label: "+ New Item", to: "/items/add", className: "btn btn-p btn-sm" }],
   "/purchase-orders": [{ label: "+ Create PO", to: "/purchase-orders/add", className: "btn btn-p btn-sm" }],
   "/grn": [{ label: "+ New GRN", to: "/grn/add", className: "btn btn-p btn-sm" }],
   "/returns": [
@@ -310,6 +309,7 @@ const getMeta = (pathname) => {
   if (/^\/dispatch\/print\//.test(pathname)) return { title: "Dispatch", subtitle: "Printable dispatch sheet" };
   if (/^\/export-documents\/\d+$/.test(pathname)) return { title: "Export Documents", subtitle: "Document details" };
   if (/^\/export-documents\/print\//.test(pathname)) return { title: "Export Documents", subtitle: "Printable export document" };
+  if (/^\/items\/edit\/\d+$/.test(pathname)) {return { title: "Item Master", subtitle: "Edit item" };}
   return { title: "Dashboard", subtitle: "Fresh World Exporters ERP" };
 };
 

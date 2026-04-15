@@ -2,288 +2,902 @@ import { useEffect, useMemo, useState } from "react";
 import api from "../utils/api";
 import { useToast } from "../context/ToastContext";
 
-const emptyForm = {
-  code: "",
+const FILTER_CONTROL_HEIGHT = 38;
+const PRIMARY_GREEN = "#166534";
+const PRIMARY_GREEN_HOVER = "#14532D";
+
+const STORAGE_OPTIONS = [
+  "Ambient (15–25°C)",
+  "Cool Room (8–12°C)",
+  "Cold Room (2–4°C)",
+  "Freezer (−18°C)",
+];
+
+const tableCountStyle = {
+  color: "#7F978A",
+  fontSize: 13,
+  fontWeight: 500,
+};
+
+const codeCellStyle = {
+  fontFamily: "monospace",
+  fontWeight: 700,
+  color: "#8EA694",
+  fontSize: 13,
+};
+
+const nameCellStyle = {
+  fontWeight: 800,
+  fontSize: 15,
+  color: "var(--g900)",
+};
+
+const botanicalCellStyle = {
+  fontStyle: "italic",
+  fontWeight: 600,
+  fontSize: 13,
+  color: "#5B7764",
+};
+
+const supplierCellStyle = {
+  color: "#5F7567",
+  fontWeight: 500,
+  fontSize: 13,
+};
+
+const tableHeaderCellStyle = {
+  fontSize: 11,
+  letterSpacing: "0.08em",
+  fontWeight: 800,
+  color: "#4F6F5C",
+  textTransform: "uppercase",
+};
+
+const editActionStyle = {
+  height: 36,
+  padding: "0 14px",
+  borderRadius: 14,
+  border: "1.5px solid #CFE2D4",
+  background: "#FFFFFF",
+  color: "#215D3D",
+  fontWeight: 700,
+  fontSize: 12,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 6,
+  whiteSpace: "nowrap",
+};
+
+const deleteActionStyle = {
+  width: 36,
+  height: 36,
+  borderRadius: 14,
+  border: "1.5px solid #CFE2D4",
+  background: "#FFFFFF",
+  color: "#6B7D71",
+  fontWeight: 700,
+  fontSize: 13,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
+const filterInputWrapStyle = {
+  minWidth: 320,
+};
+
+const filterSelectStyle = {
+  width: 190,
+  height: FILTER_CONTROL_HEIGHT,
+  minHeight: FILTER_CONTROL_HEIGHT,
+  boxSizing: "border-box",
+};
+
+const pageActionButtonStyle = {
+  height: FILTER_CONTROL_HEIGHT,
+  padding: "0 18px",
+  borderRadius: 14,
+  border: `1px solid ${PRIMARY_GREEN}`,
+  background: PRIMARY_GREEN,
+  color: "#FFFFFF",
+  fontWeight: 800,
+  fontSize: 14,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 8,
+  transition: "all 0.18s ease",
+  boxShadow: "0 2px 8px rgba(22,101,52,.12)",
+  boxSizing: "border-box",
+  whiteSpace: "nowrap",
+};
+
+const modalSectionTitleStyle = {
+  fontSize: 13,
+  fontWeight: 800,
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+  color: "#2E8B57",
+  marginBottom: 12,
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+};
+
+const toggleButtonStyle = (active) => ({
+  flex: 1,
+  height: 42,
+  borderRadius: 10,
+  border: `1px solid ${active ? "#2E8B57" : "var(--border)"}`,
+  background: active ? "#E9F7EE" : "#FFFFFF",
+  color: active ? "#1E6A43" : "var(--text2)",
+  fontWeight: 700,
+  fontSize: 14,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "0 12px",
+});
+
+const chipStyle = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  padding: "6px 10px",
+  borderRadius: 999,
+  background: "#EAF2FF",
+  color: "#2F69C8",
+  border: "1px solid rgba(47,105,200,.16)",
+  fontSize: 12,
+  fontWeight: 700,
+};
+
+const emptyChipTextStyle = {
+  fontSize: 11,
+  color: "var(--text3)",
+  alignSelf: "center",
+};
+
+const categoryBadgeStyle = (label) => {
+  const value = String(label || "").toLowerCase();
+
+  if (value.includes("micro")) {
+    return {
+      background: "#EAF2FF",
+      color: "#2F69C8",
+    };
+  }
+
+  if (value.includes("exotic")) {
+    return {
+      background: "#FFF1DE",
+      color: "#D78918",
+    };
+  }
+
+  if (value.includes("dry")) {
+    return {
+      background: "#EEE9DF",
+      color: "#5E7765",
+    };
+  }
+
+  return {
+    background: "#E9F7EE",
+    color: "#2E8B57",
+  };
+};
+
+const categoryBadgeBaseStyle = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  padding: "6px 14px",
+  borderRadius: 999,
+  fontWeight: 700,
+  fontSize: 12,
+  whiteSpace: "nowrap",
+};
+
+const modalCardStyle = {
+  maxWidth: 1020,
+  width: "92%",
+  maxHeight: "calc(100vh - 72px)",
+  display: "flex",
+  flexDirection: "column",
+  overflow: "hidden",
+};
+
+const modalFormStyle = {
+  display: "flex",
+  flexDirection: "column",
+  minHeight: 0,
+  flex: 1,
+};
+
+const modalBodyStyle = {
+  padding: 22,
+  overflowY: "auto",
+  flex: 1,
+};
+
+const modalFooterStyle = {
+  padding: "16px 22px",
+  borderTop: "1px solid var(--border)",
+  display: "flex",
+  justifyContent: "flex-end",
+  gap: 10,
+  flexShrink: 0,
+  background: "var(--white)",
+};
+
+const textValue = (...values) => {
+  for (const value of values) {
+    if (value !== undefined && value !== null && String(value).trim() !== "") {
+      return String(value);
+    }
+  }
+  return "";
+};
+
+const numberValue = (...values) => {
+  for (const value of values) {
+    if (value !== undefined && value !== null && value !== "") {
+      const num = Number(value);
+      if (!Number.isNaN(num)) return num;
+    }
+  }
+  return 0;
+};
+
+const normalizeTypeKey = (value) => {
+  const text = String(value || "").toLowerCase();
+  if (text.includes("non")) return "n";
+  return "p";
+};
+
+const normalizeTypeLabel = (value) => {
+  return normalizeTypeKey(value) === "n" ? "Non-Perishable" : "Perishable";
+};
+
+const normalizeReturnableMode = (rowOrValue) => {
+  const value =
+    typeof rowOrValue === "string"
+      ? rowOrValue
+      : textValue(
+          rowOrValue?.returnable_mode,
+          rowOrValue?.returnable,
+          rowOrValue?.returns_policy,
+          rowOrValue?.returnable_to_supplier
+        );
+
+  const text = String(value || "").toLowerCase();
+
+  if (text.includes("market")) return "mkt";
+  if (text === "yes" || text === "1" || text === "true" || text.includes("returnable")) {
+    return "yes";
+  }
+  return "no";
+};
+
+const returnableLabel = (row) => {
+  const mode = normalizeReturnableMode(row);
+  if (mode === "yes") return "Yes";
+  if (mode === "mkt") return "No (Market)";
+  return "No";
+};
+
+const returnableColorStyle = (row) => {
+  const mode = normalizeReturnableMode(row);
+  if (mode === "yes") return { color: "#2E8B57", fontWeight: 700 };
+  return { color: "#D4552D", fontWeight: 700 };
+};
+
+const extractSupplierIds = (row) => {
+  const rawIds =
+    row?.supplier_ids ??
+    row?.linked_supplier_ids ??
+    row?.supplier_id ??
+    row?.supplier_ids_csv ??
+    row?.supplier_ids_string;
+
+  if (Array.isArray(rawIds)) return rawIds.map(String);
+
+  if (rawIds !== undefined && rawIds !== null && String(rawIds).trim() !== "") {
+    return String(rawIds)
+      .split(",")
+      .map((v) => v.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+};
+
+const getSupplierNames = (row, suppliers = []) => {
+  const direct = textValue(
+    row.supplier_names,
+    row.linked_suppliers,
+    row.suppliers,
+    row.supplier_name,
+    row.supplier_display
+  );
+
+  if (direct) return direct;
+
+  const ids = extractSupplierIds(row);
+  if (!ids.length) return "—";
+
+  const names = suppliers
+    .filter((supplier) => ids.includes(String(supplier.id)))
+    .map((supplier) =>
+      textValue(supplier.supplier_name, supplier.name, supplier.contact_person)
+    )
+    .filter(Boolean);
+
+  return names.length ? names.join(", ") : "—";
+};
+
+const formatStorageDisplay = (value) => {
+  const text = String(value || "").trim().toLowerCase();
+
+  if (!text) return "—";
+  if (text.includes("ambient")) return "Ambient";
+  if (text.includes("cool room") || text.includes("8") || text.includes("12")) return "Cool Room";
+  if (text.includes("cold room") || text.includes("2") || text.includes("4")) return "Cold Room";
+  if (text.includes("freezer") || text.includes("-18")) return "Freezer";
+  if (text.includes("chilled")) return "Cold Room";
+
+  return String(value);
+};
+
+const getCategoryIdFromRow = (row, categories) => {
+  if (row?.category_id !== undefined && row?.category_id !== null && row?.category_id !== "") {
+    return String(row.category_id);
+  }
+
+  const name = textValue(row?.category_name, row?.category);
+  const match = categories.find(
+    (item) => textValue(item.category_name, item.name).toLowerCase() === name.toLowerCase()
+  );
+
+  return match ? String(match.id) : "";
+};
+
+const buildNextItemCode = (rows) => {
+  const codes = rows
+    .map((row) => textValue(row.code, row.item_code))
+    .filter(Boolean);
+
+  if (!codes.length) return "FW-PRD-001";
+
+  let bestPrefix = "FW-PRD-";
+  let maxNumber = 0;
+
+  codes.forEach((code) => {
+    const match = String(code).match(/^(.*?)(\d+)$/);
+    if (!match) return;
+    const [, prefix, digits] = match;
+    const num = Number(digits);
+    if (num >= maxNumber) {
+      maxNumber = num;
+      bestPrefix = prefix;
+    }
+  });
+
+  return `${bestPrefix}${String(maxNumber + 1).padStart(3, "0")}`;
+};
+
+const createEmptyForm = (rows) => ({
+  code: buildNextItemCode(rows),
   name: "",
   botanical_name: "",
   category_id: "",
-  type: "Perishable",
+  type: "p",
   unit: "kg",
-  shelf_life_days: 0,
-  reorder_level: 0,
-  storage_temp: "",
-  unit_cost: 0,
-  returnable: 1,
+  reorder_level: "",
+  shelf_life: "",
+  storage_temp: STORAGE_OPTIONS[0],
+  unit_cost: "",
+  returnable_mode: "yes",
+  supplier_ids: [],
   description: "",
-  status: "active",
-};
+  is_active: 1,
+});
 
 const ItemListPage = () => {
   const toast = useToast();
 
   const [rows, setRows] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("All Categories");
+  const [category, setCategory] = useState("All Categories");
+  const [typeFilter, setTypeFilter] = useState("All Types");
 
-  const [showEditModal, setShowEditModal] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [editingId, setEditingId] = useState(null);
+  const [editingItemId, setEditingItemId] = useState(null);
+  const [form, setForm] = useState(createEmptyForm([]));
+  const [supplierPickerId, setSupplierPickerId] = useState("");
 
-  const [form, setForm] = useState(emptyForm);
+    const loadPage = async () => {
+      try {
+        setLoading(true);
 
-  const loadPage = async () => {
-    try {
-      setLoading(true);
+        const [itemsRes, categoriesRes, suppliersRes] = await Promise.all([
+          api.get("/items"),
+          api.get("/items/categories"),
+          api.get("/suppliers"),
+        ]);
 
-      const [itemsRes, categoriesRes] = await Promise.all([
-        api.get("/items"),
-        api.get("/items/categories"),
-      ]);
+        setRows(Array.isArray(itemsRes.data) ? itemsRes.data : []);
+        setCategories(Array.isArray(categoriesRes.data) ? categoriesRes.data : []);
+        setSuppliers(Array.isArray(suppliersRes.data) ? suppliersRes.data : []);
+      } catch (err) {
+        console.error("LOAD ITEM MASTER ERROR:", err?.response?.data || err);
 
-      setRows(Array.isArray(itemsRes.data) ? itemsRes.data : []);
-      setCategories(Array.isArray(categoriesRes.data) ? categoriesRes.data : []);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to load item master");
-      setRows([]);
-      setCategories([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+        toast.error(
+          err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          "Failed to load Item Master"
+        );
+
+        setRows([]);
+        setCategories([]);
+        setSuppliers([]);
+      } finally {
+        setLoading(false);
+      }
+    };
 
   useEffect(() => {
     loadPage();
   }, []);
 
-  useEffect(() => {
-    if (!showEditModal) return;
-
-    const onKeyDown = (e) => {
-      if (e.key === "Escape") setShowEditModal(false);
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [showEditModal]);
-
   const categoryOptions = useMemo(() => {
-    return ["All Categories", ...categories.map((row) => row.category_name)];
-  }, [categories]);
+    const fromApi = categories
+      .map((row) => textValue(row.category_name, row.name))
+      .filter(Boolean);
+
+    const fromItems = rows
+      .map((row) => textValue(row.category_name, row.category))
+      .filter(Boolean);
+
+    const merged = Array.from(new Set([...fromApi, ...fromItems])).sort((a, b) =>
+      a.localeCompare(b)
+    );
+
+    return ["All Categories", ...merged];
+  }, [categories, rows]);
 
   const filteredRows = useMemo(() => {
+    let result = [...rows];
+
+    if (category !== "All Categories") {
+      result = result.filter(
+        (row) => textValue(row.category_name, row.category) === category
+      );
+    }
+
+    if (typeFilter !== "All Types") {
+      result = result.filter(
+        (row) =>
+          normalizeTypeLabel(row.type).toLowerCase() === typeFilter.toLowerCase()
+      );
+    }
+
     const q = search.trim().toLowerCase();
 
-    return rows.filter((row) => {
-      const matchesSearch =
-        q === "" ||
+    if (q) {
+      result = result.filter((row) =>
         [
           row.code,
+          row.item_code,
           row.name,
+          row.item_name,
           row.botanical_name,
           row.category_name,
+          row.category,
           row.type,
           row.unit,
-          row.storage_temp,
-          row.status,
+          row.reorder_level,
+          formatStorageDisplay(row.storage_temp),
+          getSupplierNames(row, suppliers),
+          returnableLabel(row),
         ]
           .filter(Boolean)
           .join(" ")
           .toLowerCase()
-          .includes(q);
+          .includes(q)
+      );
+    }
 
-      const matchesCategory =
-        categoryFilter === "All Categories" || row.category_name === categoryFilter;
+    return result;
+  }, [rows, search, category, typeFilter, suppliers]);
 
-      return matchesSearch && matchesCategory;
-    });
-  }, [rows, search, categoryFilter]);
+  const selectedSupplierRows = useMemo(() => {
+    const ids = new Set((form.supplier_ids || []).map(String));
+    return suppliers.filter((row) => ids.has(String(row.id)));
+  }, [suppliers, form.supplier_ids]);
 
-  const openEdit = (row) => {
-    setEditingId(row.id);
+  const openNewModal = () => {
+    setEditingItemId(null);
+    setSupplierPickerId("");
+    setForm(createEmptyForm(rows));
+    setShowModal(true);
+  };
+
+  const openEditModal = (row) => {
+    setEditingItemId(row.id || row.item_id);
+    setSupplierPickerId("");
+
     setForm({
-      code: row.code || "",
-      name: row.name || "",
-      botanical_name: row.botanical_name || "",
-      category_id: row.category_id || "",
-      type: row.type || "Perishable",
-      unit: row.unit || "kg",
-      shelf_life_days: row.shelf_life_days || 0,
-      reorder_level: row.reorder_level || 0,
-      storage_temp: row.storage_temp || "",
-      unit_cost: row.unit_cost || 0,
-      returnable: Number(row.returnable ?? 1),
-      description: row.description || "",
-      status: row.status || "active",
+      code: textValue(row.code, row.item_code),
+      name: textValue(row.name, row.item_name),
+      botanical_name: textValue(row.botanical_name),
+      category_id: getCategoryIdFromRow(row, categories),
+      type: normalizeTypeKey(row.type),
+      unit: textValue(row.unit) || "kg",
+      reorder_level: row.reorder_level ?? "",
+      shelf_life: row.shelf_life ?? row.shelf_life_days ?? "",
+      storage_temp: textValue(row.storage_temp) || STORAGE_OPTIONS[0],
+      unit_cost: row.unit_cost ?? "",
+      returnable_mode: normalizeReturnableMode(row),
+      supplier_ids: extractSupplierIds(row),
+      description: textValue(row.description, row.notes),
+      is_active:
+        row.is_active === undefined || row.is_active === null
+          ? 1
+          : Number(row.is_active) === 1 || row.is_active === true
+          ? 1
+          : 0,
     });
-    setShowEditModal(true);
+
+    setShowModal(true);
   };
 
-  const closeEdit = () => {
-    setShowEditModal(false);
-    setEditingId(null);
-    setForm(emptyForm);
+  const closeModal = () => {
+    setShowModal(false);
+    setEditingItemId(null);
+    setSupplierPickerId("");
   };
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
+  const setField = (name, value) => {
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const addSupplierToForm = () => {
+    if (!supplierPickerId) return;
+
+    setForm((prev) => {
+      const ids = prev.supplier_ids.map(String);
+      if (ids.includes(String(supplierPickerId))) return prev;
+      return {
+        ...prev,
+        supplier_ids: [...prev.supplier_ids, String(supplierPickerId)],
+      };
+    });
+
+    setSupplierPickerId("");
+  };
+
+  const removeSupplierFromForm = (supplierId) => {
     setForm((prev) => ({
       ...prev,
-      [name]:
-        name === "returnable" ||
-        name === "category_id" ||
-        name === "shelf_life_days" ||
-        name === "reorder_level" ||
-        name === "unit_cost"
-          ? value
-          : value,
+      supplier_ids: prev.supplier_ids.filter((id) => String(id) !== String(supplierId)),
     }));
   };
 
-  const handleUpdate = async (e) => {
+const buildPayload = () => {
+  const categoryId =
+    form.category_id ||
+    categories.find(
+      (row) =>
+        textValue(row.category_name, row.name).toLowerCase() ===
+        String(form.category_id || "").toLowerCase()
+    )?.id ||
+    "";
+
+  return {
+    code: form.code.trim(),
+    name: form.name.trim(),
+    botanical_name: form.botanical_name.trim(),
+    category_id: Number(categoryId),
+    type: form.type === "n" ? "Non-Perishable" : "Perishable",
+    unit: form.unit.trim(),
+    reorder_level: Number(form.reorder_level || 0),
+    shelf_life_days: Number(form.shelf_life || 0),
+    storage_temp: form.storage_temp.trim(),
+    unit_cost: Number(form.unit_cost || 0),
+    returnable: Number(form.returnable_mode === "yes"),
+    supplier_ids: (form.supplier_ids || [])
+      .map((id) => Number(id))
+      .filter(Boolean),
+    description: form.description.trim(),
+    status: "active",
+  };
+};
+  const handleSave = async (e) => {
     e.preventDefault();
 
-    if (!form.code || !form.name || !form.category_id || !form.type || !form.unit) {
-      toast.error("Code, name, category, type and unit are required");
+    if (!form.code.trim() || !form.name.trim()) {
+      toast.error("Item code and item name are required");
+      return;
+    }
+
+    if (!form.category_id) {
+      toast.error("Category is required");
       return;
     }
 
     try {
       setSaving(true);
-      await api.put(`/items/${editingId}`, {
-        ...form,
-        category_id: Number(form.category_id),
-        shelf_life_days: Number(form.shelf_life_days || 0),
-        reorder_level: Number(form.reorder_level || 0),
-        unit_cost: Number(form.unit_cost || 0),
-        returnable: Number(form.returnable),
-      });
-      toast.success("Item updated successfully");
-      closeEdit();
-      await loadPage();
+
+      const payload = buildPayload();
+
+      if (editingItemId) {
+        await api.put(`/items/${editingItemId}`, payload);
+        toast.success("Item updated");
+      } else {
+        await api.post("/items", payload);
+        toast.success("Item saved");
+      }
+
+      closeModal();
+      loadPage();
     } catch (err) {
-      console.error(err);
-      toast.error(err?.response?.data?.message || "Failed to update item");
+      console.error("Save item error:", err?.response?.data || err);
+
+      toast.error(
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        "Failed to save item"
+      );
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = async (row) => {
-    const ok = window.confirm(`Delete item "${row.name}"?`);
-    if (!ok) return;
+  const handleDeactivate = async (row) => {
+    const id = row.id || row.item_id;
+    if (!id) {
+      toast.error("Item id not found");
+      return;
+    }
+
+    const itemName =
+      textValue(row.name, row.item_name, row.code, row.item_code) || "this item";
+
+    const confirmed = window.confirm(
+      `Deactivate ${itemName}? This keeps history and removes it from active use.`
+    );
+
+    if (!confirmed) return;
 
     try {
-      await api.delete(`/items/${row.id}`);
-      toast.success("Item deleted successfully");
-      await loadPage();
+      const payload = {
+        code: textValue(row.code, row.item_code),
+        name: textValue(row.name, row.item_name),
+        botanical_name: textValue(row.botanical_name),
+        category_id:
+          Number(getCategoryIdFromRow(row, categories)) ||
+          getCategoryIdFromRow(row, categories),
+        type: normalizeTypeLabel(row.type),
+        unit: textValue(row.unit) || "kg",
+        reorder_level: numberValue(row.reorder_level),
+        shelf_life_days: row.shelf_life ?? row.shelf_life_days ?? 0,
+        storage_temp: textValue(row.storage_temp),
+        unit_cost: numberValue(row.unit_cost),
+        returnable: Number(normalizeReturnableMode(row) === "yes"),
+        supplier_ids: extractSupplierIds(row)
+          .map((id) => Number(id))
+          .filter(Boolean),
+        description: textValue(row.description, row.notes),
+        status: "inactive",
+      };
+      await api.put(`/items/${id}`, payload);
+      toast.success("Item marked inactive");
+      loadPage();
     } catch (err) {
-      console.error(err);
-      toast.error(err?.response?.data?.message || "Failed to delete item");
+      console.error("Deactivate item error:", err?.response?.data || err);
+
+      toast.error(
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        "Failed to deactivate item"
+      );
     }
   };
 
   return (
-    <>
-      <div className="ib ib-i">
-        <span>🥬</span>
-        <div>
-          Item Master stores your real products, botanical names, category mapping, reorder level,
-          shelf life and unit cost for inventory control.
-        </div>
-      </div>
-
-      <div className="fb">
-        <div className="sw">
+    <div>
+      <div
+        className="fb"
+        style={{
+          gap: 12,
+          marginBottom: 16,
+          alignItems: "center",
+          flexWrap: "wrap",
+        }}
+      >
+        <div className="sw" style={filterInputWrapStyle}>
           <input
             className="si"
             placeholder="Search items..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            style={{
+              height: FILTER_CONTROL_HEIGHT,
+              minHeight: FILTER_CONTROL_HEIGHT,
+              boxSizing: "border-box",
+            }}
           />
         </div>
 
         <select
-          className="fs"
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
+          className="fc"
+          style={filterSelectStyle}
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
         >
-          {categoryOptions.map((category) => (
-            <option key={category} value={category}>
-              {category}
+          {categoryOptions.map((option) => (
+            <option key={option} value={option}>
+              {option}
             </option>
           ))}
         </select>
+
+        <select
+          className="fc"
+          style={filterSelectStyle}
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+        >
+          <option>All Types</option>
+          <option>Perishable</option>
+          <option>Non-Perishable</option>
+        </select>
+
+        <div style={{ marginLeft: "auto" }}>
+          <button
+            type="button"
+            style={pageActionButtonStyle}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = PRIMARY_GREEN_HOVER;
+              e.currentTarget.style.borderColor = PRIMARY_GREEN_HOVER;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = PRIMARY_GREEN;
+              e.currentTarget.style.borderColor = PRIMARY_GREEN;
+            }}
+            onClick={openNewModal}
+          >
+            + New Item
+          </button>
+        </div>
       </div>
-      
-      <div className="tw">
-        <div className="tw-h">
-          <h3>Item Master</h3>
-          <span className="badge bg-b">{filteredRows.length} items</span>
+
+      <div className="tw" style={{ borderRadius: 24, overflow: "hidden" }}>
+        <div className="tw-h" style={{ padding: "20px 24px" }}>
+          <h3 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>Item Master</h3>
+          <span style={tableCountStyle}>
+            {filteredRows.length} items · Central product database
+          </span>
         </div>
 
         <table>
           <thead>
             <tr>
-              <th>CODE</th>
-              <th>ITEM NAME</th>
-              <th>BOTANICAL NAME</th>
-              <th>CATEGORY</th>
-              <th>TYPE</th>
-              <th>UNIT</th>
-              <th>REORDER</th>
-              <th>COST</th>
-              <th>STATUS</th>
-              <th>ACTIONS</th>
+              <th style={{ width: "11%", ...tableHeaderCellStyle }}>CODE</th>
+              <th style={{ width: "17%", ...tableHeaderCellStyle }}>ITEM NAME</th>
+              <th style={{ width: "16%", ...tableHeaderCellStyle }}>BOTANICAL NAME</th>
+              <th style={{ width: "13%", ...tableHeaderCellStyle }}>CATEGORY</th>
+              <th style={{ width: "6%", ...tableHeaderCellStyle }}>UNIT</th>
+              <th style={{ width: "9%", ...tableHeaderCellStyle }}>REORDER</th>
+              <th style={{ width: "10%", ...tableHeaderCellStyle }}>STORAGE</th>
+              <th style={{ width: "10%", ...tableHeaderCellStyle }}>RETURNABLE</th>
+              <th style={{ width: "12%", ...tableHeaderCellStyle }}>SUPPLIERS</th>
+              <th style={{ width: "10%", ...tableHeaderCellStyle }}>ACTIONS</th>
             </tr>
           </thead>
+
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="10">Loading...</td>
+                <td colSpan="10">Loading items...</td>
               </tr>
             ) : filteredRows.length ? (
-              filteredRows.map((row) => (
-                <tr key={row.id}>
-                  <td style={{ fontFamily: "monospace", fontSize: 11, fontWeight: 700, color: "var(--g800)" }}>
-                    {row.code}
-                  </td>
-                  <td style={{ fontWeight: 700 }}>{row.name}</td>
-                  <td>{row.botanical_name || "—"}</td>
-                  <td>{row.category_name}</td>
-                  <td>
-                    <span className={`badge ${row.type === "Perishable" ? "bg-a" : "bg-b"}`}>
-                      {row.type}
-                    </span>
-                  </td>
-                  <td>{row.unit}</td>
-                  <td>{Number(row.reorder_level || 0)}</td>
-                  <td>LKR {Number(row.unit_cost || 0).toLocaleString()}</td>
-                  <td>
-                    <span className={`badge ${row.status === "active" ? "bg-g" : "bg-r"}`}>
-                      {row.status === "active" ? "Active" : "Inactive"}
-                    </span>
-                  </td>
-                  <td>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button type="button" className="ab" title="Edit" onClick={() => openEdit(row)}>
-                        ✏️
-                      </button>
-                      <button
-                        type="button"
-                        className="ab d"
-                        title="Delete"
-                        onClick={() => handleDelete(row)}
+              filteredRows.map((row, index) => {
+                const id = row.id || row.item_id || index;
+                const categoryLabel = textValue(row.category_name, row.category) || "—";
+                const badgeTone = categoryBadgeStyle(categoryLabel);
+
+                return (
+                  <tr
+                    key={id}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#F7FBF8";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "transparent";
+                    }}
+                  >
+                    <td style={codeCellStyle}>
+                      {textValue(row.code, row.item_code) || "—"}
+                    </td>
+
+                    <td style={nameCellStyle}>
+                      {textValue(row.name, row.item_name) || "—"}
+                    </td>
+
+                    <td style={botanicalCellStyle}>
+                      {textValue(row.botanical_name) || "—"}
+                    </td>
+
+                    <td>
+                      <span
+                        style={{
+                          ...categoryBadgeBaseStyle,
+                          ...badgeTone,
+                          padding: "6px 14px",
+                          fontSize: 12,
+                        }}
                       >
-                        🗑
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+                        <span style={{ fontSize: 10 }}>●</span>
+                        {categoryLabel}
+                      </span>
+                    </td>
+
+                    <td style={{ fontSize: 13, color: "var(--g900)" }}>
+                      {textValue(row.unit) || "—"}
+                    </td>
+
+                    <td style={{ fontSize: 13, color: "var(--g900)" }}>
+                      {numberValue(row.reorder_level)} {textValue(row.unit)}
+                    </td>
+
+                    <td style={{ fontSize: 13, color: "var(--g900)" }}>
+                      {formatStorageDisplay(textValue(row.storage_temp))}
+                    </td>
+
+                    <td style={{ ...returnableColorStyle(row), fontSize: 13 }}>
+                      {returnableLabel(row)}
+                    </td>
+
+                    <td style={supplierCellStyle}>
+                      {getSupplierNames(row, suppliers)}
+                    </td>
+
+                    <td>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          type="button"
+                          style={editActionStyle}
+                          onClick={() => openEditModal(row)}
+                        >
+                          ✏️ Edit
+                        </button>
+
+                        <button
+                          type="button"
+                          title="Deactivate"
+                          style={deleteActionStyle}
+                          onClick={() => handleDeactivate(row)}
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             ) : (
               <tr>
                 <td colSpan="10">No items found</td>
@@ -293,163 +907,282 @@ const ItemListPage = () => {
         </table>
       </div>
 
-      {showEditModal ? (
-        <div className="modal-backdrop" onClick={closeEdit}>
-          <div className="md md-lg" onClick={(e) => e.stopPropagation()}>
+      {showModal ? (
+        <div className="modal-backdrop">
+          <div className="md" style={modalCardStyle}>
             <div className="md-h">
-              <h3>✏️ Edit Item</h3>
-              <button type="button" className="md-x" onClick={closeEdit}>
+              <h3>{editingItemId ? "✏️ Edit Item" : "🌿 Add New Item"}</h3>
+              <button type="button" className="md-x" onClick={closeModal}>
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleUpdate}>
-              <div className="md-b">
-                <div className="fr">
-                  <div className="ff">
-                    <label className="fl">Item Code</label>
-                    <input className="fc" name="code" value={form.code} onChange={handleChange} />
+            <form onSubmit={handleSave} style={modalFormStyle}>
+              <div className="md-b" style={modalBodyStyle}>
+                <div className="fs2" style={{ marginBottom: 18 }}>
+                  <div style={modalSectionTitleStyle}>▍ Item Identity</div>
+
+                  <div className="fr3" style={{ marginBottom: 14 }}>
+                    <div className="ff">
+                      <label className="fl">
+                        Item Code <span className="rq">*</span>
+                      </label>
+                      <input
+                        className="fc"
+                        value={form.code}
+                        onChange={(e) => setField("code", e.target.value)}
+                        placeholder="FW-PRD-248"
+                      />
+                    </div>
+
+                    <div className="ff">
+                      <label className="fl">
+                        Item Name <span className="rq">*</span>
+                      </label>
+                      <input
+                        className="fc"
+                        value={form.name}
+                        onChange={(e) => setField("name", e.target.value)}
+                        placeholder="e.g. Dragon Fruit (Red)"
+                      />
+                    </div>
+
+                    <div className="ff">
+                      <label className="fl">Botanical Name</label>
+                      <input
+                        className="fc"
+                        value={form.botanical_name}
+                        onChange={(e) => setField("botanical_name", e.target.value)}
+                        placeholder="e.g. Hylocereus undatus"
+                        style={{ fontStyle: "italic" }}
+                      />
+                    </div>
                   </div>
-                  <div className="ff">
-                    <label className="fl">Item Name</label>
-                    <input className="fc" name="name" value={form.name} onChange={handleChange} />
+
+                  <div className="fr" style={{ marginBottom: 4 }}>
+                    <div className="ff">
+                      <label className="fl">
+                        Category <span className="rq">*</span>
+                      </label>
+                      <select
+                        className="fc"
+                        value={form.category_id}
+                        onChange={(e) => setField("category_id", e.target.value)}
+                      >
+                        <option value="">Select category</option>
+                        {categories.map((row) => (
+                          <option key={row.id} value={row.id}>
+                            {textValue(row.category_name, row.name)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="ff">
+                      <label className="fl">
+                        Item Type <span className="rq">*</span>
+                      </label>
+                      <div className="tg" style={{ display: "flex", gap: 8 }}>
+                        <button
+                          type="button"
+                          style={toggleButtonStyle(form.type === "p")}
+                          onClick={() => setField("type", "p")}
+                        >
+                          🍎 Perishable
+                        </button>
+                        <button
+                          type="button"
+                          style={toggleButtonStyle(form.type === "n")}
+                          onClick={() => setField("type", "n")}
+                        >
+                          📦 Non-Perishable
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div className="fr">
-                  <div className="ff">
-                    <label className="fl">Botanical Name</label>
-                    <input
-                      className="fc"
-                      name="botanical_name"
-                      value={form.botanical_name}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  <div className="ff">
-                    <label className="fl">Category</label>
-                    <select
-                      className="fc"
-                      name="category_id"
-                      value={form.category_id}
-                      onChange={handleChange}
-                    >
-                      <option value="">Select category</option>
-                      {categories.map((row) => (
-                        <option key={row.id} value={row.id}>
-                          {row.category_name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
+                <div className="fs2" style={{ marginBottom: 18 }}>
+                  <div style={modalSectionTitleStyle}>▍ Stock & Storage</div>
 
-                <div className="fr3">
-                  <div className="ff">
-                    <label className="fl">Type</label>
-                    <select className="fc" name="type" value={form.type} onChange={handleChange}>
-                      <option value="Perishable">Perishable</option>
-                      <option value="Non-Perishable">Non-Perishable</option>
-                    </select>
-                  </div>
-                  <div className="ff">
-                    <label className="fl">Unit</label>
-                    <input className="fc" name="unit" value={form.unit} onChange={handleChange} />
-                  </div>
-                  <div className="ff">
-                    <label className="fl">Shelf Life (days)</label>
-                    <input
-                      className="fc"
-                      type="number"
-                      name="shelf_life_days"
-                      value={form.shelf_life_days}
-                      onChange={handleChange}
-                    />
-                  </div>
-                </div>
+                  <div className="fr3" style={{ marginBottom: 14 }}>
+                    <div className="ff">
+                      <label className="fl">
+                        Unit of Measure <span className="rq">*</span>
+                      </label>
+                      <select
+                        className="fc"
+                        value={form.unit}
+                        onChange={(e) => setField("unit", e.target.value)}
+                      >
+                        <option value="kg">kg</option>
+                        <option value="g">g</option>
+                        <option value="piece">piece</option>
+                        <option value="bunch">bunch</option>
+                        <option value="tray">tray</option>
+                        <option value="box">box</option>
+                        <option value="pack">pack</option>
+                        <option value="litre">litre</option>
+                      </select>
+                    </div>
 
-                <div className="fr3">
-                  <div className="ff">
-                    <label className="fl">Reorder Level</label>
-                    <input
-                      className="fc"
-                      type="number"
-                      step="0.01"
-                      name="reorder_level"
-                      value={form.reorder_level}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  <div className="ff">
-                    <label className="fl">Unit Cost</label>
-                    <input
-                      className="fc"
-                      type="number"
-                      step="0.01"
-                      name="unit_cost"
-                      value={form.unit_cost}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  <div className="ff">
-                    <label className="fl">Returnable</label>
-                    <select
-                      className="fc"
-                      name="returnable"
-                      value={form.returnable}
-                      onChange={handleChange}
-                    >
-                      <option value={1}>Yes</option>
-                      <option value={0}>No</option>
-                    </select>
-                  </div>
-                </div>
+                    <div className="ff">
+                      <label className="fl">
+                        Reorder Level <span className="rq">*</span>
+                      </label>
+                      <input
+                        className="fc"
+                        type="number"
+                        min="0"
+                        value={form.reorder_level}
+                        onChange={(e) => setField("reorder_level", e.target.value)}
+                        placeholder="e.g. 50"
+                      />
+                    </div>
 
-                <div className="fr">
-                  <div className="ff">
-                    <label className="fl">Storage Temp</label>
-                    <input
-                      className="fc"
-                      name="storage_temp"
-                      value={form.storage_temp}
-                      onChange={handleChange}
-                      placeholder="Chilled / Ambient / Frozen"
-                    />
+                    <div className="ff">
+                      <label className="fl">Shelf Life (days)</label>
+                      <input
+                        className="fc"
+                        type="number"
+                        min="0"
+                        value={form.shelf_life}
+                        onChange={(e) => setField("shelf_life", e.target.value)}
+                        placeholder="e.g. 7"
+                      />
+                    </div>
                   </div>
+
+                  <div className="fr" style={{ marginBottom: 14 }}>
+                    <div className="ff">
+                      <label className="fl">Storage Temperature</label>
+                      <select
+                        className="fc"
+                        value={form.storage_temp}
+                        onChange={(e) => setField("storage_temp", e.target.value)}
+                      >
+                        {STORAGE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="ff">
+                      <label className="fl">Standard Unit Cost (LKR)</label>
+                      <input
+                        className="fc"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={form.unit_cost}
+                        onChange={(e) => setField("unit_cost", e.target.value)}
+                        placeholder="0.00"
+                      />
+                      <span className="fh">Used for stock valuation reports</span>
+                    </div>
+                  </div>
+
                   <div className="ff">
-                    <label className="fl">Status</label>
-                    <select className="fc" name="status" value={form.status} onChange={handleChange}>
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
+                    <label className="fl">Returnable to Supplier?</label>
+                    <div className="tg" style={{ display: "flex", gap: 8 }}>
+                      <button
+                        type="button"
+                        style={toggleButtonStyle(form.returnable_mode === "yes")}
+                        onClick={() => setField("returnable_mode", "yes")}
+                      >
+                        ✅ Yes — returnable
+                      </button>
+                      <button
+                        type="button"
+                        style={toggleButtonStyle(form.returnable_mode === "no")}
+                        onClick={() => setField("returnable_mode", "no")}
+                      >
+                        ❌ No — wastage only
+                      </button>
+                      <button
+                        type="button"
+                        style={toggleButtonStyle(form.returnable_mode === "mkt")}
+                        onClick={() => setField("returnable_mode", "mkt")}
+                      >
+                        ❌ No (Market purchase)
+                      </button>
+                    </div>
                   </div>
                 </div>
 
                 <div className="ff">
-                  <label className="fl">Description</label>
-                  <textarea
-                    className="fc"
-                    name="description"
-                    value={form.description}
-                    onChange={handleChange}
-                    rows="4"
-                  />
+                  <label className="fl">Linked Suppliers</label>
+
+                  <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                    <select
+                      className="fc"
+                      style={{ flex: 1 }}
+                      value={supplierPickerId}
+                      onChange={(e) => setSupplierPickerId(e.target.value)}
+                    >
+                      <option value="">— Select supplier —</option>
+                      {suppliers.map((row) => (
+                        <option key={row.id} value={row.id}>
+                          {textValue(row.supplier_name, row.name, row.contact_person)}
+                        </option>
+                      ))}
+                    </select>
+
+                    <button
+                      type="button"
+                      className="btn btn-p btn-sm"
+                      onClick={addSupplierToForm}
+                    >
+                      + Add
+                    </button>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 6,
+                      minHeight: 32,
+                      padding: 8,
+                      background: "var(--ivory)",
+                      borderRadius: 9,
+                      border: "1.5px solid var(--border)",
+                    }}
+                  >
+                    {selectedSupplierRows.length ? (
+                      selectedSupplierRows.map((row) => (
+                        <span key={row.id} style={chipStyle}>
+                          🌿 {textValue(row.supplier_name, row.name, row.contact_person)}
+                          <span
+                            onClick={() => removeSupplierFromForm(row.id)}
+                            style={{ cursor: "pointer", fontWeight: 700 }}
+                          >
+                            ×
+                          </span>
+                        </span>
+                      ))
+                    ) : (
+                      <span style={emptyChipTextStyle}>No suppliers linked yet</span>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              <div className="md-f">
-                <button type="button" className="btn btn-s" onClick={closeEdit}>
+              <div className="md-f" style={modalFooterStyle}>
+                <button type="button" className="btn btn-s" onClick={closeModal}>
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-p" disabled={saving}>
-                  {saving ? "Saving..." : "Save Item"}
+                  {saving ? "Saving..." : "💾 Save Item"}
                 </button>
               </div>
             </form>
           </div>
         </div>
       ) : null}
-    </>
+    </div>
   );
 };
 

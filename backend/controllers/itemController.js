@@ -1,82 +1,224 @@
 const db = require("../config/db");
 const logActivity = require("../utils/logActivity");
 
-const getAllItems = (req, res) => {
-  const sql = `
-    SELECT
-      i.*,
-      c.category_name
-    FROM items i
-    JOIN item_categories c ON i.category_id = c.id
-    ORDER BY i.id DESC
-  `;
-
-  db.query(sql, (err, results) => {
-    if (err) {
-      return res.status(500).json({ message: "Database error", error: err.message });
-    }
-
-    res.json(results);
+const query = (sql, params = []) =>
+  new Promise((resolve, reject) => {
+    db.query(sql, params, (err, results) => {
+      if (err) return reject(err);
+      resolve(results);
+    });
   });
+
+const normalizeStatus = (value) => {
+  const text = String(value || "active").toLowerCase();
+  return text === "inactive" ? "inactive" : "active";
 };
 
-const getItemById = (req, res) => {
-  const { id } = req.params;
+const normalizeReturnable = (value) => {
+  if (value === undefined || value === null || value === "") return 1;
 
-  const sql = `
-    SELECT
-      i.*,
-      c.category_name
-    FROM items i
-    JOIN item_categories c ON i.category_id = c.id
-    WHERE i.id = ?
-  `;
+  const num = Number(value);
+  if (!Number.isNaN(num)) {
+    return num === 1 ? 1 : 0;
+  }
 
-  db.query(sql, [id], (err, results) => {
-    if (err) {
-      return res.status(500).json({ message: "Database error", error: err.message });
-    }
+  const text = String(value).toLowerCase().trim();
+  return text === "yes" || text === "true" || text === "1" ? 1 : 0;
+};
 
-    if (results.length === 0) {
+const normalizeSupplierIds = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .map((id) => Number(id))
+      .filter((id) => Number.isInteger(id) && id > 0);
+  }
+
+  if (value === undefined || value === null || value === "") return [];
+
+  return String(value)
+    .split(",")
+    .map((id) => Number(String(id).trim()))
+    .filter((id) => Number.isInteger(id) && id > 0);
+};
+
+const syncItemSuppliers = async (itemId, supplierIds) => {
+  await query("DELETE FROM item_suppliers WHERE item_id = ?", [itemId]);
+
+  const cleaned = [...new Set(normalizeSupplierIds(supplierIds))];
+  if (!cleaned.length) return;
+
+  const values = cleaned.map((supplierId) => [itemId, supplierId]);
+  await query(
+    "INSERT INTO item_suppliers (item_id, supplier_id) VALUES ?",
+    [values]
+  );
+};
+
+const getAllItems = async (req, res) => {
+  try {
+    const sql = `
+      SELECT
+        i.*,
+        c.category_name,
+        COALESCE(
+          (
+            SELECT GROUP_CONCAT(
+              DISTINCT s.supplier_name
+              ORDER BY s.supplier_name
+              SEPARATOR ', '
+            )
+            FROM item_suppliers isp
+            LEFT JOIN suppliers s ON s.id = isp.supplier_id
+            WHERE isp.item_id = i.id
+          ),
+          ''
+        ) AS supplier_names,
+        COALESCE(
+          (
+            SELECT GROUP_CONCAT(
+              DISTINCT isp.supplier_id
+              ORDER BY isp.supplier_id
+              SEPARATOR ','
+            )
+            FROM item_suppliers isp
+            WHERE isp.item_id = i.id
+          ),
+          ''
+        ) AS supplier_ids_csv
+      FROM items i
+      LEFT JOIN item_categories c ON i.category_id = c.id
+      WHERE COALESCE(i.status, 'active') <> 'inactive'
+      ORDER BY i.id DESC
+    `;
+
+    const results = await query(sql);
+
+    res.json(
+      results.map((row) => ({
+        ...row,
+        supplier_ids: row.supplier_ids_csv
+          ? String(row.supplier_ids_csv)
+              .split(",")
+              .map((id) => Number(id))
+              .filter(Boolean)
+          : [],
+      }))
+    );
+  } catch (err) {
+    console.error("GET ALL ITEMS ERROR:", err);
+    res.status(500).json({ message: "Database error", error: err.message });
+  }
+};
+
+const getItemById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const sql = `
+      SELECT
+        i.*,
+        c.category_name,
+        COALESCE(
+          (
+            SELECT GROUP_CONCAT(
+              DISTINCT s.supplier_name
+              ORDER BY s.supplier_name
+              SEPARATOR ', '
+            )
+            FROM item_suppliers isp
+            LEFT JOIN suppliers s ON s.id = isp.supplier_id
+            WHERE isp.item_id = i.id
+          ),
+          ''
+        ) AS supplier_names,
+        COALESCE(
+          (
+            SELECT GROUP_CONCAT(
+              DISTINCT isp.supplier_id
+              ORDER BY isp.supplier_id
+              SEPARATOR ','
+            )
+            FROM item_suppliers isp
+            WHERE isp.item_id = i.id
+          ),
+          ''
+        ) AS supplier_ids_csv
+      FROM items i
+      LEFT JOIN item_categories c ON i.category_id = c.id
+      WHERE i.id = ?
+      LIMIT 1
+    `;
+
+    const results = await query(sql, [id]);
+
+    if (!results.length) {
       return res.status(404).json({ message: "Item not found" });
     }
 
-    res.json(results[0]);
-  });
+    const row = results[0];
+
+    res.json({
+      ...row,
+      supplier_ids: row.supplier_ids_csv
+        ? String(row.supplier_ids_csv)
+            .split(",")
+            .map((supplierId) => Number(supplierId))
+            .filter(Boolean)
+        : [],
+    });
+  } catch (err) {
+    console.error("GET ITEM BY ID ERROR:", err);
+    res.status(500).json({ message: "Database error", error: err.message });
+  }
 };
 
-const createItem = (req, res) => {
-  const {
-    code,
-    name,
-    botanical_name,
-    category_id,
-    type,
-    unit,
-    shelf_life_days,
-    reorder_level,
-    storage_temp,
-    unit_cost,
-    returnable,
-    description,
-    status,
-  } = req.body;
+const createItem = async (req, res) => {
+  try {
+    const {
+      code,
+      name,
+      botanical_name,
+      category_id,
+      type,
+      unit,
+      shelf_life_days,
+      reorder_level,
+      storage_temp,
+      unit_cost,
+      returnable,
+      description,
+      status,
+      supplier_ids,
+    } = req.body;
 
-  if (!code || !name || !category_id || !type || !unit) {
-    return res.status(400).json({
-      message: "Code, name, category, type, and unit are required",
-    });
-  }
+    if (!code || !name || !category_id || !type || !unit) {
+      return res.status(400).json({
+        message: "Code, name, category, type, and unit are required",
+      });
+    }
 
-  const sql = `
-    INSERT INTO items
-    (code, name, botanical_name, category_id, type, unit, shelf_life_days, reorder_level, storage_temp, unit_cost, returnable, description, status, created_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `;
+    const insertSql = `
+      INSERT INTO items
+      (
+        code,
+        name,
+        botanical_name,
+        category_id,
+        type,
+        unit,
+        shelf_life_days,
+        reorder_level,
+        storage_temp,
+        unit_cost,
+        returnable,
+        description,
+        status,
+        created_by
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
 
-  db.query(
-    sql,
-    [
+    const result = await query(insertSql, [
       code,
       name,
       botanical_name || null,
@@ -87,167 +229,166 @@ const createItem = (req, res) => {
       reorder_level || 0,
       storage_temp || null,
       unit_cost || 0,
-      returnable ?? 1,
+      normalizeReturnable(returnable),
       description || null,
-      status || "active",
+      normalizeStatus(status),
       req.user.id,
-    ],
-    (err, result) => {
-      if (err) {
-        return res.status(500).json({ message: "Database error", error: err.message });
-      }
+    ]);
 
-      const itemId = result.insertId;
+    const itemId = result.insertId;
 
-      db.query(
-        `
-          INSERT INTO inventory (item_id, qty_on_hand, qty_reserved, qty_available, avg_unit_cost, total_value)
-          VALUES (?, 0, 0, 0, ?, 0)
-        `,
-        [itemId, unit_cost || 0],
-        (invErr) => {
-          if (invErr) {
-            return res.status(500).json({ message: "Database error", error: invErr.message });
-          }
+    await query(
+      `
+        INSERT INTO inventory
+        (item_id, qty_on_hand, qty_reserved, qty_available, avg_unit_cost, total_value)
+        VALUES (?, 0, 0, 0, ?, 0)
+      `,
+      [itemId, unit_cost || 0]
+    );
 
-          logActivity({
-            user_id: req.user.id,
-            user_name: req.user.name,
-            module: "Items",
-            action: "Created item",
-            reference_type: "item",
-            reference_id: itemId,
-            details: { code, name },
-            ip_address: req.ip,
-          });
-
-          res.status(201).json({
-            message: "Item created successfully",
-            itemId,
-          });
-        }
-      );
-    }
-  );
-};
-
-const updateItem = (req, res) => {
-  const { id } = req.params;
-
-  const {
-    code,
-    name,
-    botanical_name,
-    category_id,
-    type,
-    unit,
-    shelf_life_days,
-    reorder_level,
-    storage_temp,
-    unit_cost,
-    returnable,
-    description,
-    status,
-  } = req.body;
-
-  if (!code || !name || !category_id || !type || !unit) {
-    return res.status(400).json({
-      message: "Code, name, category, type, and unit are required",
-    });
-  }
-
-  const sql = `
-    UPDATE items
-    SET
-      code = ?,
-      name = ?,
-      botanical_name = ?,
-      category_id = ?,
-      type = ?,
-      unit = ?,
-      shelf_life_days = ?,
-      reorder_level = ?,
-      storage_temp = ?,
-      unit_cost = ?,
-      returnable = ?,
-      description = ?,
-      status = ?
-    WHERE id = ?
-  `;
-
-  db.query(
-    sql,
-    [
-      code,
-      name,
-      botanical_name || null,
-      category_id,
-      type,
-      unit,
-      shelf_life_days || 0,
-      reorder_level || 0,
-      storage_temp || null,
-      unit_cost || 0,
-      returnable ?? 1,
-      description || null,
-      status || "active",
-      id,
-    ],
-    (err) => {
-      if (err) {
-        return res.status(500).json({ message: "Database error", error: err.message });
-      }
-
-      db.query(
-        `
-          UPDATE inventory
-          SET avg_unit_cost = ?
-          WHERE item_id = ?
-        `,
-        [unit_cost || 0, id],
-        (invErr) => {
-          if (invErr) {
-            return res.status(500).json({ message: "Database error", error: invErr.message });
-          }
-
-          logActivity({
-            user_id: req.user.id,
-            user_name: req.user.name,
-            module: "Items",
-            action: "Updated item",
-            reference_type: "item",
-            reference_id: id,
-            details: { code, name },
-            ip_address: req.ip,
-          });
-
-          res.json({ message: "Item updated successfully" });
-        }
-      );
-    }
-  );
-};
-
-const deleteItem = (req, res) => {
-  const { id } = req.params;
-
-  db.query("DELETE FROM items WHERE id = ?", [id], (err) => {
-    if (err) {
-      return res.status(500).json({ message: "Database error", error: err.message });
-    }
+    await syncItemSuppliers(itemId, supplier_ids);
 
     logActivity({
       user_id: req.user.id,
       user_name: req.user.name,
       module: "Items",
-      action: "Deleted item",
+      action: "Created item",
+      reference_type: "item",
+      reference_id: itemId,
+      details: { code, name },
+      ip_address: req.ip,
+    });
+
+    res.status(201).json({
+      message: "Item created successfully",
+      itemId,
+    });
+  } catch (err) {
+    console.error("CREATE ITEM ERROR:", err);
+    res.status(500).json({ message: "Database error", error: err.message });
+  }
+};
+
+const updateItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const {
+      code,
+      name,
+      botanical_name,
+      category_id,
+      type,
+      unit,
+      shelf_life_days,
+      reorder_level,
+      storage_temp,
+      unit_cost,
+      returnable,
+      description,
+      status,
+      supplier_ids,
+    } = req.body;
+
+    if (!code || !name || !category_id || !type || !unit) {
+      return res.status(400).json({
+        message: "Code, name, category, type, and unit are required",
+      });
+    }
+
+    const sql = `
+      UPDATE items
+      SET
+        code = ?,
+        name = ?,
+        botanical_name = ?,
+        category_id = ?,
+        type = ?,
+        unit = ?,
+        shelf_life_days = ?,
+        reorder_level = ?,
+        storage_temp = ?,
+        unit_cost = ?,
+        returnable = ?,
+        description = ?,
+        status = ?
+      WHERE id = ?
+    `;
+
+    await query(sql, [
+      code,
+      name,
+      botanical_name || null,
+      category_id,
+      type,
+      unit,
+      shelf_life_days || 0,
+      reorder_level || 0,
+      storage_temp || null,
+      unit_cost || 0,
+      normalizeReturnable(returnable),
+      description || null,
+      normalizeStatus(status),
+      id,
+    ]);
+
+    await query(
+      `
+        UPDATE inventory
+        SET avg_unit_cost = ?
+        WHERE item_id = ?
+      `,
+      [unit_cost || 0, id]
+    );
+
+    await syncItemSuppliers(id, supplier_ids);
+
+    logActivity({
+      user_id: req.user.id,
+      user_name: req.user.name,
+      module: "Items",
+      action: "Updated item",
+      reference_type: "item",
+      reference_id: id,
+      details: { code, name },
+      ip_address: req.ip,
+    });
+
+    res.json({ message: "Item updated successfully" });
+  } catch (err) {
+    console.error("UPDATE ITEM ERROR:", err);
+    res.status(500).json({ message: "Database error", error: err.message });
+  }
+};
+
+const deleteItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await query(
+      `
+        UPDATE items
+        SET status = 'inactive'
+        WHERE id = ?
+      `,
+      [id]
+    );
+
+    logActivity({
+      user_id: req.user.id,
+      user_name: req.user.name,
+      module: "Items",
+      action: "Deactivated item",
       reference_type: "item",
       reference_id: id,
       ip_address: req.ip,
     });
 
-    res.json({ message: "Item deleted successfully" });
-  });
+    res.json({ message: "Item deactivated successfully" });
+  } catch (err) {
+    console.error("DELETE ITEM ERROR:", err);
+    res.status(500).json({ message: "Database error", error: err.message });
+  }
 };
 
 module.exports = {
