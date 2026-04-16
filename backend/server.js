@@ -30,6 +30,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/items/categories", categoryRoutes);
+app.use("/api/categories", categoryRoutes);
 app.use("/api/items", itemRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/suppliers", supplierRoutes);
