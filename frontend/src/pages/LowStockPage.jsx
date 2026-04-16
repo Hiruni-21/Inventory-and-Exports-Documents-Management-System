@@ -36,7 +36,9 @@ const getNote = (row) => {
 };
 
 const getUrgency = (row) => {
-  const qty = Number(row.qty_available || 0);
+  const qty = Number(
+    row.current_stock ?? row.qty_on_hand ?? row.qty_available ?? 0
+  );
   const reorder = Number(row.reorder_level || 0);
   const name = itemName(row).toLowerCase();
 
@@ -54,24 +56,28 @@ const getUrgency = (row) => {
   return "low";
 };
 
-const lowStockActionBtnStyle = {
-  height: "30px",
-  padding: "0 14px",
-  border: "none",
-  borderRadius: "10px",
-  background: "var(--g800)",
-  color: "var(--white)",
+const primaryGreenBtnBase = {
+  border: "1px solid #166534",
+  background: "#166534",
+  color: "#FFFFFF",
   fontFamily: "'Plus Jakarta Sans', sans-serif",
-  fontSize: "11px",
-  fontWeight: 700,
+  fontWeight: 800,
   lineHeight: 1,
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  gap: "5px",
   cursor: "pointer",
   whiteSpace: "nowrap",
   boxShadow: "none",
+};
+
+const lowStockActionBtnStyle = {
+  ...primaryGreenBtnBase,
+  height: "34px",
+  padding: "0 16px",
+  borderRadius: "14px",
+  fontSize: "12px",
+  gap: "6px",
 };
 
 const modalOverlayStyle = {
@@ -197,9 +203,9 @@ const infoBoxStyle = {
 };
 
 const footerBtnSecondary = {
-  height: "36px",
+  height: "38px",
   padding: "0 16px",
-  borderRadius: "9px",
+  borderRadius: "14px",
   border: "1.5px solid var(--border)",
   background: "var(--white)",
   color: "var(--g700)",
@@ -210,16 +216,11 @@ const footerBtnSecondary = {
 };
 
 const footerBtnPrimary = {
-  height: "36px",
-  padding: "0 16px",
-  borderRadius: "9px",
-  border: "none",
-  background: "var(--g800)",
-  color: "var(--white)",
-  fontFamily: "'Plus Jakarta Sans', sans-serif",
+  ...primaryGreenBtnBase,
+  height: "38px",
+  padding: "0 18px",
+  borderRadius: "14px",
   fontSize: "12px",
-  fontWeight: 700,
-  cursor: "pointer",
 };
 
 const priorityBtn = (active) => ({
@@ -322,10 +323,13 @@ const LowStockPage = () => {
   const preparedRows = useMemo(() => {
     return rows
       .map((row) => {
-        const qty = Number(row.qty_available || 0);
+        const qty = Number(
+          row.current_stock ?? row.qty_on_hand ?? row.qty_available ?? 0
+        );
         const reorder = Number(row.reorder_level || 0);
         const shortage = Math.max(0, Number(row.shortage || 0));
-        const fill = reorder > 0 ? Math.min(Math.round((qty / reorder) * 100), 100) : 0;
+        const fill =
+          reorder > 0 ? Math.min(Math.round((qty / reorder) * 100), 100) : 0;
         const urgency = getUrgency(row);
 
         return {
@@ -350,7 +354,21 @@ const LowStockPage = () => {
       });
   }, [rows]);
 
-  const criticalCount = preparedRows.filter((row) => row._urgency === "critical").length;
+  const bannerText = useMemo(() => {
+    if (!preparedRows.length) {
+      return "No items are currently below reorder level.";
+    }
+
+    const hasCardboardBox = preparedRows.some((row) =>
+      row._name.toLowerCase().includes("cardboard box")
+    );
+
+    if (hasCardboardBox) {
+      return `${preparedRows.length} items below reorder level. Create Purchase Orders immediately. Cardboard boxes have a 14-day lead time — order today.`;
+    }
+
+    return `${preparedRows.length} items below reorder level. Create Purchase Orders immediately.`;
+  }, [preparedRows]);
 
   const openCreatePOModal = (row) => {
     setPoForm(getInitialPOForm(row));
@@ -385,7 +403,10 @@ const LowStockPage = () => {
         i === index
           ? {
               ...line,
-              [field]: field === "quantity" || field === "price" ? Number(value || 0) : value,
+              [field]:
+                field === "quantity" || field === "price"
+                  ? Number(value || 0)
+                  : value,
             }
           : line
       ),
@@ -420,7 +441,8 @@ const LowStockPage = () => {
   const subtotal = useMemo(() => {
     if (!poForm?.line_items) return 0;
     return poForm.line_items.reduce(
-      (sum, line) => sum + Number(line.quantity || 0) * Number(line.price || 0),
+      (sum, line) =>
+        sum + Number(line.quantity || 0) * Number(line.price || 0),
       0
     );
   }, [poForm]);
@@ -447,18 +469,16 @@ const LowStockPage = () => {
         <div className="ib ib-w">
           <span>📢</span>
           <div>
-            <strong>You cannot create POs.</strong> Use the <em>Notify Kamal</em> button below for
-            each item that needs ordering. Kamal (Ops Executive) will receive the notification and
-            create the PO.
+            <strong>You cannot create POs.</strong> Use the <em>Notify Kamal</em>{" "}
+            button below for each item that needs ordering. Kamal (Ops Executive)
+            will receive the notification and create the PO.
           </div>
         </div>
       ) : (
         <div className="ib ib-d">
           <span>⚠️</span>
           <div>
-            <strong>{criticalCount || preparedRows.length} items below reorder level.</strong>{" "}
-            Create Purchase Orders immediately. Cardboard boxes have a 14-day lead time — order
-            today.
+            <strong>{bannerText}</strong>
           </div>
         </div>
       )}
@@ -466,7 +486,9 @@ const LowStockPage = () => {
       <div className="tw">
         <div className="tw-h">
           <h3>Items Below Reorder Level</h3>
-          <span style={{ fontSize: 11, color: "var(--text3)" }}>Sorted by urgency</span>
+          <span style={{ fontSize: 11, color: "var(--text3)" }}>
+            Sorted by urgency
+          </span>
         </div>
 
         <table>
@@ -491,8 +513,16 @@ const LowStockPage = () => {
               preparedRows.map((row) => (
                 <tr key={row.item_id || row.id}>
                   <td>
-                    <div style={{ fontWeight: 700, color: "var(--g900)" }}>{row._name}</div>
-                    <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 2 }}>
+                    <div style={{ fontWeight: 700, color: "var(--g900)" }}>
+                      {row._name}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 10,
+                        color: "var(--text3)",
+                        marginTop: 2,
+                      }}
+                    >
                       {row._category} · {row._note}
                     </div>
                   </td>
@@ -503,7 +533,10 @@ const LowStockPage = () => {
                         style={{
                           fontSize: 17,
                           fontWeight: 800,
-                          color: row._urgency === "critical" ? "var(--d)" : "var(--w)",
+                          color:
+                            row._urgency === "critical"
+                              ? "var(--d)"
+                              : "var(--w)",
                           minWidth: 28,
                         }}
                       >
@@ -523,13 +556,22 @@ const LowStockPage = () => {
                         <div
                           style={{
                             height: "100%",
-                            background: row._urgency === "critical" ? "var(--d)" : "var(--a500)",
+                            background:
+                              row._urgency === "critical"
+                                ? "var(--d)"
+                                : "var(--a500)",
                             width: `${row._fill}%`,
                           }}
                         />
                       </div>
 
-                      <span style={{ fontSize: 11, color: "var(--text3)", minWidth: 36 }}>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: "var(--text3)",
+                          minWidth: 36,
+                        }}
+                      >
                         {row._fill}%
                       </span>
                     </div>
@@ -540,7 +582,13 @@ const LowStockPage = () => {
                   </td>
 
                   <td>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: "var(--d)" }}>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: "var(--d)",
+                      }}
+                    >
                       Need {row._shortage} more
                     </span>
                   </td>
@@ -552,15 +600,31 @@ const LowStockPage = () => {
                   </td>
 
                   <td>
-                    <button
-                      type="button"
-                      onClick={() => handleCreatePO(row)}
-                      style={lowStockActionBtnStyle}
-                    >
-                      <span style={{ fontSize: "13px", fontWeight: 800, lineHeight: 1 }}>+</span>
-                      <span>{isSupervisor ? "Notify Kamal" : "Create PO"}</span>
-                    </button>
-                  </td>
+                <button
+                  type="button"
+                  onClick={() => handleCreatePO(row)}
+                  style={lowStockActionBtnStyle}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "#14532D";
+                    e.currentTarget.style.borderColor = "#14532D";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "#166534";
+                    e.currentTarget.style.borderColor = "#166534";
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "13px",
+                      fontWeight: 800,
+                      lineHeight: 1,
+                    }}
+                  >
+                    +
+                  </span>
+                  <span>{isSupervisor ? "Notify Kamal" : "Create PO"}</span>
+                </button>                  
+                </td>
                 </tr>
               ))
             ) : (
@@ -626,10 +690,25 @@ const LowStockPage = () => {
                   >
                     1
                   </div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "var(--g900)" }}>Details</div>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: "var(--g900)",
+                    }}
+                  >
+                    Details
+                  </div>
                 </div>
 
-                <div style={{ flex: 1, height: 2, background: "var(--border)", margin: "0 8px" }} />
+                <div
+                  style={{
+                    flex: 1,
+                    height: 2,
+                    background: "var(--border)",
+                    margin: "0 8px",
+                  }}
+                />
 
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <div
@@ -650,10 +729,25 @@ const LowStockPage = () => {
                   >
                     2
                   </div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text3)" }}>Items</div>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: "var(--text3)",
+                    }}
+                  >
+                    Items
+                  </div>
                 </div>
 
-                <div style={{ flex: 1, height: 2, background: "var(--border)", margin: "0 8px" }} />
+                <div
+                  style={{
+                    flex: 1,
+                    height: 2,
+                    background: "var(--border)",
+                    margin: "0 8px",
+                  }}
+                />
 
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <div
@@ -674,7 +768,15 @@ const LowStockPage = () => {
                   >
                     3
                   </div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text3)" }}>Review</div>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: "var(--text3)",
+                    }}
+                  >
+                    Review
+                  </div>
                 </div>
               </div>
 
@@ -762,7 +864,13 @@ const LowStockPage = () => {
                 <span>Line Items</span>
               </div>
 
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  fontSize: 12,
+                }}
+              >
                 <thead>
                   <tr>
                     <th
@@ -874,37 +982,70 @@ const LowStockPage = () => {
                 <tbody>
                   {poForm.line_items.map((line, index) => (
                     <tr key={index}>
-                      <td style={{ padding: "7px 9px", borderBottom: "1px solid rgba(216,232,223,.4)" }}>
+                      <td
+                        style={{
+                          padding: "7px 9px",
+                          borderBottom: "1px solid rgba(216,232,223,.4)",
+                        }}
+                      >
                         {index + 1}
                       </td>
-                      <td style={{ padding: "7px 9px", borderBottom: "1px solid rgba(216,232,223,.4)" }}>
+                      <td
+                        style={{
+                          padding: "7px 9px",
+                          borderBottom: "1px solid rgba(216,232,223,.4)",
+                        }}
+                      >
                         <input
                           style={fieldStyle}
                           value={line.item_name}
-                          onChange={(e) => handleLineChange(index, "item_name", e.target.value)}
+                          onChange={(e) =>
+                            handleLineChange(index, "item_name", e.target.value)
+                          }
                         />
                       </td>
-                      <td style={{ padding: "7px 9px", borderBottom: "1px solid rgba(216,232,223,.4)" }}>
+                      <td
+                        style={{
+                          padding: "7px 9px",
+                          borderBottom: "1px solid rgba(216,232,223,.4)",
+                        }}
+                      >
                         <input
                           type="number"
                           style={fieldStyle}
                           value={line.quantity}
-                          onChange={(e) => handleLineChange(index, "quantity", e.target.value)}
+                          onChange={(e) =>
+                            handleLineChange(index, "quantity", e.target.value)
+                          }
                         />
                       </td>
-                        <td style={{ padding: "7px 9px", borderBottom: "1px solid rgba(216,232,223,.4)" }}>
-                          <input
-                            style={{ ...fieldStyle, width: "72px" }}
-                            value={line.unit}
-                            onChange={(e) => handleLineChange(index, "unit", e.target.value)}
-                          />
-                        </td>                      
-                        <td style={{ padding: "7px 9px", borderBottom: "1px solid rgba(216,232,223,.4)" }}>
+                      <td
+                        style={{
+                          padding: "7px 9px",
+                          borderBottom: "1px solid rgba(216,232,223,.4)",
+                        }}
+                      >
+                        <input
+                          style={{ ...fieldStyle, width: "72px" }}
+                          value={line.unit}
+                          onChange={(e) =>
+                            handleLineChange(index, "unit", e.target.value)
+                          }
+                        />
+                      </td>
+                      <td
+                        style={{
+                          padding: "7px 9px",
+                          borderBottom: "1px solid rgba(216,232,223,.4)",
+                        }}
+                      >
                         <input
                           type="number"
                           style={fieldStyle}
                           value={line.price}
-                          onChange={(e) => handleLineChange(index, "price", e.target.value)}
+                          onChange={(e) =>
+                            handleLineChange(index, "price", e.target.value)
+                          }
                         />
                       </td>
                       <td
@@ -915,9 +1056,16 @@ const LowStockPage = () => {
                           color: "var(--g700)",
                         }}
                       >
-                        {formatMoney(Number(line.quantity || 0) * Number(line.price || 0))}
+                        {formatMoney(
+                          Number(line.quantity || 0) * Number(line.price || 0)
+                        )}
                       </td>
-                      <td style={{ padding: "7px 9px", borderBottom: "1px solid rgba(216,232,223,.4)" }}>
+                      <td
+                        style={{
+                          padding: "7px 9px",
+                          borderBottom: "1px solid rgba(216,232,223,.4)",
+                        }}
+                      >
                         <button
                           type="button"
                           onClick={() => removeLineItem(index)}
@@ -1001,7 +1149,9 @@ const LowStockPage = () => {
                   <textarea
                     style={textareaStyle}
                     value={poForm.instructions_to_supplier}
-                    onChange={(e) => handlePOChange("instructions_to_supplier", e.target.value)}
+                    onChange={(e) =>
+                      handlePOChange("instructions_to_supplier", e.target.value)
+                    }
                     placeholder="Quality, delivery notes..."
                   />
                 </div>
@@ -1011,7 +1161,9 @@ const LowStockPage = () => {
                   <textarea
                     style={textareaStyle}
                     value={poForm.internal_notes}
-                    onChange={(e) => handlePOChange("internal_notes", e.target.value)}
+                    onChange={(e) =>
+                      handlePOChange("internal_notes", e.target.value)
+                    }
                     placeholder="For your team only..."
                   />
                 </div>
@@ -1024,16 +1176,36 @@ const LowStockPage = () => {
             </div>
 
             <div style={modalFooterStyle}>
-              <button type="button" onClick={closeCreatePOModal} style={footerBtnSecondary}>
+              <button
+                type="button"
+                onClick={closeCreatePOModal}
+                style={footerBtnSecondary}
+              >
                 Cancel
               </button>
-              <button type="button" onClick={handleSaveDraft} style={footerBtnSecondary}>
+              <button
+                type="button"
+                onClick={handleSaveDraft}
+                style={footerBtnSecondary}
+              >
                 Save Draft
               </button>
-              <button type="button" onClick={handleSubmitApproval} style={footerBtnPrimary}>
+              <button
+                type="button"
+                onClick={handleSubmitApproval}
+                style={footerBtnPrimary}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "#14532D";
+                  e.currentTarget.style.borderColor = "#14532D";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "#166534";
+                  e.currentTarget.style.borderColor = "#166534";
+                }}
+              >
                 Submit for Approval →
-              </button>
-            </div>
+              </button>            
+              </div>
           </div>
         </div>
       )}
