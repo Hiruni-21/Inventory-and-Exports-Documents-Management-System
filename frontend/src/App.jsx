@@ -21,6 +21,7 @@ import LowStockPage from "./pages/LowStockPage";
 import StockAdjustmentListPage from "./pages/StockAdjustmentListPage";
 import AddStockAdjustmentPage from "./pages/AddStockAdjustmentPage";
 import ReportsPage from "./pages/ReportsPage";
+import ManagerApprovalsPage from "./pages/ManagerApprovalsPage";
 
 import PurchaseOrderListPage from "./pages/PurchaseOrderListPage";
 import AddPurchaseOrderPage from "./pages/AddPurchaseOrderPage";
@@ -85,19 +86,22 @@ function App() {
         <Route path="/suppliers/add" element={<AddSupplierPage />} />
 
         <Route path="/categories" element={<CategoryListPage />} />
-        <Route path="/categories/add" element={<AddCategoryPage />} />
 
         <Route path="/items" element={<ItemListPage />} />
         <Route path="/items/add" element={<AddItemPage />} />
+        <Route path="/items/edit/:id" element={<AddItemPage />} />
 
         <Route path="/inventory" element={<InventoryListPage />} />
         <Route path="/inventory/low-stock" element={<LowStockPage />} />
         <Route path="/inventory/expiry" element={<ExpiryItemsPage />} />
-        <Route path="/inventory/valuation" element={<StockValuationPage />} />        <Route path="/inventory/movements" element={<StockMovementsPage />} />
+        <Route path="/inventory/valuation" element={<StockValuationPage />} />        
+        <Route path="/inventory/movements" element={<StockMovementsPage />} />
 
         <Route path="/stock-adjustments" element={<StockAdjustmentListPage />} />
         <Route path="/stock-adjustments/add" element={<AddStockAdjustmentPage />} />
-        <Route path="/stock-count" element={<PhysicalStockCountPage />} />        <Route path="/packaging" element={<InventoryListPage />} />
+        <Route path="/stock-count" element={<PhysicalStockCountPage />} />        
+        <Route path="/packaging" element={<InventoryListPage />} />
+        <Route path="/approvals" element={<ManagerApprovalsPage />} />
 
         <Route path="/purchase-orders" element={<PurchaseOrderListPage />} />
         <Route path="/purchase-orders/add" element={<AddPurchaseOrderPage />} />
