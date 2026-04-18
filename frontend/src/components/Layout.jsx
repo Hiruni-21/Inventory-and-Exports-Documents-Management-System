@@ -1,5 +1,6 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import api from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import companyLogo from "../assets/company-logo.png";
 
@@ -56,6 +57,9 @@ const IconPlane = () => (
 );
 const IconUsers = () => (
   <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" /><circle cx="9.5" cy="7" r="4" /><path d="M20 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+);
+const IconShieldCheck = () => (
+  <svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.5 8.5 8 9 4.5-.5 8-4 8-9V6l-8-3Z" /><path d="m9.5 12 1.8 1.8 3.7-3.8" /></svg>
 );
 
 const notificationsByRole = {
@@ -135,8 +139,14 @@ const navByRole = {
       ],
     },
   ],
-  ops: [
-    { label: "OVERVIEW", items: [{ to: "/dashboard", text: "Dashboard", icon: <IconDashboard /> }] },
+      ops: [
+        {
+      label: "OVERVIEW",
+      items: [
+        { to: "/dashboard", text: "Dashboard", icon: <IconDashboard /> },
+        { to: "/approvals", text: "Approval Notes", icon: <IconShieldCheck /> },
+      ],
+    },
     {
       label: "INVENTORY",
       items: [
@@ -169,7 +179,13 @@ const navByRole = {
     { label: "ANALYTICS", items: [{ to: "/reports", text: "Reports", icon: <IconActivity /> }] },
   ],
   supervisor: [
-    { label: "OVERVIEW", items: [{ to: "/dashboard", text: "Dashboard", icon: <IconDashboard /> }] },
+    {
+  label: "OVERVIEW",
+  items: [
+    { to: "/dashboard", text: "Dashboard", icon: <IconDashboard /> },
+    { to: "/approvals", text: "Approval Notes", icon: <IconShieldCheck /> },
+  ],
+},
     {
       label: "INVENTORY",
       items: [
@@ -250,6 +266,7 @@ const pageMeta = {
   "/activity": { title: "Activity Log", subtitle: "Immutable audit trail" },
   "/supplier/orders": { title: "My Purchase Orders", subtitle: "Supplier portal" },
   "/supplier/returns": { title: "My Return Notes", subtitle: "Supplier portal" },
+  "/approvals": { title: "Approvals", subtitle: "Approval decisions and notes" },
 };
 
 const actionButtons = {
@@ -292,10 +309,13 @@ const actionButtons = {
 
 const normalizeRole = (role) => {
   const value = String(role || "manager").toLowerCase();
+
+  if (value.includes("ops")) return "ops";
   if (value.includes("operation")) return "ops";
   if (value.includes("supervisor")) return "supervisor";
   if (value.includes("logistics")) return "logistics";
   if (value.includes("supplier")) return "supplier";
+
   return "manager";
 };
 
@@ -315,13 +335,62 @@ const Layout = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [notifOpen, setNotifOpen] = useState(false);
+  const [approvalCount, setApprovalCount] = useState(0);
 
   const roleKey = normalizeRole(user?.role);
-  const sections = useMemo(() => navByRole[roleKey] || navByRole.manager, [roleKey]);
+
+  useEffect(() => {
+    const loadApprovalCount = async () => {
+      try {
+        if (roleKey !== "manager") {
+          setApprovalCount(0);
+          return;
+        }
+
+        const res = await api.get("/approvals/counts");
+        setApprovalCount(Number(res.data?.total || 0));
+      } catch (err) {
+        console.error(err);
+        setApprovalCount(0);
+      }
+    };
+
+    loadApprovalCount();
+  }, [roleKey, location.pathname]);
+
+
+  const sections = useMemo(() => {
+    const base = navByRole[roleKey] || navByRole.manager;
+
+    if (roleKey !== "manager") {
+      return base;
+    }
+
+    return base.map((section) => {
+      if (section.label !== "OVERVIEW") {
+        return section;
+      }
+
+      return {
+        ...section,
+        items: [
+          ...section.items,
+          {
+            to: "/approvals",
+            text: "Pending Approvals",
+            icon: <IconShieldCheck />,
+            badge:
+              approvalCount > 0
+                ? { text: String(approvalCount), cls: "nb-r" }
+                : null,
+          },
+        ],
+      };
+    });
+  }, [roleKey, approvalCount]);
   const meta = getMeta(location.pathname);
   const notifications = notificationsByRole[roleKey] || notificationsByRole.manager;
   const pageActions = actionButtons[location.pathname] || [];
-
   const initials = (user?.name || "FW")
     .split(" ")
     .map((x) => x[0])
@@ -329,89 +398,89 @@ const Layout = () => {
     .slice(0, 2)
     .toUpperCase();
 
-  return (
-    <>
-      <div id="app">
-        <div className="sb">
-          <div className="sb-top">
-            <div className="sb-head">
-              <div className="sb-brand">
-                <div className="sb-brand-box">
-                  <img src={companyLogo} alt="Fresh World logo" className="sidebar-logo-img" />
+    return (
+      <>
+        <div id="app">
+          <div className="sb">
+            <div className="sb-top">
+              <div className="sb-head">
+                <div className="sb-brand">
+                  <div className="sb-brand-box">
+                    <img src={companyLogo} alt="Fresh World logo" className="sidebar-logo-img" />
+                  </div>
+                  <div className="sb-brand-text">
+                    <h2>Fresh World</h2>
+                    <p>Exporters · ERP v5</p>
+                  </div>
                 </div>
-                <div className="sb-brand-text">
-                  <h2>Fresh World</h2>
-                  <p>Exporters · ERP v5</p>
-                </div>
+              </div>
+
+              <div className="sb-nav">
+                {sections.map((section) => (
+                  <div key={section.label}>
+                    <div className="sbl">{section.label}</div>
+                    {section.items.map((item) => (
+                      <Link
+                        key={item.to}
+                        to={item.to}
+                        className={`ni ${location.pathname === item.to ? "active" : ""}`}
+                      >
+                        <div className="ni-icon">{item.icon}</div>
+                        <div className="ni-txt">{item.text}</div>
+                        {item.badge ? <span className={`nb ${item.badge.cls}`}>{item.badge.text}</span> : null}
+                      </Link>
+                    ))}
+                  </div>
+                ))}
               </div>
             </div>
 
-            <div className="sb-nav">
-              {sections.map((section) => (
-                <div key={section.label}>
-                  <div className="sbl">{section.label}</div>
-                  {section.items.map((item) => (
-                    <Link
-                      key={item.to}
-                      to={item.to}
-                      className={`ni ${location.pathname === item.to ? "active" : ""}`}
-                    >
-                      <div className="ni-icon">{item.icon}</div>
-                      <div className="ni-txt">{item.text}</div>
-                      {item.badge ? <span className={`nb ${item.badge.cls}`}>{item.badge.text}</span> : null}
-                    </Link>
-                  ))}
+            <div className="sb-user">
+              <div className="sb-user-row">
+                <div className="sb-av">{initials}</div>
+                <div>
+                  <div className="sb-u-name">{user?.name || "Fresh World User"}</div>
+                  <div className="sb-u-role">{user?.role || "Manager"}</div>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="sb-user">
-            <div className="sb-user-row">
-              <div className="sb-av">{initials}</div>
-              <div>
-                <div className="sb-u-name">{user?.name || "Fresh World User"}</div>
-                <div className="sb-u-role">{user?.role || "Manager"}</div>
               </div>
-            </div>
 
-            <button className="sb-signout" onClick={logout}>
-              <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth="2" strokeLinecap="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
-              </svg>
-              Sign out
-            </button>
+              <button className="sb-signout" onClick={logout}>
+                <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth="2" strokeLinecap="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+                </svg>
+                Sign out
+              </button>
+            </div>
           </div>
-        </div>
 
-        <div className="main">
-          <div className="topbar">
-            <div className="tb-t">
-              <h1>{meta.title}</h1>
-              <p>{meta.subtitle}</p>
-            </div>
+          <div className="main">
+            <div className="topbar">
+              <div className="tb-t">
+                <h1>{meta.title}</h1>
+                <p>{meta.subtitle}</p>
+              </div>
 
-            <div className="tb-a">
-    {pageActions.map((action) =>
-  action.disabled ? (
-    <button key={action.label} className={action.className} disabled title="Not wired yet">
-      {action.label}
-    </button>
-  ) : action.eventName ? (
-    <button
-      key={action.label}
-      type="button"
-      className={action.className}
-      onClick={() => window.dispatchEvent(new CustomEvent(action.eventName))}
-    >
-      {action.label}
-    </button>
-  ) : (
-    <Link key={action.label} to={action.to} className={action.className}>
-      {action.label}
-    </Link>
-  )
-)}
+              <div className="tb-a">
+      {pageActions.map((action) =>
+    action.disabled ? (
+      <button key={action.label} className={action.className} disabled title="Not wired yet">
+        {action.label}
+      </button>
+    ) : action.eventName ? (
+      <button
+        key={action.label}
+        type="button"
+        className={action.className}
+        onClick={() => window.dispatchEvent(new CustomEvent(action.eventName))}
+      >
+        {action.label}
+      </button>
+    ) : (
+      <Link key={action.label} to={action.to} className={action.className}>
+        {action.label}
+      </Link>
+    )
+  )}
 
               <button className="nb-btn" onClick={() => setNotifOpen((p) => !p)}>
                 <svg viewBox="0 0 24 24">
