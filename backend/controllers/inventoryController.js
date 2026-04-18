@@ -108,43 +108,43 @@ const getInventory = (req, res) => {
     res.json(results);
   });
 };
-  const getLowStockItems = (req, res) => {
-    const sql = `
-      SELECT
-        i.id AS item_id,
-        i.id,
-        i.code,
-        i.name,
-        i.code AS item_code,
-        i.name AS item_name,
-        c.category_name,
-        i.type,
-        i.unit,
-        COALESCE(i.reorder_level, 0) AS reorder_level,
-        COALESCE(inv.qty_on_hand, 0) AS qty_on_hand,
-        COALESCE(inv.qty_on_hand, 0) AS current_stock,
-        COALESCE(inv.qty_available, 0) AS qty_available,
-        (COALESCE(i.reorder_level, 0) - COALESCE(inv.qty_on_hand, 0)) AS shortage
-      FROM items i
-      JOIN item_categories c ON i.category_id = c.id
-      LEFT JOIN inventory inv ON inv.item_id = i.id
-      WHERE COALESCE(inv.qty_on_hand, 0) > 0
-        AND COALESCE(inv.qty_on_hand, 0) <= COALESCE(i.reorder_level, 0)
-      ORDER BY shortage DESC, i.name ASC
-    `;
 
-    db.query(sql, (err, results) => {
-      if (err) {
-        return res.status(500).json({
-          message: "Database error",
-          error: err.message,
-        });
-      }
+const getLowStockItems = (req, res) => {
+  const sql = `
+    SELECT
+      i.id AS item_id,
+      i.id,
+      i.code,
+      i.name,
+      i.code AS item_code,
+      i.name AS item_name,
+      c.category_name,
+      i.type,
+      i.unit,
+      COALESCE(i.reorder_level, 0) AS reorder_level,
+      COALESCE(inv.qty_on_hand, 0) AS qty_on_hand,
+      COALESCE(inv.qty_on_hand, 0) AS current_stock,
+      COALESCE(inv.qty_available, 0) AS qty_available,
+      (COALESCE(i.reorder_level, 0) - COALESCE(inv.qty_on_hand, 0)) AS shortage
+    FROM items i
+    JOIN item_categories c ON i.category_id = c.id
+    LEFT JOIN inventory inv ON inv.item_id = i.id
+    WHERE COALESCE(inv.qty_on_hand, 0) > 0
+      AND COALESCE(inv.qty_on_hand, 0) <= COALESCE(i.reorder_level, 0)
+    ORDER BY shortage DESC, i.name ASC
+  `;
 
-      res.json(results);
-    });
-  };
+  db.query(sql, (err, results) => {
+    if (err) {
+      return res.status(500).json({
+        message: "Database error",
+        error: err.message,
+      });
+    }
 
+    res.json(results);
+  });
+};
 
 const getExpiryItems = (req, res) => {
   const days = Number(req.query.days) || 7;
@@ -223,7 +223,58 @@ const getBatchesByItemId = (req, res) => {
 };
 
 const getInventoryValuation = (req, res) => {
-  const sql = `
+  const wantsDetails =
+    req.query.details === "1" ||
+    req.query.details === "true" ||
+    req.query.mode === "items";
+
+  if (wantsDetails) {
+    const detailSql = `
+      SELECT
+        i.id AS item_id,
+        i.code AS item_code,
+        i.name AS item_name,
+        c.category_name,
+        i.type,
+        i.unit,
+        COALESCE(inv.qty_on_hand, 0) AS qty_on_hand,
+        COALESCE(inv.qty_available, 0) AS qty_available,
+        COALESCE(inv.avg_unit_cost, i.unit_cost, 0) AS avg_unit_cost,
+        COALESCE(i.unit_cost, inv.avg_unit_cost, 0) AS unit_cost,
+        COALESCE(inv.total_value, COALESCE(inv.qty_available, 0) * COALESCE(inv.avg_unit_cost, i.unit_cost, 0)) AS total_value,
+        eb.nearest_expiry_date,
+        COALESCE(eb.batch_count, 0) AS batch_count
+      FROM items i
+      LEFT JOIN item_categories c
+        ON c.id = i.category_id
+      LEFT JOIN inventory inv
+        ON inv.item_id = i.id
+      LEFT JOIN (
+        SELECT
+          item_id,
+          MIN(expiry_date) AS nearest_expiry_date,
+          COUNT(*) AS batch_count
+        FROM inventory_batches
+        WHERE COALESCE(available_quantity, 0) > 0
+        GROUP BY item_id
+      ) eb
+        ON eb.item_id = i.id
+      WHERE COALESCE(i.status, 'active') = 'active'
+      ORDER BY total_value DESC, i.name ASC
+    `;
+
+    db.query(detailSql, (err, results) => {
+      if (err) {
+        return res.status(500).json({ message: "Database error", error: err.message });
+      }
+
+      res.json(results);
+    });
+
+    return;
+  }
+
+  const summarySql = `
     SELECT
       COUNT(*) AS total_items,
       COALESCE(SUM(qty_on_hand), 0) AS total_qty_on_hand,
@@ -232,7 +283,7 @@ const getInventoryValuation = (req, res) => {
     FROM inventory
   `;
 
-  db.query(sql, (err, results) => {
+  db.query(summarySql, (err, results) => {
     if (err) {
       return res.status(500).json({ message: "Database error", error: err.message });
     }
