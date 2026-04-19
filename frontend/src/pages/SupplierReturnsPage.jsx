@@ -13,7 +13,7 @@ const overlayStyle = {
 };
 
 const modalStyle = {
-  width: "min(1280px, 96vw)",
+  width: "min(1040px, 84vw)",
   maxHeight: "92vh",
   overflow: "auto",
   background: "var(--white)",
@@ -32,20 +32,6 @@ const closeBtnStyle = {
   justifyContent: "center",
   lineHeight: 1,
   fontSize: 24,
-};
-
-const acknowledgeBtnStyle = {
-  width: "100%",
-  background: "var(--white)",
-  color: "var(--g700)",
-  border: "1px solid rgba(39,143,85,.45)",
-  boxShadow: "none",
-};
-
-const disputeBtnStyle = {
-  width: "100%",
-  color: "var(--d)",
-  borderColor: "rgba(200,75,47,.28)",
 };
 
 const formatDate = (value) => {
@@ -81,6 +67,8 @@ const SupplierReturnsPage = () => {
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
+  const [ackHover, setAckHover] = useState(false);
+  const [disputeHover, setDisputeHover] = useState(false);
 
   const loadReturns = async () => {
     try {
@@ -103,6 +91,8 @@ const SupplierReturnsPage = () => {
       setSelectedReturnId(id);
       setLoadingDetails(true);
       setMessage({ type: "", text: "" });
+      setAckHover(false);
+      setDisputeHover(false);
 
       const res = await api.get(`/supplier-portal/returns/${id}`);
       const data = res.data || null;
@@ -123,6 +113,8 @@ const SupplierReturnsPage = () => {
     setSelectedReturn(null);
     setNote("");
     setMessage({ type: "", text: "" });
+    setAckHover(false);
+    setDisputeHover(false);
   };
 
   const handleRespond = async (responseStatus) => {
@@ -381,7 +373,16 @@ const SupplierReturnsPage = () => {
                         className="btn btn-s btn-sm"
                         onClick={() => handleRespond("acknowledged")}
                         disabled={saving}
-                        style={acknowledgeBtnStyle}
+                        onMouseEnter={() => !saving && setAckHover(true)}
+                        onMouseLeave={() => setAckHover(false)}
+                        style={{
+                          width: "100%",
+                          background: ackHover ? "var(--g700)" : "var(--white)",
+                          color: ackHover ? "var(--white)" : "var(--g700)",
+                          border: "1px solid rgba(39,143,85,.45)",
+                          boxShadow: "none",
+                          transition: "all .18s ease",
+                        }}
                       >
                         {saving ? "Saving..." : "Acknowledge Deduction"}
                       </button>
@@ -391,7 +392,16 @@ const SupplierReturnsPage = () => {
                         className="btn btn-s btn-sm"
                         onClick={() => handleRespond("disputed")}
                         disabled={saving}
-                        style={disputeBtnStyle}
+                        onMouseEnter={() => !saving && setDisputeHover(true)}
+                        onMouseLeave={() => setDisputeHover(false)}
+                        style={{
+                          width: "100%",
+                          background: disputeHover ? "var(--d)" : "var(--white)",
+                          color: disputeHover ? "var(--white)" : "var(--d)",
+                          border: "1px solid rgba(200,75,47,.28)",
+                          boxShadow: "none",
+                          transition: "all .18s ease",
+                        }}
                       >
                         {saving ? "Saving..." : "Dispute Return"}
                       </button>
