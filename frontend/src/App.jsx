@@ -18,10 +18,11 @@ import ItemListPage from "./pages/ItemListPage";
 import AddItemPage from "./pages/AddItemPage";
 import InventoryListPage from "./pages/InventoryListPage";
 import LowStockPage from "./pages/LowStockPage";
-import StockValuationPage from "./pages/StockValuationPage";
+import ExpiryItemsPage from "./pages/ExpiryItemsPage";
 import StockAdjustmentListPage from "./pages/StockAdjustmentListPage";
 import AddStockAdjustmentPage from "./pages/AddStockAdjustmentPage";
 import ReportsPage from "./pages/ReportsPage";
+import ManagerApprovalsPage from "./pages/ManagerApprovalsPage";
 
 import PurchaseOrderListPage from "./pages/PurchaseOrderListPage";
 import AddPurchaseOrderPage from "./pages/AddPurchaseOrderPage";
@@ -40,6 +41,8 @@ import DispatchListPage from "./pages/DispatchListPage";
 import AddDispatchPage from "./pages/AddDispatchPage";
 import DispatchDetailsPage from "./pages/DispatchDetailsPage";
 import DispatchPrintPage from "./pages/DispatchPrintPage";
+import GlobalDispatchListPage from "./pages/GlobalDispatchListPage";
+import AddGlobalDispatchPage from "./pages/AddGlobalDispatchPage";
 
 import ExportDocumentListPage from "./pages/ExportDocumentListPage";
 import AddExportDocumentPage from "./pages/AddExportDocumentPage";
@@ -47,17 +50,21 @@ import ExportDocumentDetailsPage from "./pages/ExportDocumentDetailsPage";
 import ExportDocumentPrintPage from "./pages/ExportDocumentPrintPage";
 
 import StockMovementsPage from "./pages/StockMovementsPage";
+import SupplierDashboardPage from "./pages/SupplierDashboard";
 import SupplierOrdersPage from "./pages/SupplierOrdersPage";
 import SupplierReturnsPage from "./pages/SupplierReturnsPage";
-import SupplierMessagesPage from "./pages/SupplierMessagesPage";
 import SupplierOrderDetailsPage from "./pages/SupplierOrderDetailsPage";
 import SupplierReturnDetailsPage from "./pages/SupplierReturnDetailsPage";
+import SupplierMessagesPage from "./pages/SupplierMessagesPage";
+
+import StockValuationPage from "./pages/StockValuationPage";
+import PhysicalStockCountPage from "./pages/PhysicalStockCountPage";
 
 const DashboardRouter = () => {
   const { user } = useAuth();
   const role = String(user?.role || "").toLowerCase();
 
-  if (role.includes("operation") || role.includes("ops")) return <OperationsDashboard />;
+  if (role.includes("operation")) return <OperationsDashboard />;
   if (role.includes("logistics")) return <LogisticsDashboard />;
   if (role.includes("supervisor")) return <SupervisorDashboard />;
   if (role.includes("supplier")) return <SupplierDashboard />;
@@ -86,17 +93,19 @@ function App() {
 
         <Route path="/items" element={<ItemListPage />} />
         <Route path="/items/add" element={<AddItemPage />} />
+        <Route path="/items/edit/:id" element={<AddItemPage />} />
 
         <Route path="/inventory" element={<InventoryListPage />} />
         <Route path="/inventory/low-stock" element={<LowStockPage />} />
-        <Route path="/inventory/expiry" element={<InventoryListPage />} />
+        <Route path="/inventory/expiry" element={<ExpiryItemsPage />} />
         <Route path="/inventory/valuation" element={<StockValuationPage />} />
         <Route path="/inventory/movements" element={<StockMovementsPage />} />
 
         <Route path="/stock-adjustments" element={<StockAdjustmentListPage />} />
         <Route path="/stock-adjustments/add" element={<AddStockAdjustmentPage />} />
-        <Route path="/stock-count" element={<InventoryListPage />} />
+        <Route path="/stock-count" element={<PhysicalStockCountPage />} />
         <Route path="/packaging" element={<InventoryListPage />} />
+        <Route path="/approvals" element={<ManagerApprovalsPage />} />
 
         <Route path="/purchase-orders" element={<PurchaseOrderListPage />} />
         <Route path="/purchase-orders/add" element={<AddPurchaseOrderPage />} />
@@ -115,10 +124,12 @@ function App() {
         <Route path="/customers/global" element={<GlobalCustomersPage />} />
 
         <Route path="/dispatch/local" element={<DispatchListPage />} />
-        <Route path="/dispatch/global" element={<DispatchListPage />} />
-        <Route path="/dispatch/add" element={<AddDispatchPage />} />
+        <Route path="/dispatch/local/add" element={<AddDispatchPage />} />
         <Route path="/dispatch/:id" element={<DispatchDetailsPage />} />
         <Route path="/dispatch/print/:id" element={<DispatchPrintPage />} />
+
+        <Route path="/dispatch/global" element={<GlobalDispatchListPage />} />
+        <Route path="/dispatch/global/add" element={<AddGlobalDispatchPage />} />
 
         <Route path="/export-documents" element={<ExportDocumentListPage />} />
         <Route path="/export-documents/add" element={<AddExportDocumentPage />} />
@@ -128,8 +139,8 @@ function App() {
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/users" element={<ReportsPage />} />
         <Route path="/activity" element={<ReportsPage />} />
-        <Route path="/approvals" element={<ReportsPage />} />
 
+        <Route path="/supplier/dashboard" element={<SupplierDashboardPage />} />
         <Route path="/supplier/orders" element={<SupplierOrdersPage />} />
         <Route path="/supplier/orders/:id" element={<SupplierOrderDetailsPage />} />
         <Route path="/supplier/returns" element={<SupplierReturnsPage />} />

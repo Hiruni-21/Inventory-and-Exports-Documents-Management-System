@@ -76,26 +76,39 @@ const priorityBadgeStyle = (days, label) => {
     color = "#D48A1B";
   }
 
-  return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "4px 10px",
-        borderRadius: 999,
-        background,
-        color,
-        fontSize: 11,
-        fontWeight: 800,
-        lineHeight: 1,
-        whiteSpace: "nowrap",
-      }}
-    >
-      {label}
-    </span>
-  );
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "4px 10px",
+    borderRadius: 999,
+    background,
+    color,
+    fontSize: 11,
+    fontWeight: 800,
+    lineHeight: 1,
+    whiteSpace: "nowrap",
+  };
 };
+
+const summaryCardStyle = {
+  background: "var(--white)",
+  border: "1px solid var(--border)",
+  borderRadius: 16,
+  padding: 22,
+  boxShadow: "0 2px 8px rgba(10,40,24,.03)",
+  position: "relative",
+  overflow: "hidden",
+};
+
+const summaryAccentStyle = (color) => ({
+  position: "absolute",
+  left: 0,
+  right: 0,
+  bottom: 0,
+  height: 4,
+  background: color,
+});
 
 const ExpiryItemsPage = () => {
   const navigate = useNavigate();
@@ -104,6 +117,7 @@ const ExpiryItemsPage = () => {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("All");
+  const [search, setSearch] = useState("");
   const [hoveredTab, setHoveredTab] = useState("");
   const [hoveredAction, setHoveredAction] = useState("");
 
@@ -127,37 +141,60 @@ const ExpiryItemsPage = () => {
 
   const allRows = useMemo(() => {
     return [...rows].sort(
-      (a, b) => Number(a.days_left || 999) - Number(b.days_left || 999)
+      (a, b) => Number(a.days_left ?? 999) - Number(b.days_left ?? 999)
     );
   }, [rows]);
 
-  const criticalCount = useMemo(
-    () => allRows.filter((row) => Number(row.days_left || 0) <= 3).length,
-    [allRows]
-  );
+  const summary = useMemo(() => {
+    const total = allRows.length;
+    const critical = allRows.filter((row) => Number(row.days_left ?? 0) <= 3).length;
+    const warning = allRows.filter((row) => {
+      const days = Number(row.days_left ?? 0);
+      return days > 3 && days <= 7;
+    }).length;
+    const safe = allRows.filter((row) => Number(row.days_left ?? 0) > 7).length;
+
+    return { total, critical, warning, safe };
+  }, [allRows]);
 
   const filteredRows = useMemo(() => {
-    if (tab === "Critical") {
-      return allRows.filter((row) => Number(row.days_left || 0) <= 3);
-    }
+    let result = [...allRows];
 
-    if (tab === "Warning") {
-      return allRows.filter((row) => {
-        const days = Number(row.days_left || 0);
+    if (tab === "Critical") {
+      result = result.filter((row) => Number(row.days_left ?? 0) <= 3);
+    } else if (tab === "Warning") {
+      result = result.filter((row) => {
+        const days = Number(row.days_left ?? 0);
         return days > 3 && days <= 7;
       });
+    } else if (tab === "Safe") {
+      result = result.filter((row) => Number(row.days_left ?? 0) > 7);
     }
 
-    if (tab === "Safe") {
-      return allRows.filter((row) => Number(row.days_left || 0) > 7);
+    const q = search.trim().toLowerCase();
+    if (q) {
+      result = result.filter((row) =>
+        [
+          row.batch_code,
+          row.batch_number,
+          row.item_name,
+          row.name,
+          row.item_code,
+          row.code,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(q)
+      );
     }
 
-    return allRows;
-  }, [allRows, tab]);
+    return result;
+  }, [allRows, tab, search]);
 
   const bannerText =
-    criticalCount > 0
-      ? `${criticalCount} batches are expiring within 3 days. FEFO applies — dispatch older batches first before newer stock.`
+    summary.critical > 0
+      ? `${summary.critical} batches are expiring within 3 days. FEFO applies — dispatch older batches before newer stock.`
       : "No critical expiry batches within 3 days. FEFO still applies across all dispatches.";
 
   const getPriorityLabel = (index) => {
@@ -166,7 +203,7 @@ const ExpiryItemsPage = () => {
     return `#${index + 1}`;
   };
 
-  const getItemName = (row) => row.name || row.item_name || "—";
+  const getItemName = (row) => row.item_name || row.name || "—";
   const getBatchCode = (row) => row.batch_code || row.batch_number || "—";
   const getQty = (row) =>
     row.qty_remaining ?? row.available_quantity ?? row.quantity ?? 0;
@@ -186,7 +223,7 @@ const ExpiryItemsPage = () => {
   return (
     <>
       <div
-        className={criticalCount > 0 ? "ib ib-d" : "ib ib-s"}
+        className={summary.critical > 0 ? "ib ib-d" : "ib ib-s"}
         style={{
           marginBottom: 16,
           alignItems: "center",
@@ -198,52 +235,151 @@ const ExpiryItemsPage = () => {
       </div>
 
       <div
-        className="fb"
+        className="cg"
         style={{
-          gap: 8,
-          marginBottom: 14,
-          flexWrap: "wrap",
+          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+          gap: 16,
+          marginBottom: 18,
         }}
       >
-        <button
-          type="button"
-          style={getTabButtonStyle(tab === "All", hoveredTab === "All")}
-          onClick={() => setTab("All")}
-          onMouseEnter={() => setHoveredTab("All")}
-          onMouseLeave={() => setHoveredTab("")}
-        >
-          All Batches
-        </button>
+        <div style={summaryCardStyle}>
+          <div style={{ color: "#9AA2B0", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em" }}>
+            TOTAL BATCHES
+          </div>
+          <div style={{ marginTop: 10, fontSize: 24, fontWeight: 800, color: "var(--g900)" }}>
+            {summary.total}
+          </div>
+          <div
+            style={{
+              marginTop: 12,
+              paddingTop: 12,
+              borderTop: "1px solid var(--border)",
+              color: "var(--text3)",
+            }}
+          >
+            Expiring within 14 days
+          </div>
+          <div style={summaryAccentStyle("#2FA34A")} />
+        </div>
 
-        <button
-          type="button"
-          style={getTabButtonStyle(tab === "Critical", hoveredTab === "Critical")}
-          onClick={() => setTab("Critical")}
-          onMouseEnter={() => setHoveredTab("Critical")}
-          onMouseLeave={() => setHoveredTab("")}
-        >
-          Critical (≤3d)
-        </button>
+        <div style={summaryCardStyle}>
+          <div style={{ color: "#9AA2B0", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em" }}>
+            CRITICAL
+          </div>
+          <div style={{ marginTop: 10, fontSize: 24, fontWeight: 800, color: "#9B3224" }}>
+            {summary.critical}
+          </div>
+          <div
+            style={{
+              marginTop: 12,
+              paddingTop: 12,
+              borderTop: "1px solid var(--border)",
+              color: "var(--text3)",
+            }}
+          >
+            3 days or less
+          </div>
+          <div style={summaryAccentStyle("#D84D32")} />
+        </div>
 
-        <button
-          type="button"
-          style={getTabButtonStyle(tab === "Warning", hoveredTab === "Warning")}
-          onClick={() => setTab("Warning")}
-          onMouseEnter={() => setHoveredTab("Warning")}
-          onMouseLeave={() => setHoveredTab("")}
-        >
-          Warning (≤7d)
-        </button>
+        <div style={summaryCardStyle}>
+          <div style={{ color: "#9AA2B0", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em" }}>
+            WARNING
+          </div>
+          <div style={{ marginTop: 10, fontSize: 24, fontWeight: 800, color: "#A35F00" }}>
+            {summary.warning}
+          </div>
+          <div
+            style={{
+              marginTop: 12,
+              paddingTop: 12,
+              borderTop: "1px solid var(--border)",
+              color: "var(--text3)",
+            }}
+          >
+            4 to 7 days left
+          </div>
+          <div style={summaryAccentStyle("#E29B2D")} />
+        </div>
 
-        <button
-          type="button"
-          style={getTabButtonStyle(tab === "Safe", hoveredTab === "Safe")}
-          onClick={() => setTab("Safe")}
-          onMouseEnter={() => setHoveredTab("Safe")}
-          onMouseLeave={() => setHoveredTab("")}
-        >
-          Safe
-        </button>
+        <div style={summaryCardStyle}>
+          <div style={{ color: "#9AA2B0", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em" }}>
+            SAFE
+          </div>
+          <div style={{ marginTop: 10, fontSize: 24, fontWeight: 800, color: "var(--g900)" }}>
+            {summary.safe}
+          </div>
+          <div
+            style={{
+              marginTop: 12,
+              paddingTop: 12,
+              borderTop: "1px solid var(--border)",
+              color: "var(--text3)",
+            }}
+          >
+            More than 7 days
+          </div>
+          <div style={summaryAccentStyle("#2F69C8")} />
+        </div>
+      </div>
+
+      <div className="fb" style={{ gap: 12, marginBottom: 14, alignItems: "stretch", flexWrap: "wrap" }}>
+        <div className="sw" style={{ minWidth: 320 }}>
+          <input
+            className="si"
+            placeholder="Search by item name or batch code..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <button
+            type="button"
+            style={getTabButtonStyle(tab === "All", hoveredTab === "All")}
+            onClick={() => setTab("All")}
+            onMouseEnter={() => setHoveredTab("All")}
+            onMouseLeave={() => setHoveredTab("")}
+          >
+            All
+          </button>
+
+          <button
+            type="button"
+            style={getTabButtonStyle(tab === "Critical", hoveredTab === "Critical")}
+            onClick={() => setTab("Critical")}
+            onMouseEnter={() => setHoveredTab("Critical")}
+            onMouseLeave={() => setHoveredTab("")}
+          >
+            Critical
+          </button>
+
+          <button
+            type="button"
+            style={getTabButtonStyle(tab === "Warning", hoveredTab === "Warning")}
+            onClick={() => setTab("Warning")}
+            onMouseEnter={() => setHoveredTab("Warning")}
+            onMouseLeave={() => setHoveredTab("")}
+          >
+            Warning
+          </button>
+
+          <button
+            type="button"
+            style={getTabButtonStyle(tab === "Safe", hoveredTab === "Safe")}
+            onClick={() => setTab("Safe")}
+            onMouseEnter={() => setHoveredTab("Safe")}
+            onMouseLeave={() => setHoveredTab("")}
+          >
+            Safe
+          </button>
+        </div>
+
+        <div style={{ marginLeft: "auto" }}>
+          <button type="button" className="btn btn-s" onClick={() => navigate("/stock-adjustments")}>
+            Adjust Stock
+          </button>
+        </div>
       </div>
 
       <div className="tw">
@@ -268,7 +404,7 @@ const ExpiryItemsPage = () => {
               </tr>
             ) : filteredRows.length ? (
               filteredRows.map((row, index) => {
-                const days = Number(row.days_left || 0);
+                const days = Number(row.days_left ?? 0);
                 const isCritical = days <= 3;
                 const dispatchKey = `dispatch-${row.id}`;
                 const wasteKey = `waste-${row.id}`;
@@ -308,7 +444,11 @@ const ExpiryItemsPage = () => {
                       </span>
                     </td>
 
-                    <td>{priorityBadgeStyle(days, getPriorityLabel(index))}</td>
+                    <td>
+                      <span style={priorityBadgeStyle(days, getPriorityLabel(index))}>
+                        {getPriorityLabel(index)}
+                      </span>
+                    </td>
 
                     <td>
                       <div
@@ -334,10 +474,7 @@ const ExpiryItemsPage = () => {
                         {isCritical ? (
                           <button
                             type="button"
-                            style={getCompactActionStyle(
-                              hoveredAction === wasteKey,
-                              "danger"
-                            )}
+                            style={getCompactActionStyle(hoveredAction === wasteKey, "danger")}
                             onMouseEnter={() => setHoveredAction(wasteKey)}
                             onMouseLeave={() => setHoveredAction("")}
                             onClick={() =>
