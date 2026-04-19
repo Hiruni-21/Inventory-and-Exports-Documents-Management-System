@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Search } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
+import { useToast } from "../context/ToastContext";
 
 const fmtDate = (value) => {
   if (!value) return "—";
@@ -9,46 +11,75 @@ const fmtDate = (value) => {
   return date.toLocaleDateString("en-CA");
 };
 
-const GrnListPage = () => {
-  const [grnList, setGrnList] = useState([]);
-  const [error, setError] = useState("");
-  const [search, setSearch] = useState("");
+const statusLabel = (value) => {
+  const text = String(value || "received").toLowerCase();
+  if (text === "pending_verification") return "Pending Verification";
+  if (text === "verified") return "Verified";
+  return "Received";
+};
+
+const badgeClass = (value) => {
+  const text = String(value || "received").toLowerCase();
+  if (text === "pending_verification") return "badge bg-a";
+  if (text === "verified") return "badge bg-b";
+  return "badge bg-g";
+};
+
+export default function GrnListPage() {
+  const navigate = useNavigate();
+  const toast = useToast();
+
+  const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+
+  const loadRows = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get("/grn");
+      setRows(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to load GRNs");
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchGrn = async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const res = await api.get("/grn");
-        setGrnList(Array.isArray(res.data) ? res.data : []);
-      } catch (err) {
-        setError(err.response?.data?.message || "Failed to load GRN records");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchGrn();
+    loadRows();
   }, []);
 
-  const filteredGrn = useMemo(() => {
+  const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return grnList;
+    if (!q) return rows;
 
-    return grnList.filter((grn) =>
-      [grn.grn_number, grn.po_number, grn.supplier_name, grn.created_by_name]
+    return rows.filter((row) =>
+      [
+        row.grn_number,
+        row.po_number,
+        row.supplier_name,
+        row.created_by_name,
+        row.status,
+      ]
         .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(q))
+        .join(" ")
+        .toLowerCase()
+        .includes(q)
     );
-  }, [grnList, search]);
+  }, [rows, search]);
 
   return (
-    <div>
-      <div className="fb">
-        <div className="sw">
+    <>
+      <div className="notice-banner notice-success">
+        <span>Goods Receiving is now backend-connected. GRNs with high variance wait for Ops verification before stock is updated.</span>
+      </div>
+
+      <div className="fb" style={{ justifyContent: "space-between", alignItems: "center" }}>
+        <div className="search-field" style={{ minWidth: 280 }}>
+          <Search size={16} />
           <input
-            className="si"
+            type="text"
             placeholder="Search GRNs..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -56,72 +87,63 @@ const GrnListPage = () => {
         </div>
       </div>
 
-      {loading ? (
-        <div className="ib ib-i">
-          <span>⏳</span>
-          <div>Loading GRN records...</div>
-        </div>
-      ) : null}
-
-      {error ? (
-        <div className="ib ib-d">
-          <span>⚠️</span>
-          <div>{error}</div>
-        </div>
-      ) : null}
-
-      <div className="tw">
-        <div className="tw-h">
-          <h3>Goods Received Notes</h3>
+      <div className="content-card">
+        <div className="card-header-row">
+          <h3>Goods Receiving Notes</h3>
+          <span className="count-pill">{filteredRows.length} GRNs</span>
         </div>
 
-        <table>
-          <thead>
-            <tr>
-              <th>GRN No.</th>
-              <th>Linked PO</th>
-              <th>Supplier</th>
-              <th>Received Date</th>
-              <th>Received Time</th>
-              <th>Created By</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredGrn.length > 0 ? (
-              filteredGrn.map((grn) => (
-                <tr key={grn.id}>
-                  <td style={{ fontFamily: "monospace", fontWeight: 700, color: "var(--g800)" }}>
-                    {grn.grn_number}
-                  </td>
-                  <td>{grn.po_number || "—"}</td>
-                  <td>{grn.supplier_name || "—"}</td>
-                  <td>{fmtDate(grn.received_date)}</td>
-                  <td>{grn.received_time || "—"}</td>
-                  <td>{grn.created_by_name || "—"}</td>
-                  <td>
-                    <span className="badge bg-g">Recorded</span>
-                  </td>
-                  <td>
-                    <Link to={`/grn/${grn.id}`} className="ab" title="View GRN">
-                      👁
-                    </Link>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>GRN NUMBER</th>
+                <th>RECEIVED DATE</th>
+                <th>PO NUMBER</th>
+                <th>SUPPLIER</th>
+                <th>ITEMS</th>
+                <th>RECEIVED QTY</th>
+                <th>STATUS</th>
+                <th>CREATED BY</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan="8" className="empty-row">
+                    Loading GRNs...
                   </td>
                 </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="8" style={{ textAlign: "center", color: "var(--text3)" }}>
-                  No GRN records found
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              ) : filteredRows.length ? (
+                filteredRows.map((row) => (
+                  <tr
+                    key={row.id}
+                    style={{ cursor: "pointer" }}
+                    onClick={() => navigate(`/grn/${row.id}`)}
+                  >
+                    <td className="code-cell">{row.grn_number}</td>
+                    <td>{fmtDate(row.received_date)}</td>
+                    <td>{row.po_number}</td>
+                    <td className="strong-cell">{row.supplier_name}</td>
+                    <td>{Number(row.item_count || 0)}</td>
+                    <td>{Number(row.total_received_qty || 0).toFixed(2)}</td>
+                    <td>
+                      <span className={badgeClass(row.status)}>{statusLabel(row.status)}</span>
+                    </td>
+                    <td>{row.created_by_name || "—"}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="8" className="empty-row">
+                    No GRNs found
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
+    </>
   );
-};
-
-export default GrnListPage;
+}
