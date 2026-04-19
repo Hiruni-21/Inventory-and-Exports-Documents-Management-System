@@ -94,7 +94,7 @@ const getInventory = (req, res) => {
     params.push(type);
   }
 
-  sql += ` ORDER BY i.name ASC`;
+  sql += ` ORDER BY CAST(SUBSTRING(i.code, 5) AS UNSIGNED) ASC`;
 
   db.query(sql, params, (err, results) => {
     if (err) {

@@ -9,11 +9,31 @@ const query = (sql, params = []) =>
     });
   });
 
+const getNextCategoryCode = async () => {
+  const rows = await query(`
+    SELECT category_code
+    FROM item_categories
+    WHERE category_code IS NOT NULL
+      AND category_code <> ''
+    ORDER BY category_code DESC
+    LIMIT 1
+  `);
+
+  if (!rows.length || !rows[0].category_code) {
+    return "CAT-001";
+  }
+
+  const lastCode = String(rows[0].category_code).trim();
+  const lastNumber = parseInt(lastCode.replace(/\D/g, ""), 10) || 0;
+  return `CAT-${String(lastNumber + 1).padStart(3, "0")}`;
+};
+
 const getAllCategories = async (req, res) => {
   try {
     const sql = `
       SELECT
         c.id,
+        c.category_code,
         c.category_name,
         COALESCE(c.description, '') AS description,
         COALESCE(c.status, 'active') AS status,
@@ -26,7 +46,13 @@ const getAllCategories = async (req, res) => {
         ON i.category_id = c.id
        AND COALESCE(i.status, 'active') <> 'inactive'
       WHERE COALESCE(c.status, 'active') <> 'inactive'
-      GROUP BY c.id, c.category_name, c.description, c.status, c.created_at
+      GROUP BY
+        c.id,
+        c.category_code,
+        c.category_name,
+        c.description,
+        c.status,
+        c.created_at
       ORDER BY c.id ASC
     `;
 
@@ -45,6 +71,7 @@ const getCategoryById = async (req, res) => {
     const sql = `
       SELECT
         c.id,
+        c.category_code,
         c.category_name,
         COALESCE(c.description, '') AS description,
         COALESCE(c.status, 'active') AS status,
@@ -57,7 +84,13 @@ const getCategoryById = async (req, res) => {
         ON i.category_id = c.id
        AND COALESCE(i.status, 'active') <> 'inactive'
       WHERE c.id = ?
-      GROUP BY c.id, c.category_name, c.description, c.status, c.created_at
+      GROUP BY
+        c.id,
+        c.category_code,
+        c.category_name,
+        c.description,
+        c.status,
+        c.created_at
       LIMIT 1
     `;
 
@@ -82,12 +115,15 @@ const createCategory = async (req, res) => {
       return res.status(400).json({ message: "Category name is required" });
     }
 
+    const category_code = await getNextCategoryCode();
+
     const result = await query(
       `
-        INSERT INTO item_categories (category_name, description, status)
-        VALUES (?, ?, ?)
+        INSERT INTO item_categories (category_code, category_name, description, status)
+        VALUES (?, ?, ?, ?)
       `,
       [
+        category_code,
         String(category_name).trim(),
         description ? String(description).trim() : null,
         String(status || "active").toLowerCase() === "inactive" ? "inactive" : "active",
@@ -101,13 +137,14 @@ const createCategory = async (req, res) => {
       action: "Created category",
       reference_type: "item_category",
       reference_id: result.insertId,
-      details: { category_name },
+      details: { category_name, category_code },
       ip_address: req.ip,
     });
 
     res.status(201).json({
       message: "Category created successfully",
       id: result.insertId,
+      category_code,
     });
   } catch (err) {
     console.error("CREATE CATEGORY ERROR:", err);

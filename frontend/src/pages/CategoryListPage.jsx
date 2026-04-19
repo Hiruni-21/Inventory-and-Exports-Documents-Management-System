@@ -87,7 +87,8 @@ const numberValue = (...values) => {
   return 0;
 };
 
-const categoryCode = (id) => `CAT-${String(id).padStart(3, "0")}`;
+const categoryCode = (row) =>
+  row.category_code || `CAT-${String(row.id).padStart(3, "0")}`;
 
 const shelfLifeLabel = (minValue, maxValue) => {
   const min = Number(minValue);
@@ -390,7 +391,7 @@ export default function CategoryListPage() {
                   >
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ ...metaBadgeStyle, marginBottom: 8 }}>
-                        {categoryCode(row.id)}
+                        {categoryCode(row)}
                       </div>
 
                       <div
