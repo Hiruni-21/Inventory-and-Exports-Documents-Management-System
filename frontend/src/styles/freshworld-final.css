@@ -1682,3 +1682,37 @@ textarea.fc{height:78px;padding:10px 12px;resize:vertical}
     min-width: 100%;
   }
 }
+.rw-photo-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 14px;
+  padding: 18px;
+}
+
+.rw-photo-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-decoration: none;
+  color: var(--text);
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 18px;
+  padding: 10px;
+  overflow: hidden;
+}
+
+.rw-photo-card img {
+  width: 100%;
+  height: 170px;
+  object-fit: cover;
+  border-radius: 14px;
+  background: #f4f7f3;
+}
+
+.rw-photo-card span {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text2);
+  word-break: break-word;
+}

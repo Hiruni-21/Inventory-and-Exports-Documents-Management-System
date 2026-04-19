@@ -34,6 +34,9 @@ import ReturnListPage from "./pages/ReturnListPage";
 import AddReturnPage from "./pages/AddReturnPage";
 import WastageListPage from "./pages/WastageListPage";
 import AddWastagePage from "./pages/AddWastagePage";
+import ReturnDetailsPage from "./pages/ReturnDetailsPage";
+import WastageDetailsPage from "./pages/WastageDetailsPage";
+
 
 import LocalCustomersPage from "./pages/LocalCustomersPage";
 import GlobalCustomersPage from "./pages/GlobalCustomersPage";
@@ -117,8 +120,10 @@ function App() {
 
         <Route path="/returns" element={<ReturnListPage />} />
         <Route path="/returns/add" element={<AddReturnPage />} />
+        <Route path="/returns/:id" element={<ReturnDetailsPage />} />
         <Route path="/wastage" element={<WastageListPage />} />
         <Route path="/wastage/add" element={<AddWastagePage />} />
+        <Route path="/wastage/:id" element={<WastageDetailsPage />} />
 
         <Route path="/customers/local" element={<LocalCustomersPage />} />
         <Route path="/customers/global" element={<GlobalCustomersPage />} />

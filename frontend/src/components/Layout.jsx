@@ -259,7 +259,6 @@ const pageMeta = {
   "/stock-count": { title: "Physical Stock Count", subtitle: "Count and reconcile warehouse stock" },
   "/packaging": { title: "Packaging Stock", subtitle: "Boxes, labels and packing materials" },
   "/purchase-orders": { title: "Purchase Orders", subtitle: "Procurement orders" },
-  "/purchase-orders/add": { title: "Purchase Orders", subtitle: "Create purchase order" },
   "/grn": { title: "Goods Receiving", subtitle: "Goods Received Notes" },
   "/grn/add": { title: "Goods Receiving", subtitle: "Create GRN" },
   "/returns": { title: "Returns & Wastage", subtitle: "Supplier and customer returns" },
@@ -284,11 +283,8 @@ const pageMeta = {
 
 const actionButtons = {
   "/grn": [],
-  "/returns": [
-    { label: "Record Return", to: "/returns/add", className: "btn btn-s btn-sm" },
-    { label: "Record Wastage", to: "/wastage/add", className: "btn btn-p btn-sm" },
-  ],
-  "/wastage": [{ label: "Record Wastage", to: "/wastage/add", className: "btn btn-p btn-sm" }],
+  "/returns": [],
+  "/wastage": [],
   "/dispatch/local": [],
   "/dispatch/global": [],
   "/export-documents": [],

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Search } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "../context/ToastContext";
 import api from "../utils/api";
@@ -559,16 +558,13 @@ export default function GlobalDispatchListPage() {
             + New Shipment
           </button>
 
-          <div className="dispatch-search-wrap">
-            <div className="dispatch-search-box">
-              <Search size={16} className="dispatch-search-icon" />
-              <input
-                className="dispatch-search-input"
-                placeholder="Search by dispatch no, customer, airline or status"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
+          <div className="sw">
+            <input
+              className="si"
+              placeholder="Search global shipments..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
         </div>
       </div>
@@ -586,14 +582,13 @@ export default function GlobalDispatchListPage() {
                 <th>WEIGHT</th>
                 <th>DOCS</th>
                 <th>STATUS</th>
-                <th>ACTIONS</th>
               </tr>
             </thead>
 
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="9">Loading...</td>
+                  <td colSpan="8">Loading...</td>
                 </tr>
               ) : filteredRows.length ? (
                 filteredRows.map((row) => {
@@ -628,27 +623,12 @@ export default function GlobalDispatchListPage() {
                       <td>
                         <span className={statusBadgeClass(label)}>{label}</span>
                       </td>
-                      <td>
-                        <div className="gd-actions" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            type="button"
-                            className={
-                              docsComplete
-                                ? "gd-action-btn gd-action-btn-secondary"
-                                : "gd-action-btn gd-action-btn-primary"
-                            }
-                            onClick={(e) => handleOpenDocs(row.id, e)}
-                          >
-                            {docsComplete ? "📄 View Docs" : "📄 Upload Docs"}
-                          </button>
-                        </div>
-                      </td>
                     </tr>
                   );
                 })
               ) : (
                 <tr>
-                  <td colSpan="9">No global shipments found</td>
+                  <td colSpan="8">No global shipments found</td>
                 </tr>
               )}
             </tbody>

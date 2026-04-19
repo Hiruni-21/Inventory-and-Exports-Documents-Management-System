@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useToast } from "../context/ToastContext";
 import api from "../utils/api";
@@ -6,42 +6,56 @@ import api from "../utils/api";
 const DOCS = [
   {
     key: "commercial_invoice_status",
+    fileKey: "commercial_invoice_file",
+    uploadKey: "commercial_invoice",
     label: "Commercial Invoice",
     issuedBy: "Fresh World Exporters",
     required: "Always",
   },
   {
     key: "packing_list_status",
+    fileKey: "packing_list_file",
+    uploadKey: "packing_list",
     label: "Packing List",
     issuedBy: "Fresh World Exporters",
     required: "Always",
   },
   {
     key: "phytosanitary_certificate_status",
+    fileKey: "phytosanitary_certificate_file",
+    uploadKey: "phytosanitary_certificate",
     label: "Phytosanitary Certificate",
     issuedBy: "Plant Quarantine Dept.",
     required: "Always",
   },
   {
     key: "airway_bill_status",
+    fileKey: "airway_bill_file",
+    uploadKey: "airway_bill",
     label: "Airway Bill (AWB)",
     issuedBy: "Airline (SriLankan / Maldivian)",
     required: "Always",
   },
   {
     key: "certificate_of_origin_status",
+    fileKey: "certificate_of_origin_file",
+    uploadKey: "certificate_of_origin",
     label: "Certificate of Origin",
     issuedBy: "Chamber of Commerce",
     required: "Always",
   },
   {
     key: "health_certificate_status",
+    fileKey: "health_certificate_file",
+    uploadKey: "health_certificate",
     label: "Health Certificate",
     issuedBy: "Ministry of Health",
     required: "Always",
   },
   {
     key: "insurance_certificate_status",
+    fileKey: "insurance_certificate_file",
+    uploadKey: "insurance_certificate",
     label: "Insurance Certificate",
     issuedBy: "Insurance Company",
     required: "CIF only",
@@ -57,8 +71,17 @@ const emptyForm = {
   certificate_of_origin_status: "pending",
   health_certificate_status: "pending",
   insurance_certificate_status: "pending",
+  commercial_invoice_file: "",
+  packing_list_file: "",
+  phytosanitary_certificate_file: "",
+  airway_bill_file: "",
+  certificate_of_origin_file: "",
+  health_certificate_file: "",
+  insurance_certificate_file: "",
   notes: "",
 };
+
+const BACKEND_BASE_URL = String(api.defaults.baseURL || "").replace(/\/api\/?$/, "");
 
 const statusBadge = (value) => {
   if (value === "done") return "badge bg-g";
@@ -182,9 +205,35 @@ const getDocNumberStyle = (doc, status, shipment) => {
   };
 };
 
+const mapRowToForm = (row) => ({
+  global_dispatch_id: String(row.global_dispatch_id || ""),
+  commercial_invoice_status: row.commercial_invoice_status || "pending",
+  packing_list_status: row.packing_list_status || "pending",
+  phytosanitary_certificate_status: row.phytosanitary_certificate_status || "pending",
+  airway_bill_status: row.airway_bill_status || "pending",
+  certificate_of_origin_status: row.certificate_of_origin_status || "pending",
+  health_certificate_status: row.health_certificate_status || "pending",
+  insurance_certificate_status: row.insurance_certificate_status || "pending",
+  commercial_invoice_file: row.commercial_invoice_file || "",
+  packing_list_file: row.packing_list_file || "",
+  phytosanitary_certificate_file: row.phytosanitary_certificate_file || "",
+  airway_bill_file: row.airway_bill_file || "",
+  certificate_of_origin_file: row.certificate_of_origin_file || "",
+  health_certificate_file: row.health_certificate_file || "",
+  insurance_certificate_file: row.insurance_certificate_file || "",
+  notes: row.notes || "",
+});
+
+const resolveFileUrl = (filePath) => {
+  if (!filePath) return "";
+  if (/^https?:\/\//i.test(filePath)) return filePath;
+  return `${BACKEND_BASE_URL}${filePath.startsWith("/") ? filePath : `/${filePath}`}`;
+};
+
 const ExportDocumentListPage = () => {
   const [searchParams] = useSearchParams();
   const toast = useToast();
+  const fileInputRef = useRef(null);
 
   const dispatchIdFromQuery = searchParams.get("dispatchId") || "";
 
@@ -194,6 +243,8 @@ const ExportDocumentListPage = () => {
 
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploadingKey, setUploadingKey] = useState("");
+  const [pendingUploadDoc, setPendingUploadDoc] = useState(null);
 
   const [form, setForm] = useState(emptyForm);
 
@@ -202,42 +253,40 @@ const ExportDocumentListPage = () => {
     [shipments, form.global_dispatch_id]
   );
 
-  const doneCount = useMemo(
-    () => getDoneCount(form, selectedShipment),
-    [form, selectedShipment]
-  );
+  const doneCount = useMemo(() => getDoneCount(form, selectedShipment), [form, selectedShipment]);
+  const requiredCount = useMemo(() => getRequiredCount(selectedShipment), [selectedShipment]);
 
-  const requiredCount = useMemo(
-    () => getRequiredCount(selectedShipment),
-    [selectedShipment]
-  );
+const loadPage = async () => {
+  setLoading(true);
 
-  const loadPage = async () => {
-    try {
-      setLoading(true);
+  try {
+    const [documentsResult, shipmentsResult] = await Promise.allSettled([
+      api.get("/export-docs"),
+      api.get("/export-docs/shipments"),
+    ]);
 
-      const [documentsRes, shipmentsRes] = await Promise.all([
-        api.get("/export-docs"),
-        api.get("/export-docs/shipments"),
-      ]);
-
-      const documentRows = Array.isArray(documentsRes.data) ? documentsRes.data : [];
-      const shipmentRows = Array.isArray(shipmentsRes.data) ? shipmentsRes.data : [];
-
-      setRows(documentRows);
-      setShipments(shipmentRows);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to load export documents");
+    if (documentsResult.status === "fulfilled") {
+      setRows(Array.isArray(documentsResult.value.data) ? documentsResult.value.data : []);
+    } else {
+      console.error("export docs load error:", documentsResult.reason);
       setRows([]);
-      setShipments([]);
-    } finally {
-      setLoading(false);
+      toast.error("Failed to load export documents");
     }
-  };
 
+    if (shipmentsResult.status === "fulfilled") {
+      setShipments(Array.isArray(shipmentsResult.value.data) ? shipmentsResult.value.data : []);
+    } else {
+      console.error("shipment list load error:", shipmentsResult.reason);
+      setShipments([]);
+      toast.error("Failed to load shipment list");
+    }
+  } finally {
+    setLoading(false);
+  }
+};
   useEffect(() => {
     loadPage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -261,17 +310,7 @@ const ExportDocumentListPage = () => {
     );
 
     if (existing) {
-      setForm({
-        global_dispatch_id: String(existing.global_dispatch_id),
-        commercial_invoice_status: existing.commercial_invoice_status || "pending",
-        packing_list_status: existing.packing_list_status || "pending",
-        phytosanitary_certificate_status: existing.phytosanitary_certificate_status || "pending",
-        airway_bill_status: existing.airway_bill_status || "pending",
-        certificate_of_origin_status: existing.certificate_of_origin_status || "pending",
-        health_certificate_status: existing.health_certificate_status || "pending",
-        insurance_certificate_status: existing.insurance_certificate_status || "pending",
-        notes: existing.notes || "",
-      });
+      setForm(mapRowToForm(existing));
       setShowModal(true);
     }
   }, [dispatchIdFromQuery, rows]);
@@ -287,40 +326,34 @@ const ExportDocumentListPage = () => {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [showModal]);
 
-  const openForRow = (row) => {
-    setForm({
-      global_dispatch_id: String(row.global_dispatch_id),
-      commercial_invoice_status: row.commercial_invoice_status || "pending",
-      packing_list_status: row.packing_list_status || "pending",
-      phytosanitary_certificate_status: row.phytosanitary_certificate_status || "pending",
-      airway_bill_status: row.airway_bill_status || "pending",
-      certificate_of_origin_status: row.certificate_of_origin_status || "pending",
-      health_certificate_status: row.health_certificate_status || "pending",
-      insurance_certificate_status: row.insurance_certificate_status || "pending",
-      notes: row.notes || "",
+  const mergeUpdatedDocumentRow = (updatedRow) => {
+    if (!updatedRow) return;
+
+    setRows((prev) => {
+      const found = prev.some((row) => row.id === updatedRow.id);
+      if (!found) return [updatedRow, ...prev];
+      return prev.map((row) => (row.id === updatedRow.id ? updatedRow : row));
     });
+
+    setForm(mapRowToForm(updatedRow));
+  };
+
+  const openForRow = (row) => {
+    setForm(mapRowToForm(row));
     setShowModal(true);
   };
 
   const closeModal = () => {
     setShowModal(false);
+    setPendingUploadDoc(null);
+    setUploadingKey("");
   };
 
   const handleShipmentChange = (value) => {
     const existing = rows.find((row) => String(row.global_dispatch_id) === String(value));
 
     if (existing) {
-      setForm({
-        global_dispatch_id: String(existing.global_dispatch_id),
-        commercial_invoice_status: existing.commercial_invoice_status || "pending",
-        packing_list_status: existing.packing_list_status || "pending",
-        phytosanitary_certificate_status: existing.phytosanitary_certificate_status || "pending",
-        airway_bill_status: existing.airway_bill_status || "pending",
-        certificate_of_origin_status: existing.certificate_of_origin_status || "pending",
-        health_certificate_status: existing.health_certificate_status || "pending",
-        insurance_certificate_status: existing.insurance_certificate_status || "pending",
-        notes: existing.notes || "",
-      });
+      setForm(mapRowToForm(existing));
     } else {
       setForm({
         ...emptyForm,
@@ -340,8 +373,61 @@ const ExportDocumentListPage = () => {
     }));
   };
 
-  const handleUploadPlaceholder = (docLabel) => {
-    toast.info(`${docLabel} upload UI is shown. File storage is not changed in this step.`);
+  const openUploadPicker = (doc) => {
+    if (!form.global_dispatch_id) {
+      toast.error("Please select a shipment first");
+      return;
+    }
+
+    setPendingUploadDoc(doc);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileSelected = async (e) => {
+    const file = e.target.files?.[0];
+
+    if (!file || !pendingUploadDoc || !form.global_dispatch_id) {
+      return;
+    }
+
+    const data = new FormData();
+    data.append("file", file);
+
+    try {
+      setUploadingKey(pendingUploadDoc.key);
+
+      const res = await api.post(
+        `/export-docs/by-dispatch/${form.global_dispatch_id}/upload/${pendingUploadDoc.uploadKey}`,
+        data,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      mergeUpdatedDocumentRow(res.data?.document);
+      toast.success(res.data?.message || `${pendingUploadDoc.label} uploaded successfully`);
+    } catch (err) {
+      console.error(err);
+      toast.error(err?.response?.data?.message || `Failed to upload ${pendingUploadDoc.label}`);
+    } finally {
+      setUploadingKey("");
+      setPendingUploadDoc(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleViewFile = (filePath) => {
+    const url = resolveFileUrl(filePath);
+    if (!url) {
+      toast.error("No uploaded file found for this document");
+      return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   const handleSave = async (e) => {
@@ -355,7 +441,19 @@ const ExportDocumentListPage = () => {
     try {
       setSaving(true);
 
-      const res = await api.put(`/export-docs/by-dispatch/${form.global_dispatch_id}`, form);
+      const payload = {
+        global_dispatch_id: form.global_dispatch_id,
+        commercial_invoice_status: form.commercial_invoice_status,
+        packing_list_status: form.packing_list_status,
+        phytosanitary_certificate_status: form.phytosanitary_certificate_status,
+        airway_bill_status: form.airway_bill_status,
+        certificate_of_origin_status: form.certificate_of_origin_status,
+        health_certificate_status: form.health_certificate_status,
+        insurance_certificate_status: form.insurance_certificate_status,
+        notes: form.notes,
+      };
+
+      const res = await api.put(`/export-docs/by-dispatch/${form.global_dispatch_id}`, payload);
 
       toast.success(res.data?.message || "Export document set updated");
       setShowModal(false);
@@ -370,31 +468,52 @@ const ExportDocumentListPage = () => {
 
   const noShipments = !loading && shipments.length === 0;
 
+  const openCreateModal = () => {
+  setForm({
+    ...emptyForm,
+    global_dispatch_id: dispatchIdFromQuery || "",
+  });
+  setShowModal(true);
+};
+
   return (
     <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,image/png,image/jpeg,image/webp"
+        style={{ display: "none" }}
+        onChange={handleFileSelected}
+      />
+
       <div className="ib ib-i">
         <span>📄</span>
         <div>
           All 7 documents must be verified before a shipment can be <strong>Cleared</strong> and
-          stock deducted. Use <strong>+ Create Document Set</strong> on this page to upload and confirm
+          stock deducted. Use <strong>+ Create Document Set</strong> above to upload and confirm
           documents per shipment.
         </div>
       </div>
 
-      <div className="page-toolbar" style={{ marginTop: 16 }}>
-        <div></div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <button
-            type="button"
-            className="btn btn-p btn-sm"
-            onClick={() => window.dispatchEvent(new Event("fw-open-export-docs-modal"))}
-          >
-            + Create Document Set
-          </button>
-        </div>
-      </div>
+      <div
+  style={{
+    display: "flex",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    marginTop: 14,
+    marginBottom: 16,
+  }}
+>
+  <button
+    type="button"
+    className="btn btn-p"
+    onClick={openCreateModal}
+  >
+    + Create Document Set
+  </button>
+</div>
 
-      <div className="content-card">
+      <div className="content-card" style={{ marginTop: 16 }}>
         <div className="card-header-row">
           <h3>Document Status by Shipment</h3>
         </div>
@@ -483,7 +602,7 @@ const ExportDocumentListPage = () => {
         </div>
       </div>
 
-      <div className="content-card">
+      <div className="content-card" style={{ marginTop: 16 }}>
         <div className="card-header-row" style={{ display: "block" }}>
           <h3>Export Document Reference</h3>
           <p style={{ color: "var(--text2)", marginTop: 4, fontSize: 13 }}>
@@ -545,7 +664,13 @@ const ExportDocumentListPage = () => {
           <div
             className="md md-lg"
             onClick={(e) => e.stopPropagation()}
-            style={{ width: "100%", maxWidth: 920, maxHeight: "92vh", display: "flex", flexDirection: "column" }}
+            style={{
+              width: "100%",
+              maxWidth: 920,
+              maxHeight: "92vh",
+              display: "flex",
+              flexDirection: "column",
+            }}
           >
             <div className="md-h">
               <h3>📄 Create / Update Export Document Set</h3>
@@ -598,7 +723,7 @@ const ExportDocumentListPage = () => {
                 </div>
 
                 <div className="fst" style={{ marginBottom: 11 }}>
-                  {requiredCount} Required Documents
+                  7 Required Documents
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
@@ -610,6 +735,8 @@ const ExportDocumentListPage = () => {
                     const status = insuranceOptional ? "pending" : form[doc.key];
                     const rowStyle = getDocRowStyle(doc, status, selectedShipment);
                     const numberStyle = getDocNumberStyle(doc, status, selectedShipment);
+                    const hasFile = !!form[doc.fileKey];
+                    const isUploading = uploadingKey === doc.key;
 
                     return (
                       <div
@@ -654,12 +781,26 @@ const ExportDocumentListPage = () => {
                           >
                             — {doc.issuedBy}
                           </span>
+                          {hasFile && (
+                            <div
+                              style={{
+                                marginTop: 4,
+                                fontSize: 10,
+                                color: "var(--s)",
+                                fontWeight: 700,
+                              }}
+                            >
+                              File uploaded
+                            </div>
+                          )}
                         </div>
 
                         <div className="tg" style={{ gap: 5, flexShrink: 0, minWidth: 146 }}>
                           <button
                             type="button"
-                            className={`to ${!insuranceOptional && form[doc.key] === "done" ? "on" : ""}`}
+                            className={`to ${
+                              !insuranceOptional && form[doc.key] === "done" ? "on" : ""
+                            }`}
                             style={{ padding: "3px 10px", fontSize: 10 }}
                             onClick={() => setDocStatus(doc.key, "done")}
                             disabled={insuranceOptional}
@@ -679,13 +820,26 @@ const ExportDocumentListPage = () => {
                           </button>
                         </div>
 
-                        <button
-                          type="button"
-                          className="btn btn-s btn-xs"
-                          onClick={() => handleUploadPlaceholder(doc.label)}
-                        >
-                          📎 Upload
-                        </button>
+                        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                          <button
+                            type="button"
+                            className="btn btn-s btn-xs"
+                            onClick={() => openUploadPicker(doc)}
+                            disabled={insuranceOptional || isUploading}
+                          >
+                            {isUploading ? "Uploading..." : "📎 Upload"}
+                          </button>
+
+                          {hasFile && (
+                            <button
+                              type="button"
+                              className="btn btn-s btn-xs"
+                              onClick={() => handleViewFile(form[doc.fileKey])}
+                            >
+                              👁 View
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
@@ -703,13 +857,7 @@ const ExportDocumentListPage = () => {
                     justifyContent: "space-between",
                   }}
                 >
-                  <span
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 600,
-                      color: "var(--g800)",
-                    }}
-                  >
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--g800)" }}>
                     Document Progress
                   </span>
 
