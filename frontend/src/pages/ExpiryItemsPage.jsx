@@ -374,12 +374,6 @@ const ExpiryItemsPage = () => {
             Safe
           </button>
         </div>
-
-        <div style={{ marginLeft: "auto" }}>
-          <button type="button" className="btn btn-s" onClick={() => navigate("/stock-adjustments")}>
-            Adjust Stock
-          </button>
-        </div>
       </div>
 
       <div className="tw">
