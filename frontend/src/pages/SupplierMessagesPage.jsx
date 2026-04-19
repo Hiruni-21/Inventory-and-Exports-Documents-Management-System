@@ -33,6 +33,13 @@ const closeBtnStyle = {
   fontSize: 24,
 };
 
+const greenBtnStyle = {
+  background: "var(--g700)",
+  border: "1px solid var(--g700)",
+  color: "var(--white)",
+  boxShadow: "none",
+};
+
 const formatDate = (value) => {
   if (!value) return "—";
   const date = new Date(value);
@@ -172,7 +179,8 @@ const SupplierMessagesPage = () => {
         <div />
         <button
           type="button"
-          className="btn btn-p btn-sm"
+          className="btn btn-sm"
+          style={greenBtnStyle}
           onClick={() => setOpenModal(true)}
         >
           + New Message
@@ -335,7 +343,8 @@ const SupplierMessagesPage = () => {
 
               <button
                 type="button"
-                className="btn btn-p btn-sm"
+                className="btn btn-sm"
+                style={greenBtnStyle}
                 onClick={handleSend}
                 disabled={saving}
               >
