@@ -80,9 +80,11 @@ const SupplierListPage = () => {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState(null);
+  const [editingSupplierId, setEditingSupplierId] = useState(null);
   const [selectedRowId, setSelectedRowId] = useState(null);
   const [showDetailsPanel, setShowDetailsPanel] = useState(false);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  
 
   const loadRows = async ({ focusId } = {}) => {
     try {
@@ -184,48 +186,53 @@ const SupplierListPage = () => {
     });
   }, [rows, search, cityFilter, quickFilter]);
 
-  const openAddModal = () => {
-    const previewCode = `FW-SUP-${String(rows.length + 1).padStart(3, "0")}`;
-    setModalMode("add");
-    setForm({ ...emptyForm, supplier_code: previewCode });
-    setShowModal(true);
-  };
+const openAddModal = () => {
+  const previewCode = `FW-SUP-${String(rows.length + 1).padStart(3, "0")}`;
+  setModalMode("add");
+  setEditingSupplierId(null);
+  setForm({ ...emptyForm, supplier_code: previewCode });
+  setShowModal(true);
+};
+const openEditModal = (supplier) => {
+  const supplierItemIds = Array.isArray(supplier.items)
+    ? supplier.items.map((item) => Number(item.item_id)).filter(Boolean)
+    : [];
 
-  const openEditModal = (supplier) => {
-    const supplierItemIds = Array.isArray(supplier.items)
-      ? supplier.items.map((item) => Number(item.item_id)).filter(Boolean)
-      : [];
+  setSelectedSupplier(supplier);
+  setEditingSupplierId(Number(supplier.id));
 
-    setModalMode("edit");
-    setForm({
-      supplier_code: supplier.supplier_code || "",
-      supplier_name: supplier.supplier_name || "",
-      contact_person: supplier.contact_person === "—" ? "" : supplier.contact_person || "",
-      contact_number: supplier.contact_number || "",
-      whatsapp_number: supplier.whatsapp_number || supplier.contact_number || "",
-      email: supplier.email || "",
-      address: supplier.address || "",
-      city: supplier.city === "—" ? "" : supplier.city || "",
-      payment_terms: supplier.payment_terms === "—" ? "Immediate cash on delivery" : supplier.payment_terms || "Immediate cash on delivery",
-      lead_time_days: supplier.lead_time_days ? String(supplier.lead_time_days) : "",
-      notes: supplier.notes || "",
-      organic_certified: !!supplier.organic_certified,
-      accepts_returns: !!supplier.accepts_returns,
-      portal_enabled: !!supplier.portal_enabled,
-      portal_email: supplier.portal_user_email || supplier.email || "",
-      portal_password: "",
-      item_ids: supplierItemIds,
-      status: supplier.status || "active",
-    });
-    setShowModal(true);
-  };
-
-  const closeModal = () => {
-    setShowModal(false);
-    setSaving(false);
-    setForm(emptyForm);
-  };
-
+  setModalMode("edit");
+  setForm({
+    supplier_code: supplier.supplier_code || "",
+    supplier_name: supplier.supplier_name || "",
+    contact_person: supplier.contact_person === "—" ? "" : supplier.contact_person || "",
+    contact_number: supplier.contact_number || "",
+    whatsapp_number: supplier.whatsapp_number || supplier.contact_number || "",
+    email: supplier.email || "",
+    address: supplier.address || "",
+    city: supplier.city === "—" ? "" : supplier.city || "",
+    payment_terms:
+      supplier.payment_terms === "—"
+        ? "Immediate cash on delivery"
+        : supplier.payment_terms || "Immediate cash on delivery",
+    lead_time_days: supplier.lead_time_days ? String(supplier.lead_time_days) : "",
+    notes: supplier.notes || "",
+    organic_certified: !!supplier.organic_certified,
+    accepts_returns: !!supplier.accepts_returns,
+    portal_enabled: !!supplier.portal_enabled,
+    portal_email: supplier.portal_user_email || supplier.email || "",
+    portal_password: "",
+    item_ids: supplierItemIds,
+    status: supplier.status || "active",
+  });
+  setShowModal(true);
+};
+const closeModal = () => {
+  setShowModal(false);
+  setSaving(false);
+  setEditingSupplierId(null);
+  setForm(emptyForm);
+};
   const closeDetailsPanel = () => {
     setShowDetailsPanel(false);
     setSelectedSupplier(null);
@@ -325,19 +332,25 @@ const SupplierListPage = () => {
     try {
       setSaving(true);
 
-      let savedId = null;
-      if (modalMode === "add") {
-        const res = await api.post("/suppliers", payload);
-        savedId = res.data?.supplierId;
-        toast.success("Supplier added successfully");
-      } else if (selectedSupplier?.id) {
-        const res = await api.put(`/suppliers/${selectedSupplier.id}`, payload);
-        savedId = res.data?.supplierId || selectedSupplier.id;
-        toast.success("Supplier updated successfully");
-      }
+let savedId = null;
 
-      closeModal();
-      await loadRows({ focusId: savedId || selectedSupplier?.id || null });
+if (modalMode === "add") {
+  const res = await api.post("/suppliers", payload);
+  savedId = res.data?.supplierId;
+  toast.success("Supplier added successfully");
+} else if (modalMode === "edit") {
+  if (!editingSupplierId) {
+    toast.error("Missing supplier id for update");
+    return;
+  }
+
+  const res = await api.put(`/suppliers/${editingSupplierId}`, payload);
+  savedId = res.data?.supplierId || editingSupplierId;
+  toast.success("Supplier updated successfully");
+}
+
+closeModal();
+await loadRows({ focusId: savedId || editingSupplierId || null });
     } catch (err) {
       console.error(err);
       toast.error(err?.response?.data?.message || "Failed to save supplier");
