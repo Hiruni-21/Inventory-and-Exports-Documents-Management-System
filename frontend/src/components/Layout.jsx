@@ -283,7 +283,6 @@ const pageMeta = {
 };
 
 const actionButtons = {
-  "/suppliers": [{ label: "+ Add Supplier", to: "/suppliers/add", className: "btn btn-p btn-sm" }],
   "/purchase-orders": [{ label: "+ Create PO", to: "/purchase-orders/add", className: "btn btn-p btn-sm" }],
   "/grn": [{ label: "+ New GRN", to: "/grn/add", className: "btn btn-p btn-sm" }],
   "/returns": [

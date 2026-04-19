@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { Leaf, Mail, MessageCircle, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import api from "../utils/api";
 import { useToast } from "../context/ToastContext";
@@ -435,7 +436,7 @@ const SupplierListPage = () => {
       <div className="notice-banner notice-success">
         <Leaf size={16} />
         <span>
-          Supplier master is now backend-connected. Add, edit, deactivate, and review supplier
+          Add, edit, deactivate, and review supplier
           procurement history from this page.
         </span>
       </div>
@@ -603,214 +604,216 @@ const SupplierListPage = () => {
         </div>
       </div>
 
-      {showDetailsPanel && selectedSupplier && (
-        <>
-          <div className="details-panel-overlay" onClick={closeDetailsPanel}></div>
+{showDetailsPanel &&
+  selectedSupplier &&
+  createPortal(
+    <>
+      <div className="details-panel-overlay" onClick={closeDetailsPanel}></div>
 
-          <div className={`details-panel ${showDetailsPanel ? "open" : ""}`}>
-            <div className="details-panel-header">
-              <div className="details-panel-icon">🌿</div>
+      <div className={`details-panel ${showDetailsPanel ? "open" : ""}`}>
+        <div className="details-panel-header">
+          <div className="details-panel-icon">🌿</div>
 
-              <div className="details-panel-head-text">
-                <h3>{selectedSupplier.supplier_name}</h3>
-                <p>
-                  {selectedSupplier.city} · {selectedSupplier.contact_person}
-                </p>
+          <div className="details-panel-head-text">
+            <h3>{selectedSupplier.supplier_name}</h3>
+            <p>
+              {selectedSupplier.city} · {selectedSupplier.contact_person}
+            </p>
+          </div>
+
+          <button type="button" className="details-panel-close" onClick={closeDetailsPanel}>
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="details-panel-body">
+          {loadingDetails ? (
+            <div className="empty-row" style={{ padding: 24 }}>
+              Loading supplier details...
+            </div>
+          ) : (
+            <>
+              <div className="details-panel-grid">
+                <div className="details-stat-card">
+                  <label>CODE</label>
+                  <span>{selectedSupplier.supplier_code}</span>
+                </div>
+                <div className="details-stat-card">
+                  <label>STATUS</label>
+                  <span className={selectedSupplier.status === "active" ? "yes-text" : "no-text"}>
+                    {statusLabel(selectedSupplier.status)}
+                  </span>
+                </div>
+                <div className="details-stat-card">
+                  <label>CONTACT PERSON</label>
+                  <span>{selectedSupplier.contact_person}</span>
+                </div>
+                <div className="details-stat-card">
+                  <label>MOBILE</label>
+                  <span>{selectedSupplier.contact_number || "—"}</span>
+                </div>
+                <div className="details-stat-card">
+                  <label>WHATSAPP</label>
+                  <span>{selectedSupplier.whatsapp_number || "—"}</span>
+                </div>
+                <div className="details-stat-card">
+                  <label>EMAIL</label>
+                  <span>{selectedSupplier.email || "—"}</span>
+                </div>
+                <div className="details-stat-card">
+                  <label>DISTRICT</label>
+                  <span>{selectedSupplier.city}</span>
+                </div>
+                <div className="details-stat-card">
+                  <label>PAYMENT TERMS</label>
+                  <span>{selectedSupplier.payment_terms}</span>
+                </div>
+                <div className="details-stat-card">
+                  <label>LEAD TIME</label>
+                  <span>{selectedSupplier.lead_time_days} days</span>
+                </div>
+                <div className="details-stat-card">
+                  <label>RETURNS</label>
+                  <span className={selectedSupplier.accepts_returns ? "yes-text" : "no-text"}>
+                    {selectedSupplier.accepts_returns ? "Accepted" : "Not accepted"}
+                  </span>
+                </div>
+                <div className="details-stat-card">
+                  <label>ORGANIC</label>
+                  <span className={selectedSupplier.organic_certified ? "yes-text" : "no-text"}>
+                    {selectedSupplier.organic_certified ? "Certified" : "No"}
+                  </span>
+                </div>
+                <div className="details-stat-card">
+                  <label>PORTAL</label>
+                  <span className={selectedSupplier.portal_enabled ? "yes-text" : "no-text"}>
+                    {selectedSupplier.portal_enabled ? "Enabled" : "Disabled"}
+                  </span>
+                </div>
+                <div className="details-stat-card details-stat-card-full">
+                  <label>ADDRESS</label>
+                  <span>{selectedSupplier.address || "—"}</span>
+                </div>
+                <div className="details-stat-card details-stat-card-full">
+                  <label>ITEMS SUPPLIED</label>
+                  <span>{selectedSupplier.item_names || "No linked items yet"}</span>
+                </div>
               </div>
 
-              <button type="button" className="details-panel-close" onClick={closeDetailsPanel}>
-                <X size={18} />
-              </button>
-            </div>
+              <div className="details-stat-card details-stat-card-full">
+                <label>NOTES</label>
+                <span>{selectedSupplier.notes || "—"}</span>
+              </div>
 
-            <div className="details-panel-body">
-              {loadingDetails ? (
-                <div className="empty-row" style={{ padding: 24 }}>
-                  Loading supplier details...
-                </div>
-              ) : (
-                <>
-                  <div className="details-panel-grid">
-                    <div className="details-stat-card">
-                      <label>CODE</label>
-                      <span>{selectedSupplier.supplier_code}</span>
-                    </div>
-                    <div className="details-stat-card">
-                      <label>STATUS</label>
-                      <span className={selectedSupplier.status === "active" ? "yes-text" : "no-text"}>
-                        {statusLabel(selectedSupplier.status)}
-                      </span>
-                    </div>
-                    <div className="details-stat-card">
-                      <label>CONTACT PERSON</label>
-                      <span>{selectedSupplier.contact_person}</span>
-                    </div>
-                    <div className="details-stat-card">
-                      <label>MOBILE</label>
-                      <span>{selectedSupplier.contact_number || "—"}</span>
-                    </div>
-                    <div className="details-stat-card">
-                      <label>WHATSAPP</label>
-                      <span>{selectedSupplier.whatsapp_number || "—"}</span>
-                    </div>
-                    <div className="details-stat-card">
-                      <label>EMAIL</label>
-                      <span>{selectedSupplier.email || "—"}</span>
-                    </div>
-                    <div className="details-stat-card">
-                      <label>DISTRICT</label>
-                      <span>{selectedSupplier.city}</span>
-                    </div>
-                    <div className="details-stat-card">
-                      <label>PAYMENT TERMS</label>
-                      <span>{selectedSupplier.payment_terms}</span>
-                    </div>
-                    <div className="details-stat-card">
-                      <label>LEAD TIME</label>
-                      <span>{selectedSupplier.lead_time_days} days</span>
-                    </div>
-                    <div className="details-stat-card">
-                      <label>RETURNS</label>
-                      <span className={selectedSupplier.accepts_returns ? "yes-text" : "no-text"}>
-                        {selectedSupplier.accepts_returns ? "Accepted" : "Not accepted"}
-                      </span>
-                    </div>
-                    <div className="details-stat-card">
-                      <label>ORGANIC</label>
-                      <span className={selectedSupplier.organic_certified ? "yes-text" : "no-text"}>
-                        {selectedSupplier.organic_certified ? "Certified" : "No"}
-                      </span>
-                    </div>
-                    <div className="details-stat-card">
-                      <label>PORTAL</label>
-                      <span className={selectedSupplier.portal_enabled ? "yes-text" : "no-text"}>
-                        {selectedSupplier.portal_enabled ? "Enabled" : "Disabled"}
-                      </span>
-                    </div>
-                    <div className="details-stat-card details-stat-card-full">
-                      <label>ADDRESS</label>
-                      <span>{selectedSupplier.address || "—"}</span>
-                    </div>
-                    <div className="details-stat-card details-stat-card-full">
-                      <label>ITEMS SUPPLIED</label>
-                      <span>{selectedSupplier.item_names || "No linked items yet"}</span>
-                    </div>
-                  </div>
-
-                  <div className="details-stat-card details-stat-card-full">
-                    <label>NOTES</label>
-                    <span>{selectedSupplier.notes || "—"}</span>
-                  </div>
-
-                  <div className="details-mini-title">RECENT PURCHASE ORDERS</div>
-                  <table className="details-mini-table">
-                    <thead>
-                      <tr>
-                        <th>PO</th>
-                        <th>DATE</th>
-                        <th>ITEMS</th>
-                        <th>VALUE</th>
-                        <th>STATUS</th>
+              <div className="details-mini-title">RECENT PURCHASE ORDERS</div>
+              <table className="details-mini-table">
+                <thead>
+                  <tr>
+                    <th>PO</th>
+                    <th>DATE</th>
+                    <th>ITEMS</th>
+                    <th>VALUE</th>
+                    <th>STATUS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedSupplier.purchase_orders?.length ? (
+                    selectedSupplier.purchase_orders.map((order) => (
+                      <tr key={order.id}>
+                        <td>{order.po_number}</td>
+                        <td>{formatDate(order.order_date)}</td>
+                        <td>{order.item_count}</td>
+                        <td>
+                          {Number(order.total_amount || 0).toLocaleString("en-LK", {
+                            style: "currency",
+                            currency: "LKR",
+                            minimumFractionDigits: 0,
+                          })}
+                        </td>
+                        <td>{String(order.status || "draft").replace(/_/g, " ")}</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {selectedSupplier.purchase_orders?.length ? (
-                        selectedSupplier.purchase_orders.map((order) => (
-                          <tr key={order.id}>
-                            <td>{order.po_number}</td>
-                            <td>{formatDate(order.order_date)}</td>
-                            <td>{order.item_count}</td>
-                            <td>
-                              {Number(order.total_amount || 0).toLocaleString("en-LK", {
-                                style: "currency",
-                                currency: "LKR",
-                                minimumFractionDigits: 0,
-                              })}
-                            </td>
-                            <td>{String(order.status || "draft").replace(/_/g, " ")}</td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan="5" className="empty-row">
-                            Purchase orders for this supplier will appear here.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="5" className="empty-row">
+                        Purchase orders for this supplier will appear here.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
 
-                  <div className="details-mini-title">RECENT RETURN NOTES</div>
-                  <table className="details-mini-table">
-                    <thead>
-                      <tr>
-                        <th>RETURN</th>
-                        <th>DATE</th>
-                        <th>ITEMS</th>
-                        <th>QTY</th>
-                        <th>DEDUCTED?</th>
+              <div className="details-mini-title">RECENT RETURN NOTES</div>
+              <table className="details-mini-table">
+                <thead>
+                  <tr>
+                    <th>RETURN</th>
+                    <th>DATE</th>
+                    <th>ITEMS</th>
+                    <th>QTY</th>
+                    <th>DEDUCTED?</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedSupplier.return_notes?.length ? (
+                    selectedSupplier.return_notes.map((returnNote) => (
+                      <tr key={returnNote.id}>
+                        <td>{returnNote.return_number}</td>
+                        <td>{formatDate(returnNote.return_date)}</td>
+                        <td>{returnNote.item_count}</td>
+                        <td>{Number(returnNote.total_qty || 0).toFixed(2)}</td>
+                        <td>{Number(returnNote.deducted_from_supplier_payment || 0) === 1 ? "Yes" : "No"}</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {selectedSupplier.return_notes?.length ? (
-                        selectedSupplier.return_notes.map((returnNote) => (
-                          <tr key={returnNote.id}>
-                            <td>{returnNote.return_number}</td>
-                            <td>{formatDate(returnNote.return_date)}</td>
-                            <td>{returnNote.item_count}</td>
-                            <td>{Number(returnNote.total_qty || 0).toFixed(2)}</td>
-                            <td>{Number(returnNote.deducted_from_supplier_payment || 0) === 1 ? "Yes" : "No"}</td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan="5" className="empty-row">
-                            Return history for this supplier will appear here.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </>
-              )}
-            </div>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="5" className="empty-row">
+                        Return history for this supplier will appear here.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </>
+          )}
+        </div>
 
-            <div className="details-panel-footer">
-              <button
-                type="button"
-                className="btn btn-primary details-panel-btn-main"
-                onClick={() => openEditModal(selectedSupplier)}
-              >
-                <Pencil size={16} /> Edit
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={(e) => openEmail(e, selectedSupplier)}
-              >
-                <Mail size={16} /> Email
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={(e) => openWhatsApp(e, selectedSupplier)}
-              >
-                <MessageCircle size={16} /> WhatsApp
-              </button>
-              <button
-                type="button"
-                className="btn btn-danger-outline details-panel-btn-delete"
-                onClick={handleDeleteSupplier}
-                title="Delete supplier"
-              >
-                <Trash2 size={16} />
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-
-      {showModal && (
+        <div className="details-panel-footer">
+          <button
+            type="button"
+            className="btn btn-primary details-panel-btn-main"
+            onClick={() => openEditModal(selectedSupplier)}
+          >
+            <Pencil size={16} /> Edit
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={(e) => openEmail(e, selectedSupplier)}
+          >
+            <Mail size={16} /> Email
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={(e) => openWhatsApp(e, selectedSupplier)}
+          >
+            <MessageCircle size={16} /> WhatsApp
+          </button>
+          <button
+            type="button"
+            className="btn btn-danger-outline details-panel-btn-delete"
+            onClick={handleDeleteSupplier}
+            title="Delete supplier"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      </div>
+    </>,
+    document.body
+  )}
+        {showModal && (
         <div className="modal-backdrop" onClick={closeModal}>
           <div className="modal-shell modal-lg customer-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
