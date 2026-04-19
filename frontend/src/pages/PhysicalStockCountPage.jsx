@@ -3,6 +3,8 @@ import api from "../utils/api";
 import { useToast } from "../context/ToastContext";
 
 const STORAGE_KEY = "fw_physical_stock_count_progress_v2";
+const PRIMARY_GREEN = "#166534";
+const PRIMARY_GREEN_HOVER = "#14532D";
 
 const formatQty = (value) => {
   const num = Number(value || 0);
@@ -67,13 +69,14 @@ const footerBtnPrimary = {
   height: "36px",
   padding: "0 18px",
   borderRadius: "10px",
-  border: "none",
-  background: "var(--g800)",
+  border: `1px solid ${PRIMARY_GREEN}`,
+  background: PRIMARY_GREEN,
   color: "var(--white)",
   fontFamily: "'Plus Jakarta Sans', sans-serif",
   fontSize: "12px",
   fontWeight: 700,
   cursor: "pointer",
+  boxShadow: "none",
 };
 
 const PhysicalStockCountPage = () => {
@@ -223,25 +226,25 @@ const PhysicalStockCountPage = () => {
   );
 
   const countedToday = useMemo(() => {
-  const today = new Date();
-  const yyyy = today.getFullYear();
-  const mm = String(today.getMonth() + 1).padStart(2, "0");
-  const dd = String(today.getDate()).padStart(2, "0");
-  const todayKey = `${yyyy}-${mm}-${dd}`;
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+    const todayKey = `${yyyy}-${mm}-${dd}`;
 
-  return stockCountRows.filter((row) => {
-    if (!row?.created_at) return false;
-    const created = new Date(row.created_at);
-    if (Number.isNaN(created.getTime())) return false;
+    return stockCountRows.filter((row) => {
+      if (!row?.created_at) return false;
+      const created = new Date(row.created_at);
+      if (Number.isNaN(created.getTime())) return false;
 
-    const cY = created.getFullYear();
-    const cM = String(created.getMonth() + 1).padStart(2, "0");
-    const cD = String(created.getDate()).padStart(2, "0");
-    const createdKey = `${cY}-${cM}-${cD}`;
+      const cY = created.getFullYear();
+      const cM = String(created.getMonth() + 1).padStart(2, "0");
+      const cD = String(created.getDate()).padStart(2, "0");
+      const createdKey = `${cY}-${cM}-${cD}`;
 
-    return createdKey === todayKey;
-  }).length;
-}, [stockCountRows]);
+      return createdKey === todayKey;
+    }).length;
+  }, [stockCountRows]);
 
   const handleActualChange = (progressKey, value) => {
     setProgress((prev) => ({
@@ -524,7 +527,19 @@ const PhysicalStockCountPage = () => {
             {savingProgress ? "Saving..." : "Save Progress"}
           </button>
 
-          <button type="button" style={footerBtnPrimary} onClick={handleFinishCount}>
+          <button
+            type="button"
+            style={footerBtnPrimary}
+            onClick={handleFinishCount}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = PRIMARY_GREEN_HOVER;
+              e.currentTarget.style.borderColor = PRIMARY_GREEN_HOVER;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = PRIMARY_GREEN;
+              e.currentTarget.style.borderColor = PRIMARY_GREEN;
+            }}
+          >
             {finishing ? "Finishing..." : "Finish Count"}
           </button>
         </div>

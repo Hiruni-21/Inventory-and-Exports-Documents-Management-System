@@ -72,12 +72,22 @@ const primaryGreenBtnBase = {
 };
 
 const lowStockActionBtnStyle = {
-  ...primaryGreenBtnBase,
+  border: "1px solid #166534",
+  background: "#FFFFFF",
+  color: "#166534",
+  fontFamily: "'Plus Jakarta Sans', sans-serif",
+  fontWeight: 800,
+  lineHeight: 1,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+  boxShadow: "none",
   height: "34px",
   padding: "0 16px",
   borderRadius: "14px",
   fontSize: "12px",
-  gap: "6px",
 };
 
 const modalOverlayStyle = {
@@ -600,31 +610,24 @@ const LowStockPage = () => {
                   </td>
 
                   <td>
-                <button
-                  type="button"
-                  onClick={() => handleCreatePO(row)}
-                  style={lowStockActionBtnStyle}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#14532D";
-                    e.currentTarget.style.borderColor = "#14532D";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "#166534";
-                    e.currentTarget.style.borderColor = "#166534";
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: "13px",
-                      fontWeight: 800,
-                      lineHeight: 1,
-                    }}
-                  >
-                    +
-                  </span>
-                  <span>{isSupervisor ? "Notify Kamal" : "Create PO"}</span>
-                </button>                  
-                </td>
+                    <button
+                      type="button"
+                      onClick={() => handleCreatePO(row)}
+                      style={lowStockActionBtnStyle}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "#F4FBF6";
+                        e.currentTarget.style.borderColor = "#14532D";
+                        e.currentTarget.style.color = "#14532D";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "#FFFFFF";
+                        e.currentTarget.style.borderColor = "#166534";
+                        e.currentTarget.style.color = "#166534";
+                      }}
+                    >
+                      {isSupervisor ? "Notify Kamal" : "Create PO"}
+                    </button>
+                  </td>
                 </tr>
               ))
             ) : (
@@ -1204,8 +1207,8 @@ const LowStockPage = () => {
                 }}
               >
                 Submit for Approval →
-              </button>            
-              </div>
+              </button>
+            </div>
           </div>
         </div>
       )}
