@@ -13,12 +13,24 @@ const overlayStyle = {
 };
 
 const modalStyle = {
-  width: "min(1100px, 92vw)",
+  width: "min(920px, 78vw)",
   background: "var(--white)",
   borderRadius: 18,
   border: "1px solid var(--border)",
   boxShadow: "0 26px 70px rgba(0,0,0,.16)",
   overflow: "hidden",
+};
+
+const closeBtnStyle = {
+  width: 46,
+  height: 46,
+  minWidth: 46,
+  padding: 0,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  lineHeight: 1,
+  fontSize: 24,
 };
 
 const formatDate = (value) => {
@@ -243,9 +255,9 @@ const SupplierMessagesPage = () => {
                 type="button"
                 className="btn btn-s btn-sm"
                 onClick={closeModal}
-                style={{ minWidth: 46, height: 46, padding: 0 }}
+                style={closeBtnStyle}
               >
-                ✕
+                ×
               </button>
             </div>
 
