@@ -19,6 +19,13 @@ const formatDate = (value) => {
   return date.toLocaleDateString("en-CA");
 };
 
+const formatMultiLineHtml = (value) =>
+  String(value || "")
+    .split("|")
+    .map((line) => escapeHtml(line.trim()))
+    .filter(Boolean)
+    .join("<br/>");
+
 function buildPurchaseOrderHtml({
   company = {},
   supplier = {},
@@ -35,9 +42,9 @@ function buildPurchaseOrderHtml({
           <td>${escapeHtml(item.item_code || "-")}</td>
           <td>${escapeHtml(item.item_name || "-")}</td>
           <td>${escapeHtml(item.unit || "-")}</td>
-          <td style="text-align:right;">${Number(item.ordered_qty || 0).toFixed(2)}</td>
-          <td style="text-align:right;">${formatMoney(item.unit_price || 0)}</td>
-          <td style="text-align:right;">${formatMoney(item.line_total || 0)}</td>
+          <td class="num">${Number(item.ordered_qty || 0).toFixed(2)}</td>
+          <td class="num">${formatMoney(item.unit_price || 0)}</td>
+          <td class="num">${formatMoney(item.line_total || 0)}</td>
         </tr>
       `
     )
@@ -59,7 +66,7 @@ function buildPurchaseOrderHtml({
 
       body {
         margin: 0;
-        padding: 28px;
+        padding: 24px;
         font-family: Arial, Helvetica, sans-serif;
         color: #1A2E22;
         background: #ffffff;
@@ -73,179 +80,215 @@ function buildPurchaseOrderHtml({
 
       .header {
         text-align: center;
-        margin-bottom: 22px;
+        margin-bottom: 18px;
       }
 
       .logo-wrap {
-        height: 72px;
+        height: 64px;
         display: flex;
         align-items: center;
         justify-content: center;
-        margin-bottom: 8px;
+        margin-bottom: 6px;
       }
 
       .logo {
-        max-height: 72px;
-        max-width: 220px;
+        max-height: 64px;
+        max-width: 210px;
         object-fit: contain;
       }
 
       .doc-title {
-        font-size: 28px;
-        font-weight: 700;
-        letter-spacing: 4px;
-        color: #0F3D24;
         margin: 0 0 10px;
+        font-size: 26px;
+        line-height: 1.1;
+        font-weight: 800;
+        letter-spacing: 5px;
+        color: #0F3D24;
       }
 
-      .company-line {
-        font-size: 13px;
-        color: #4A6858;
+      .company-name {
+        font-size: 11px;
+        color: #355a49;
         line-height: 1.5;
+        font-weight: 500;
       }
 
-      .info-box {
-        border: 1px solid #D8E8DF;
+      .company-address {
+        font-size: 11px;
+        color: #355a49;
+        line-height: 1.55;
+        margin-top: 2px;
+      }
+
+      .company-contact {
+        font-size: 11px;
+        color: #355a49;
+        line-height: 1.5;
+        margin-top: 4px;
+      }
+
+      .meta-cards {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+        margin-bottom: 16px;
+      }
+
+      .meta-card {
+        border: 1px solid #cfe2d7;
+        border-radius: 16px;
+        padding: 14px 16px;
+      }
+
+      .meta-big {
+        font-size: 15px;
+        line-height: 1.15;
+        font-weight: 800;
+        color: #0F3D24;
+        margin-bottom: 4px;
+      }
+
+      .meta-label {
+        font-size: 9px;
+        line-height: 1.2;
+        color: #5d7c6d;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+        .supplier-order-box {
+        background: #eaf8ef;
+        border: 1px solid #d8e8df;
+        border-radius: 0;
+        padding: 18px 22px;
+        margin-bottom: 18px;
+        }
+      .supplier-order-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 32px;
+      }
+
+      .detail-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      .detail-table td {
+        padding: 4px 0;
+        vertical-align: top;
+        font-size: 11px;
+        line-height: 1.45;
+        color: #1A2E22;
+      }
+
+        .detail-table td.label {
+        width: 140px;
+        font-weight: 700;
+        color: #1E7242;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        white-space: nowrap;
+        padding-right: 14px;
+        }
+      .detail-table td.value {
+        font-weight: 400;
+        color: #1A2E22;
+        word-break: break-word;
+      }
+
+      .po-section-title {
+        margin: 0 0 8px;
+        font-size: 10px;
+        font-weight: 700;
+        color: #5d7c6d;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      table.items-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 8px;
+      }
+
+      .items-table thead th {
+        background: #eaf8ef;
+        color: #1E7242;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding: 9px 8px;
+        border: 1px solid #d8e8df;
+        text-align: left;
+      }
+
+      .items-table tbody td {
+        padding: 9px 8px;
+        border: 1px solid #d8e8df;
+        font-size: 11px;
+        color: #1A2E22;
+        vertical-align: top;
+      }
+
+      .num {
+        text-align: right;
+      }
+
+      .totals-wrap {
+        width: 290px;
+        margin-left: auto;
+        margin-top: 14px;
+      }
+
+      .totals-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 8px 0;
+        border-bottom: 1px solid #d8e8df;
+        font-size: 12px;
+        color: #1A2E22;
+      }
+
+      .totals-grand {
+        font-size: 15px;
+        font-weight: 800;
+        color: #0F3D24;
+      }
+
+      .notes-box {
+        margin-top: 16px;
+        border: 1px solid #d8e8df;
         border-radius: 14px;
         overflow: hidden;
-        margin-bottom: 18px;
       }
 
-      .info-head {
-        background: #EAF8EF;
-        padding: 10px 14px;
-        font-size: 12px;
+      .notes-head {
+        background: #eaf8ef;
+        padding: 8px 14px;
+        font-size: 10px;
         font-weight: 700;
         color: #1E7242;
         text-transform: uppercase;
         letter-spacing: 0.08em;
       }
 
-      .info-body {
-        padding: 16px;
-      }
-
-      .grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 16px 24px;
-      }
-
-      .field {
-        min-height: 40px;
-      }
-
-      .label {
-        font-size: 11px;
-        font-weight: 700;
-        color: #4A6858;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        margin-bottom: 6px;
-      }
-
-      .value {
-        font-size: 14px;
-        color: #1A2E22;
-        line-height: 1.5;
-        word-break: break-word;
-      }
-
-      .po-meta {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 16px;
-        margin-bottom: 18px;
-      }
-
-      .po-meta-card {
-        border: 1px solid #D8E8DF;
-        border-radius: 14px;
-        padding: 16px;
-      }
-
-      .po-meta-card .big {
-        font-size: 22px;
-        font-weight: 800;
-        color: #0F3D24;
-        line-height: 1.1;
-      }
-
-      .po-meta-card .small {
-        margin-top: 6px;
-        font-size: 12px;
-        color: #4A6858;
-      }
-
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-
-      thead th {
-        background: #EAF8EF;
-        color: #1E7242;
-        font-size: 11px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        padding: 11px 10px;
-        border: 1px solid #D8E8DF;
-        text-align: left;
-      }
-
-      tbody td {
-        padding: 11px 10px;
-        border: 1px solid #D8E8DF;
-        font-size: 13px;
-        color: #1A2E22;
-        vertical-align: top;
-      }
-
-      .totals-wrap {
-        width: 320px;
-        margin-left: auto;
-        margin-top: 16px;
-      }
-
-      .totals-row {
-        display: flex;
-        justify-content: space-between;
-        gap: 16px;
-        padding: 10px 0;
-        border-bottom: 1px solid #D8E8DF;
-        font-size: 14px;
-      }
-
-      .totals-row strong {
-        color: #0F3D24;
-      }
-
-      .totals-grand {
-        font-size: 18px;
-        font-weight: 800;
-      }
-
-      .notes-box {
-        margin-top: 18px;
-        border: 1px solid #D8E8DF;
-        border-radius: 14px;
-        overflow: hidden;
-      }
-
       .notes-body {
-        padding: 14px 16px;
-        font-size: 13px;
+        padding: 12px 14px;
+        font-size: 11px;
+        line-height: 1.55;
         color: #1A2E22;
-        line-height: 1.6;
         white-space: pre-wrap;
       }
 
       .footer {
-        margin-top: 26px;
-        font-size: 12px;
-        color: #4A6858;
-        line-height: 1.6;
+        margin-top: 18px;
+        font-size: 10px;
+        color: #5d7c6d;
+        line-height: 1.5;
       }
     </style>
   </head>
@@ -256,88 +299,107 @@ function buildPurchaseOrderHtml({
           ${logoUrl ? `<img src="${logoUrl}" alt="Company Logo" class="logo" />` : ""}
         </div>
         <h1 class="doc-title">PURCHASE ORDER</h1>
-        <div class="company-line">${escapeHtml(company.name || "Fresh World Exporters Pvt Ltd")}</div>
-        <div class="company-line">${escapeHtml(company.address || "Manning Market, Colombo, Sri Lanka")}</div>
-        <div class="company-line">${escapeHtml(company.email || "")}${company.phone ? ` · ${escapeHtml(company.phone)}` : ""}</div>
-      </div>
-
-      <div class="po-meta">
-        <div class="po-meta-card">
-          <div class="big">${escapeHtml(po.po_number || "-")}</div>
-          <div class="small">PO Number</div>
-        </div>
-        <div class="po-meta-card">
-          <div class="big">${formatDate(po.order_date)}</div>
-          <div class="small">Order Date</div>
+        <div class="company-name">${escapeHtml(company.name || "Fresh World Export (Pvt) Ltd")}</div>
+        <div class="company-address">${formatMultiLineHtml(company.address || "")}</div>
+        <div class="company-contact">
+          ${escapeHtml(company.email || "")}${company.phone ? ` · ${escapeHtml(company.phone)}` : ""}
         </div>
       </div>
 
-      <div class="info-box">
-        <div class="info-head">Supplier & Order Details</div>
-        <div class="info-body">
-          <div class="grid">
-            <div class="field">
-              <div class="label">Supplier Name</div>
-              <div class="value">${escapeHtml(supplier.supplier_name || "-")}</div>
-            </div>
-            <div class="field">
-              <div class="label">Required By</div>
-              <div class="value">${formatDate(po.expected_date)}</div>
-            </div>
+      <div class="meta-cards">
+        <div class="meta-card">
+          <div class="meta-big">${escapeHtml(po.po_number || "-")}</div>
+          <div class="meta-label">PO Number</div>
+        </div>
+        <div class="meta-card">
+          <div class="meta-big">${formatDate(po.order_date)}</div>
+          <div class="meta-label">PO Date</div>
+        </div>
+      </div>
 
-            <div class="field">
-              <div class="label">Contact Person</div>
-              <div class="value">${escapeHtml(supplier.contact_person || "-")}</div>
-            </div>
-            <div class="field">
-              <div class="label">Payment Terms</div>
-              <div class="value">${escapeHtml(po.payment_terms || "-")}</div>
-            </div>
+      <div class="supplier-order-box">
+        <div class="supplier-order-grid">
+          <div>
+            <table class="detail-table">
+              <tr>
+                <td class="label">Supplier Name:</td>
+                <td class="value">${escapeHtml(supplier.supplier_name || "-")}</td>
+              </tr>
+              <tr>
+                <td class="label">Address:</td>
+                <td class="value">${escapeHtml(supplier.address || "-")}</td>
+              </tr>
+              <tr>
+                <td class="label">District:</td>
+                <td class="value">${escapeHtml(supplier.city || "-")}</td>
+              </tr>
+              <tr>
+                <td class="label">Contact:</td>
+                <td class="value">${escapeHtml(supplier.contact_number || "-")}</td>
+              </tr>
+              <tr>
+                <td class="label">WhatsApp:</td>
+                <td class="value">${escapeHtml(supplier.whatsapp_number || "-")}</td>
+              </tr>
+              <tr>
+                <td class="label">Email:</td>
+                <td class="value">${escapeHtml(supplier.email || "-")}</td>
+              </tr>
+            </table>
+          </div>
 
-            <div class="field">
-              <div class="label">Mobile</div>
-              <div class="value">${escapeHtml(supplier.contact_number || "-")}</div>
-            </div>
-            <div class="field">
-              <div class="label">WhatsApp</div>
-              <div class="value">${escapeHtml(supplier.whatsapp_number || "-")}</div>
-            </div>
-
-            <div class="field">
-              <div class="label">Email</div>
-              <div class="value">${escapeHtml(supplier.email || "-")}</div>
-            </div>
-            <div class="field">
-              <div class="label">District</div>
-              <div class="value">${escapeHtml(supplier.city || "-")}</div>
-            </div>
-
-            <div class="field" style="grid-column: 1 / -1;">
-              <div class="label">Address</div>
-              <div class="value">${escapeHtml(supplier.address || "-")}</div>
-            </div>
+          <div>
+            <table class="detail-table">
+              <tr>
+                <td class="label">Supplier Code:</td>
+                <td class="value">${escapeHtml(supplier.supplier_code || "-")}</td>
+              </tr>
+              <tr>
+                <td class="label">PO No:</td>
+                <td class="value">${escapeHtml(po.po_number || "-")}</td>
+              </tr>
+              <tr>
+                <td class="label">PO Date:</td>
+                <td class="value">${formatDate(po.order_date)}</td>
+              </tr>
+              <tr>
+                <td class="label">Required By:</td>
+                <td class="value">${formatDate(po.expected_date)}</td>
+              </tr>
+              <tr>
+                <td class="label">Payment Terms:</td>
+                <td class="value">${escapeHtml(po.payment_terms || "-")}</td>
+              </tr>
+              <tr>
+                <td class="label">Contact Person:</td>
+                <td class="value">${escapeHtml(supplier.contact_person || "-")}</td>
+              </tr>
+            </table>
           </div>
         </div>
       </div>
 
-      <table>
+      <table class="items-table">
         <thead>
           <tr>
-            <th style="width: 48px;">#</th>
-            <th style="width: 120px;">Item Code</th>
+            <th style="width: 42px;">#</th>
+            <th style="width: 100px;">Item Code</th>
             <th>Item Name</th>
-            <th style="width: 90px;">Unit</th>
-            <th style="width: 100px; text-align:right;">Qty</th>
-            <th style="width: 120px; text-align:right;">Rate (LKR)</th>
-            <th style="width: 130px; text-align:right;">Amount (LKR)</th>
+            <th style="width: 72px;">Unit</th>
+            <th style="width: 84px;" class="num">Qty</th>
+            <th style="width: 110px;" class="num">Rate (LKR)</th>
+            <th style="width: 118px;" class="num">Amount (LKR)</th>
           </tr>
         </thead>
         <tbody>
-          ${rowsHtml || `
+          ${
+            rowsHtml ||
+            `
             <tr>
-              <td colspan="7" style="text-align:center; color:#4A6858;">No items found</td>
+              <td colspan="7" style="text-align:center; color:#5d7c6d;">No items found</td>
             </tr>
-          `}
+          `
+          }
         </tbody>
       </table>
 
@@ -347,13 +409,13 @@ function buildPurchaseOrderHtml({
           <span>LKR ${formatMoney(subtotal)}</span>
         </div>
         <div class="totals-row totals-grand">
-          <strong>Total</strong>
-          <strong>LKR ${formatMoney(total)}</strong>
+          <span>Total</span>
+          <span>LKR ${formatMoney(total)}</span>
         </div>
       </div>
 
       <div class="notes-box">
-        <div class="info-head">Notes</div>
+        <div class="notes-head">Notes</div>
         <div class="notes-body">${escapeHtml(po.notes || "-")}</div>
       </div>
 

@@ -261,10 +261,6 @@ export default function PurchaseOrderListPage() {
       </div>
 
       <div className="content-card">
-        <div className="card-header-row">
-          <h3>📋 Purchase Orders</h3>
-          <span className="count-pill">{filtered.length} orders</span>
-        </div>
 
         <div className="table-wrap">
           <table className="data-table">
