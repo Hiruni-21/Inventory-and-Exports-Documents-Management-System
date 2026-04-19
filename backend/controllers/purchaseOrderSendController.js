@@ -219,26 +219,30 @@ const sendEmailInternal = async (req, purchaseOrderId) => {
   const bundle = await ensurePdfForPo(purchaseOrderId);
   const { po, supplier, pdfInfo } = bundle;
 
-  if (!supplier.email) {
-    const error = new Error("Supplier email is missing");
-    error.statusCode = 400;
-    throw error;
-  }
+const recipientEmail = String(
+  process.env.TEST_EMAIL_OVERRIDE || supplier.email || ""
+).trim();
 
-  const subject = `Purchase Order ${po.po_number}`;
-  const html = buildPurchaseOrderEmailHtml({
-    supplierName: supplier.supplier_name,
-    poNumber: po.po_number,
-    requiredBy: formatDate(po.expected_date),
-  });
+if (!recipientEmail) {
+  const error = new Error("Supplier email is missing");
+  error.statusCode = 400;
+  throw error;
+}
 
-  const info = await sendPurchaseOrderEmail({
-    to: supplier.email,
-    subject,
-    html,
-    pdfPath: pdfInfo.absPath,
-    pdfFileName: pdfInfo.fileName,
-  });
+const subject = `Purchase Order ${po.po_number}`;
+const html = buildPurchaseOrderEmailHtml({
+  supplierName: supplier.supplier_name,
+  poNumber: po.po_number,
+  requiredBy: formatDate(po.expected_date),
+});
+
+const info = await sendPurchaseOrderEmail({
+  to: recipientEmail,
+  subject,
+  html,
+  pdfPath: pdfInfo.absPath,
+  pdfFileName: pdfInfo.fileName,
+});
 
   await logPurchaseOrderCommunication({
     purchaseOrderId: po.id,
