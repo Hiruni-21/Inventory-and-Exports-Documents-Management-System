@@ -22,6 +22,18 @@ const modalStyle = {
   boxShadow: "0 26px 70px rgba(0,0,0,.16)",
 };
 
+const closeBtnStyle = {
+  width: 46,
+  height: 46,
+  minWidth: 46,
+  padding: 0,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  lineHeight: 1,
+  fontSize: 24,
+};
+
 const formatDate = (value) => {
   if (!value) return "—";
   const date = new Date(value);
@@ -44,7 +56,12 @@ const getListStatus = (row) => {
   const supplierStatus = normalizeStatus(row.supplier_response_status);
 
   if (supplierStatus === "accepted") {
-    if (poStatus === "grn_created" || poStatus === "closed" || poStatus === "completed" || poStatus === "delivered") {
+    if (
+      poStatus === "grn_created" ||
+      poStatus === "closed" ||
+      poStatus === "completed" ||
+      poStatus === "delivered"
+    ) {
       return { text: "Delivered & Closed", cls: "bg-g" };
     }
     return { text: "Accepted", cls: "bg-g" };
@@ -54,7 +71,12 @@ const getListStatus = (row) => {
     return { text: "Rejected", cls: "bg-r" };
   }
 
-  if (poStatus === "grn_created" || poStatus === "closed" || poStatus === "completed" || poStatus === "delivered") {
+  if (
+    poStatus === "grn_created" ||
+    poStatus === "closed" ||
+    poStatus === "completed" ||
+    poStatus === "delivered"
+  ) {
     return { text: "Delivered & Closed", cls: "bg-g" };
   }
 
@@ -66,7 +88,9 @@ const poStatusText = (value) => {
   if (s === "draft" || s === "pending_approval") return "Awaiting Approval";
   if (s === "approved") return "Approved";
   if (s === "sent") return "Sent";
-  if (s === "grn_created" || s === "closed" || s === "completed" || s === "delivered") return "Delivered & Closed";
+  if (s === "grn_created" || s === "closed" || s === "completed" || s === "delivered") {
+    return "Delivered & Closed";
+  }
   return value || "—";
 };
 
@@ -85,15 +109,13 @@ const responseClass = (value) => {
 };
 
 const parseItemPreview = (value) => {
-  const parts = String(value || "")
+  return String(value || "")
     .split("~~~")
     .filter(Boolean)
     .map((entry) => {
       const [name, qty, unit] = entry.split("||");
       return { name, qty, unit };
     });
-
-  return parts;
 };
 
 const SupplierOrdersPage = () => {
@@ -131,7 +153,9 @@ const SupplierOrdersPage = () => {
       if (s === "draft" || s === "pending_approval") next.awaiting += 1;
       else if (s === "approved") next.approved += 1;
       else if (s === "sent") next.sent += 1;
-      else if (s === "grn_created" || s === "closed" || s === "completed" || s === "delivered") next.closed += 1;
+      else if (s === "grn_created" || s === "closed" || s === "completed" || s === "delivered") {
+        next.closed += 1;
+      }
     });
 
     return next;
@@ -140,6 +164,7 @@ const SupplierOrdersPage = () => {
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
       const s = normalizeStatus(row.status);
+
       if (activeTab === "all") return true;
       if (activeTab === "awaiting") return s === "draft" || s === "pending_approval";
       if (activeTab === "approved") return s === "approved";
@@ -205,7 +230,10 @@ const SupplierOrdersPage = () => {
 
       setMessage({
         type: "success",
-        text: responseStatus === "accepted" ? "Purchase order accepted successfully" : "Purchase order rejected successfully",
+        text:
+          responseStatus === "accepted"
+            ? "Purchase order accepted successfully"
+            : "Purchase order rejected successfully",
       });
     } catch (err) {
       setMessage({
@@ -257,11 +285,7 @@ const SupplierOrdersPage = () => {
                 const status = getListStatus(row);
 
                 return (
-                  <tr
-                    key={row.id}
-                    style={{ cursor: "pointer" }}
-                    onClick={() => openOrder(row.id)}
-                  >
+                  <tr key={row.id} style={{ cursor: "pointer" }} onClick={() => openOrder(row.id)}>
                     <td style={{ fontWeight: 800, color: "var(--text)" }}>{row.po_number}</td>
                     <td>{formatDate(row.order_date || row.created_at)}</td>
                     <td style={{ color: status.text === "Action Required" ? "var(--d)" : "var(--text)" }}>
@@ -316,13 +340,8 @@ const SupplierOrdersPage = () => {
                 {selectedOrder?.po_number || "Purchase Order"} — Purchase Order
               </div>
 
-              <button
-                type="button"
-                className="btn btn-s btn-sm"
-                onClick={closeOrder}
-                style={{ minWidth: 46, height: 46, padding: 0 }}
-              >
-                ✕
+              <button type="button" className="btn btn-s btn-sm" onClick={closeOrder} style={closeBtnStyle}>
+                ×
               </button>
             </div>
 
@@ -352,14 +371,21 @@ const SupplierOrdersPage = () => {
                         borderBottom: "1px solid var(--border)",
                       }}
                     >
-                      <div style={{ fontSize: 12, letterSpacing: ".18em", color: "var(--text3)", textTransform: "uppercase" }}>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          letterSpacing: ".18em",
+                          color: "var(--text3)",
+                          textTransform: "uppercase",
+                        }}
+                      >
                         Purchase Order
                       </div>
                       <div style={{ fontSize: 24, fontWeight: 800, color: "var(--text)", marginTop: 6 }}>
-                        Fresh World Exporters Pvt Ltd
+                        Fresh World Export (Pvt) Ltd
                       </div>
                       <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 4 }}>
-                        Manning Market, Colombo 10, Sri Lanka
+                        No 101/2 Malapalla, Pannipitiya, Sri Lanka
                       </div>
                     </div>
 
@@ -371,28 +397,67 @@ const SupplierOrdersPage = () => {
                       }}
                     >
                       <div style={{ padding: 24, borderRight: "1px solid var(--border)" }}>
-                        <div style={{ fontSize: 12, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--text3)", marginBottom: 12 }}>
+                        <div
+                          style={{
+                            fontSize: 12,
+                            letterSpacing: ".12em",
+                            textTransform: "uppercase",
+                            color: "var(--text3)",
+                            marginBottom: 12,
+                          }}
+                        >
                           Supplier Details
                         </div>
                         <div style={{ lineHeight: 1.7 }}>
-                          <div><strong>Name:</strong> {selectedOrder?.supplier_name || "—"}</div>
-                          <div><strong>Address:</strong> {selectedOrder?.address || "—"}</div>
-                          <div><strong>Contact:</strong> {selectedOrder?.contact_number || "—"}</div>
-                          <div><strong>Email:</strong> {selectedOrder?.email || "—"}</div>
+                          <div>
+                            <strong>Name:</strong> {selectedOrder?.supplier_name || "—"}
+                          </div>
+                          <div>
+                            <strong>Address:</strong> {selectedOrder?.address || "—"}
+                          </div>
+                          <div>
+                            <strong>Contact:</strong> {selectedOrder?.contact_number || "—"}
+                          </div>
+                          <div>
+                            <strong>Email:</strong> {selectedOrder?.email || "—"}
+                          </div>
                         </div>
                       </div>
 
                       <div style={{ padding: 24 }}>
-                        <div style={{ fontSize: 12, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--text3)", marginBottom: 12 }}>
+                        <div
+                          style={{
+                            fontSize: 12,
+                            letterSpacing: ".12em",
+                            textTransform: "uppercase",
+                            color: "var(--text3)",
+                            marginBottom: 12,
+                          }}
+                        >
                           Order Details
                         </div>
                         <div style={{ lineHeight: 1.7 }}>
-                          <div><strong>PO No:</strong> {selectedOrder?.po_number || "—"}</div>
-                          <div><strong>PO Date:</strong> {formatDate(selectedOrder?.order_date || selectedOrder?.created_at)}</div>
-                          <div><strong>Required By:</strong> {formatDate(selectedOrder?.required_date)}</div>
-                          <div><strong>Payment Terms:</strong> {selectedOrder?.payment_terms || "—"}</div>
-                          <div><strong>Status:</strong> <span className={`badge ${responseClass(selectedOrder?.supplier_response_status)}`}>{responseText(selectedOrder?.supplier_response_status)}</span></div>
-                          <div><strong>PO Status:</strong> {poStatusText(selectedOrder?.status)}</div>
+                          <div>
+                            <strong>PO No:</strong> {selectedOrder?.po_number || "—"}
+                          </div>
+                          <div>
+                            <strong>PO Date:</strong> {formatDate(selectedOrder?.order_date || selectedOrder?.created_at)}
+                          </div>
+                          <div>
+                            <strong>Required By:</strong> {formatDate(selectedOrder?.required_date)}
+                          </div>
+                          <div>
+                            <strong>Payment Terms:</strong> {selectedOrder?.payment_terms || "—"}
+                          </div>
+                          <div>
+                            <strong>Status:</strong>{" "}
+                            <span className={`badge ${responseClass(selectedOrder?.supplier_response_status)}`}>
+                              {responseText(selectedOrder?.supplier_response_status)}
+                            </span>
+                          </div>
+                          <div>
+                            <strong>PO Status:</strong> {poStatusText(selectedOrder?.status)}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -432,16 +497,30 @@ const SupplierOrdersPage = () => {
                     </table>
 
                     <div style={{ padding: 24, borderTop: "1px solid var(--border)" }}>
-                      <div style={{ fontSize: 12, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--text3)", marginBottom: 10 }}>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          letterSpacing: ".12em",
+                          textTransform: "uppercase",
+                          color: "var(--text3)",
+                          marginBottom: 10,
+                        }}
+                      >
                         Instructions from Fresh World
                       </div>
-                      <div style={{ color: "var(--text2)" }}>
-                        {selectedOrder?.notes || "No instructions available"}
-                      </div>
+                      <div style={{ color: "var(--text2)" }}>{selectedOrder?.notes || "No instructions available"}</div>
                     </div>
 
                     <div style={{ padding: 24, borderTop: "1px solid var(--border)" }}>
-                      <div style={{ fontSize: 12, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--text3)", marginBottom: 10 }}>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          letterSpacing: ".12em",
+                          textTransform: "uppercase",
+                          color: "var(--text3)",
+                          marginBottom: 10,
+                        }}
+                      >
                         Terms & Conditions
                       </div>
                       <ol style={{ margin: 0, paddingLeft: 20, lineHeight: 1.8, color: "var(--text2)" }}>
@@ -450,51 +529,6 @@ const SupplierOrdersPage = () => {
                         <li>Delivery must be completed within the required-by date.</li>
                         <li>Packing and delivery costs are borne by the supplier.</li>
                       </ol>
-                    </div>
-                  </div>
-
-                  <div
-                    style={{
-                      border: "1px solid var(--border)",
-                      borderRadius: 14,
-                      padding: 24,
-                    }}
-                  >
-                    <div style={{ fontSize: 12, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--text3)", marginBottom: 16 }}>
-                      Your Response
-                    </div>
-
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
-                      <button
-                        type="button"
-                        className="btn btn-p btn-sm"
-                        onClick={() => handleRespond("accepted")}
-                        disabled={saving}
-                        style={{ width: "100%" }}
-                      >
-                        {saving ? "Saving..." : "Accept PO"}
-                      </button>
-
-                      <button
-                        type="button"
-                        className="btn btn-s btn-sm"
-                        onClick={() => handleRespond("rejected")}
-                        disabled={saving}
-                        style={{ width: "100%", color: "var(--d)", borderColor: "rgba(200,75,47,.28)" }}
-                      >
-                        {saving ? "Saving..." : "Reject PO"}
-                      </button>
-                    </div>
-
-                    <div className="ff">
-                      <label className="fl">Special Note (Optional)</label>
-                      <textarea
-                        className="fc"
-                        rows="4"
-                        value={note}
-                        onChange={(e) => setNote(e.target.value)}
-                        placeholder="Add any notes, partial delivery info, or delivery date confirmation..."
-                      />
                     </div>
                   </div>
                 </div>

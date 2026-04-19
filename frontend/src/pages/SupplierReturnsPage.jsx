@@ -22,6 +22,32 @@ const modalStyle = {
   boxShadow: "0 26px 70px rgba(0,0,0,.16)",
 };
 
+const closeBtnStyle = {
+  width: 46,
+  height: 46,
+  minWidth: 46,
+  padding: 0,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  lineHeight: 1,
+  fontSize: 24,
+};
+
+const acknowledgeBtnStyle = {
+  width: "100%",
+  background: "var(--white)",
+  color: "var(--g700)",
+  border: "1px solid rgba(39,143,85,.45)",
+  boxShadow: "none",
+};
+
+const disputeBtnStyle = {
+  width: "100%",
+  color: "var(--d)",
+  borderColor: "rgba(200,75,47,.28)",
+};
+
 const formatDate = (value) => {
   if (!value) return "—";
   const date = new Date(value);
@@ -160,11 +186,7 @@ const SupplierReturnsPage = () => {
               preparedRows.map((row) => {
                 const status = returnStatus(row.supplier_response_status);
                 return (
-                  <tr
-                    key={row.id}
-                    style={{ cursor: "pointer" }}
-                    onClick={() => openReturn(row.id)}
-                  >
+                  <tr key={row.id} style={{ cursor: "pointer" }} onClick={() => openReturn(row.id)}>
                     <td style={{ fontWeight: 800, color: "var(--d)" }}>{row.return_number}</td>
                     <td>{row.linked_po_number || "—"}</td>
                     <td>{formatDate(row.created_at)}</td>
@@ -203,13 +225,8 @@ const SupplierReturnsPage = () => {
                 {selectedReturn?.return_number || "Return Note"} — Return Note
               </div>
 
-              <button
-                type="button"
-                className="btn btn-s btn-sm"
-                onClick={closeReturn}
-                style={{ minWidth: 46, height: 46, padding: 0 }}
-              >
-                ✕
+              <button type="button" className="btn btn-s btn-sm" onClick={closeReturn} style={closeBtnStyle}>
+                ×
               </button>
             </div>
 
@@ -255,22 +272,49 @@ const SupplierReturnsPage = () => {
                       }}
                     >
                       <div style={{ padding: 24 }}>
-                        <div style={{ fontSize: 12, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--text3)", marginBottom: 12 }}>
+                        <div
+                          style={{
+                            fontSize: 12,
+                            letterSpacing: ".12em",
+                            textTransform: "uppercase",
+                            color: "var(--text3)",
+                            marginBottom: 12,
+                          }}
+                        >
                           Return Note
                         </div>
                         <div style={{ lineHeight: 1.8 }}>
-                          <div><strong>{selectedReturn?.return_number || "—"}</strong></div>
-                          <div><strong>Linked PO:</strong> {selectedReturn?.linked_po_number || "—"}</div>
+                          <div>
+                            <strong>{selectedReturn?.return_number || "—"}</strong>
+                          </div>
+                          <div>
+                            <strong>Linked PO:</strong> {selectedReturn?.linked_po_number || "—"}
+                          </div>
                         </div>
                       </div>
 
                       <div style={{ padding: 24 }}>
-                        <div style={{ fontSize: 12, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--text3)", marginBottom: 12 }}>
+                        <div
+                          style={{
+                            fontSize: 12,
+                            letterSpacing: ".12em",
+                            textTransform: "uppercase",
+                            color: "var(--text3)",
+                            marginBottom: 12,
+                          }}
+                        >
                           Summary
                         </div>
                         <div style={{ lineHeight: 1.8 }}>
-                          <div><strong>Date Raised:</strong> {formatDate(selectedReturn?.created_at)}</div>
-                          <div><strong>Total Deduction:</strong> <span style={{ color: "var(--d)", fontWeight: 800 }}>{formatCurrency(selectedReturn?.deduction_amount)}</span></div>
+                          <div>
+                            <strong>Date Raised:</strong> {formatDate(selectedReturn?.created_at)}
+                          </div>
+                          <div>
+                            <strong>Total Deduction:</strong>{" "}
+                            <span style={{ color: "var(--d)", fontWeight: 800 }}>
+                              {formatCurrency(selectedReturn?.deduction_amount)}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -289,18 +333,26 @@ const SupplierReturnsPage = () => {
                           <td style={{ fontWeight: 700 }}>{selectedReturn?.item_name || "—"}</td>
                           <td>{selectedReturn?.quantity} kg</td>
                           <td>{selectedReturn?.reason || "—"}</td>
-                          <td style={{ color: "var(--d)", fontWeight: 800 }}>{formatCurrency(selectedReturn?.deduction_amount)}</td>
+                          <td style={{ color: "var(--d)", fontWeight: 800 }}>
+                            {formatCurrency(selectedReturn?.deduction_amount)}
+                          </td>
                         </tr>
                       </tbody>
                     </table>
 
                     <div style={{ padding: 24, borderTop: "1px solid var(--border)" }}>
-                      <div style={{ fontSize: 12, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--text3)", marginBottom: 10 }}>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          letterSpacing: ".12em",
+                          textTransform: "uppercase",
+                          color: "var(--text3)",
+                          marginBottom: 10,
+                        }}
+                      >
                         Fresh World&apos;s Note
                       </div>
-                      <div style={{ color: "var(--text2)" }}>
-                        {selectedReturn?.notes || "No note available"}
-                      </div>
+                      <div style={{ color: "var(--text2)" }}>{selectedReturn?.notes || "No note available"}</div>
                     </div>
                   </div>
 
@@ -311,7 +363,15 @@ const SupplierReturnsPage = () => {
                       padding: 24,
                     }}
                   >
-                    <div style={{ fontSize: 12, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--text3)", marginBottom: 16 }}>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        letterSpacing: ".12em",
+                        textTransform: "uppercase",
+                        color: "var(--text3)",
+                        marginBottom: 16,
+                      }}
+                    >
                       Your Response
                     </div>
 
@@ -321,7 +381,7 @@ const SupplierReturnsPage = () => {
                         className="btn btn-s btn-sm"
                         onClick={() => handleRespond("acknowledged")}
                         disabled={saving}
-                        style={{ width: "100%" }}
+                        style={acknowledgeBtnStyle}
                       >
                         {saving ? "Saving..." : "Acknowledge Deduction"}
                       </button>
@@ -331,7 +391,7 @@ const SupplierReturnsPage = () => {
                         className="btn btn-s btn-sm"
                         onClick={() => handleRespond("disputed")}
                         disabled={saving}
-                        style={{ width: "100%", color: "var(--d)", borderColor: "rgba(200,75,47,.28)" }}
+                        style={disputeBtnStyle}
                       >
                         {saving ? "Saving..." : "Dispute Return"}
                       </button>
