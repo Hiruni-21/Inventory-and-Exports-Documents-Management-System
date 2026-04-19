@@ -6,6 +6,7 @@ require("./config/db");
 const authRoutes = require("./routes/authRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const userRoutes = require("./routes/userRoutes");
+const customerRoutes = require("./routes/customerRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
 const itemRoutes = require("./routes/itemRoutes");
 const inventoryRoutes = require("./routes/inventoryRoutes");
@@ -27,6 +28,7 @@ app.use("/uploads", express.static("uploads"));
 app.use("/api/auth", authRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/customers", customerRoutes);
 app.use("/api/items/categories", categoryRoutes);
 app.use("/api/items", itemRoutes);
 app.use("/api/inventory", inventoryRoutes);
@@ -38,6 +40,7 @@ app.use("/api/wastage", wastageRoutes);
 app.use("/api/dispatch/global", globalDispatchRoutes);
 app.use("/api/dispatch", dispatchRoutes);
 app.use("/api/export-docs", exportDocumentRoutes);
+app.use("/api/export-documents", exportDocumentRoutes);
 
 app.get("/", (req, res) => {
   res.send("Fresh World ERP backend is running");

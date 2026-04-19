@@ -3,16 +3,14 @@ const router = express.Router();
 
 const {
   getAllExportDocuments,
-  getExportDocumentById,
-  updateExportDocuments,
+  getExportDocumentsByDispatchId,
   updateExportDocumentsByDispatchId,
 } = require("../controllers/exportDocumentController");
 
 const { verifyToken } = require("../middleware/authMiddleware");
 
 router.get("/", verifyToken, getAllExportDocuments);
-router.get("/:id", verifyToken, getExportDocumentById);
+router.get("/by-dispatch/:globalDispatchId", verifyToken, getExportDocumentsByDispatchId);
 router.put("/by-dispatch/:globalDispatchId", verifyToken, updateExportDocumentsByDispatchId);
-router.put("/:id", verifyToken, updateExportDocuments);
 
 module.exports = router;
