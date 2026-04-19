@@ -682,19 +682,20 @@ useEffect(() => {
                       <button
                         type="button"
                         className="btn btn-p btn-xs"
-                        style={{ background: "var(--s)", border: "none" }}
+                        style={{ background: "#ffffff", border: "none" }}
                         onClick={(e) => markDelivered(row.id, e)}
                       >
-                        ✅ Delivered
+                        Delivered
                       </button>
                     ) : (
                       <button
                         type="button"
-                        className="ab"
+                        className="btn btn-p btn-xs"
+                        style={{ background: "#ffffff", border: "var(--s)" }}
                         title="Print DN"
                         onClick={(e) => printDispatch(row.id, e)}
                       >
-                        🖨️
+                        Print
                       </button>
                     )}
                   </td>

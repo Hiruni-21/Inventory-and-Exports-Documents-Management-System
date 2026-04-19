@@ -515,11 +515,11 @@ export default function GlobalCustomersPage() {
                       <div className="table-actions">
                         <button
                           type="button"
-                          className="btn btn-p btn-xs gc-ship-btn"
+                          className="table-icon-btn"
                           title="New shipment"
                           onClick={(e) => openRealShipmentFlow(customer, e)}
                         >
-                          ✈️ Shipment
+                          <Plane size={15} />
                         </button>
                       </div>
                     </td>

@@ -1,260 +1,185 @@
 import { useEffect, useMemo, useState } from "react";
+import { Mail, Plus, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
+import { useToast } from "../context/ToastContext";
 
-const AddReturnPage = () => {
-  const navigate = useNavigate();
+const formatDate = (value) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-CA");
+};
 
-  const [suppliers, setSuppliers] = useState([]);
-  const [inventory, setInventory] = useState([]);
-  const [batches, setBatches] = useState([]);
-  const [form, setForm] = useState({
-    supplier_id: "",
-    item_id: "",
-    batch_id: "",
-    quantity: "",
-    reason: "",
-    notes: "",
+const money = (value) =>
+  Number(value || 0).toLocaleString("en-LK", {
+    style: "currency",
+    currency: "LKR",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   });
 
+const monthKey = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getFullYear()}-${date.getMonth()}`;
+};
+
+export default function ReturnListPage() {
+  const navigate = useNavigate();
+  const toast = useToast();
+
+  const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [batchLoading, setBatchLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [search, setSearch] = useState("");
+  const [periodFilter, setPeriodFilter] = useState("this");
+
+  const loadRows = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get("/returns");
+      setRows(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error(err);
+      toast.error(err?.response?.data?.message || "Failed to load return notes");
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const [suppliersRes, inventoryRes] = await Promise.all([
-          api.get("/suppliers"),
-          api.get("/inventory"),
-        ]);
-
-        setSuppliers(Array.isArray(suppliersRes.data) ? suppliersRes.data : []);
-        setInventory(
-          (Array.isArray(inventoryRes.data) ? inventoryRes.data : []).filter(
-            (item) => Number(item.qty_available) > 0
-          )
-        );
-      } catch (err) {
-        setError(err.response?.data?.message || "Failed to load suppliers or inventory");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
+    loadRows();
   }, []);
 
-  const selectedBatch = useMemo(
-    () => batches.find((batch) => String(batch.id) === String(form.batch_id)),
-    [batches, form.batch_id]
-  );
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
 
-  const availableQty = selectedBatch?.qty_remaining ?? selectedBatch?.available_quantity ?? "—";
+    const now = new Date();
+    const thisMonth = `${now.getFullYear()}-${now.getMonth()}`;
+    const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonth = `${lastMonthDate.getFullYear()}-${lastMonthDate.getMonth()}`;
 
-  const handleChange = async (e) => {
-    const { name, value } = e.target;
-    const nextForm = { ...form, [name]: value };
+    return rows.filter((row) => {
+      const textMatch =
+        q === ""
+          ? true
+          : [
+              row.return_number,
+              row.po_number,
+              row.supplier_name,
+              row.reason,
+              row.status,
+            ]
+              .filter(Boolean)
+              .join(" ")
+              .toLowerCase()
+              .includes(q);
 
-    if (name === "item_id") {
-      nextForm.batch_id = "";
-      setBatches([]);
-    }
+      const rowMonth = monthKey(row.return_date);
 
-    setForm(nextForm);
+      const periodMatch =
+        periodFilter === "history"
+          ? true
+          : periodFilter === "last"
+          ? rowMonth === lastMonth
+          : rowMonth === thisMonth;
 
-    if (name === "item_id" && value) {
-      setBatchLoading(true);
-      setError("");
-      try {
-        const res = await api.get(`/inventory/batches/${value}`);
-        setBatches(Array.isArray(res.data) ? res.data : []);
-      } catch (err) {
-        setError(err.response?.data?.message || "Failed to load item batches");
-      } finally {
-        setBatchLoading(false);
-      }
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-    setSuccess("");
-
-    if (!form.supplier_id || !form.item_id || !form.batch_id || !form.quantity || !form.reason) {
-      setError("Please fill all required fields");
-      return;
-    }
-
-    setSaving(true);
-
-    try {
-      await api.post("/returns", {
-        supplier_id: Number(form.supplier_id),
-        item_id: Number(form.item_id),
-        batch_id: Number(form.batch_id),
-        quantity: Number(form.quantity),
-        reason: form.reason,
-        notes: form.notes,
-      });
-
-      setSuccess("Goods return recorded successfully");
-      setTimeout(() => navigate("/returns"), 800);
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to record return");
-    } finally {
-      setSaving(false);
-    }
-  };
+      return textMatch && periodMatch;
+    });
+  }, [rows, search, periodFilter]);
 
   return (
-    <div className="md md-lg" style={{ maxWidth: "100%", display: "flex" }}>
-      <div className="md-h">
-        <h3>↩️ Record Goods Return</h3>
-        <button type="button" className="md-x" onClick={() => navigate("/returns")}>
-          ✕
+    <>
+      <div className="notice-banner notice-success">
+        <span>Record supplier return notes, upload photos, and send return notes by email from this page.</span>
+      </div>
+
+      <div className="fb" style={{ justifyContent: "space-between", alignItems: "center" }}>
+        <div className="fb" style={{ marginBottom: 0, gap: 12, flexWrap: "wrap" }}>
+          <button type="button" className={`ft ${periodFilter === "this" ? "on" : ""}`} onClick={() => setPeriodFilter("this")}>
+            This Month
+          </button>
+          <button type="button" className={`ft ${periodFilter === "last" ? "on" : ""}`} onClick={() => setPeriodFilter("last")}>
+            Last Month
+          </button>
+          <button type="button" className={`ft ${periodFilter === "history" ? "on" : ""}`} onClick={() => setPeriodFilter("history")}>
+            Return History
+          </button>
+
+          <div className="search-field" style={{ minWidth: 280 }}>
+            <Search size={16} />
+            <input
+              type="text"
+              placeholder="Search return notes..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <button type="button" className="btn btn-primary" onClick={() => navigate("/returns/add")}>
+          <Plus size={16} /> New Return
         </button>
       </div>
 
-      <form onSubmit={handleSubmit}>
-        <div className="md-b">
-          <div className="ib ib-i">
-            <span>↩️</span>
-            <div>
-              Select the exact FEFO batch to return. Available in selected batch:{" "}
-              <strong>{availableQty}</strong>
-            </div>
-          </div>
-
-          {loading ? (
-            <div className="ib ib-i">
-              <span>⏳</span>
-              <div>Loading suppliers and inventory...</div>
-            </div>
-          ) : null}
-
-          {batchLoading ? (
-            <div className="ib ib-i">
-              <span>⏳</span>
-              <div>Loading item batches...</div>
-            </div>
-          ) : null}
-
-          {error ? (
-            <div className="ib ib-d">
-              <span>⚠️</span>
-              <div>{error}</div>
-            </div>
-          ) : null}
-
-          {success ? (
-            <div className="ib ib-s">
-              <span>✅</span>
-              <div>{success}</div>
-            </div>
-          ) : null}
-
-          <div className="fs2">
-            <div className="fst">Return Details</div>
-
-            <div className="fr">
-              <div className="ff">
-                <label className="fl">Supplier</label>
-                <select className="fc" name="supplier_id" value={form.supplier_id} onChange={handleChange}>
-                  <option value="">Select supplier</option>
-                  {suppliers.map((supplier) => (
-                    <option key={supplier.id} value={supplier.id}>
-                      {supplier.supplier_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="ff">
-                <label className="fl">Item</label>
-                <select className="fc" name="item_id" value={form.item_id} onChange={handleChange}>
-                  <option value="">Select item</option>
-                  {inventory.map((item) => (
-                    <option key={item.item_id} value={item.item_id}>
-                      {(item.name || item.item_name)} ({item.code || item.item_code})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="fr">
-              <div className="ff">
-                <label className="fl">Batch</label>
-                <select className="fc" name="batch_id" value={form.batch_id} onChange={handleChange}>
-                  <option value="">Select batch</option>
-                  {batches.map((batch) => (
-                    <option key={batch.id} value={batch.id}>
-                      {(batch.batch_number || batch.batch_code)} - Available:{" "}
-                      {batch.qty_remaining || batch.available_quantity} {batch.unit || ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="ff">
-                <label className="fl">Return Quantity</label>
-                <input
-                  className="fc"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  name="quantity"
-                  value={form.quantity}
-                  onChange={handleChange}
-                  placeholder="0.00"
-                />
-              </div>
-            </div>
-
-            <div className="fr">
-              <div className="ff">
-                <label className="fl">Reason</label>
-                <input
-                  className="fc"
-                  type="text"
-                  name="reason"
-                  value={form.reason}
-                  onChange={handleChange}
-                  placeholder="Overripe, damage, quality issue..."
-                />
-              </div>
-
-              <div className="ff">
-                <label className="fl">Notes</label>
-                <textarea
-                  className="fc"
-                  name="notes"
-                  value={form.notes}
-                  onChange={handleChange}
-                  placeholder="Extra return notes..."
-                />
-              </div>
-            </div>
-          </div>
+      <div className="content-card">
+        <div className="card-header-row">
+          <h3>Return Notes</h3>
+          <span className="count-pill">{filteredRows.length} returns</span>
         </div>
 
-        <div className="md-f">
-          <button type="button" className="btn btn-s" onClick={() => navigate("/returns")}>
-            Cancel
-          </button>
-          <button type="submit" className="btn btn-p" disabled={saving}>
-            {saving ? "Saving..." : "Save Return"}
-          </button>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>RETURN NO</th>
+                <th>DATE</th>
+                <th>PO NUMBER</th>
+                <th>SUPPLIER</th>
+                <th>ITEMS</th>
+                <th>TOTAL QTY</th>
+                <th>AMOUNT</th>
+                <th>EMAIL</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan="8" className="empty-row">Loading return notes...</td>
+                </tr>
+              ) : filteredRows.length ? (
+                filteredRows.map((row) => (
+                  <tr
+                    key={row.id}
+                    style={{ cursor: "pointer" }}
+                    onClick={() => navigate(`/returns/${row.id}`)}
+                  >
+                    <td className="code-cell">{row.return_number}</td>
+                    <td>{formatDate(row.return_date)}</td>
+                    <td>{row.po_number || "—"}</td>
+                    <td className="strong-cell">{row.supplier_name}</td>
+                    <td>{Number(row.item_count || 0)}</td>
+                    <td>{Number(row.total_qty || 0).toFixed(2)}</td>
+                    <td>{money(row.total_amount)}</td>
+                    <td>
+                      {row.email_sent_at ? (
+                        <span className="badge bg-b"><Mail size={12} /> Sent</span>
+                      ) : (
+                        <span className="badge">Draft</span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="8" className="empty-row">No return notes found</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      </form>
-    </div>
+      </div>
+    </>
   );
-};
-
-export default AddReturnPage;
+}

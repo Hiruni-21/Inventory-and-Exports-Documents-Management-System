@@ -106,20 +106,37 @@ const ensureRuntimeSchema = async () => {
     await q(`ALTER TABLE grn_items ${sql}`);
   }
 
-  if (!(await tableExists("grn_photos"))) {
-    await q(`
-      CREATE TABLE grn_photos (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        grn_id INT NOT NULL,
-        file_name VARCHAR(255) NOT NULL,
-        file_path VARCHAR(500) NOT NULL,
-        original_name VARCHAR(255) NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_grn_photos_grn (grn_id)
-      )
-    `);
+if (!(await tableExists("grn_photos"))) {
+  await q(`
+    CREATE TABLE grn_photos (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      grn_id INT NOT NULL,
+      file_name VARCHAR(255) NOT NULL,
+      file_path VARCHAR(500) NOT NULL,
+      original_name VARCHAR(255) NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_grn_photos_grn (grn_id)
+    )
+  `);
+} else {
+  const photoCols = await getTableColumns("grn_photos");
+
+  if (!photoCols.has("file_name")) {
+    await q(`ALTER TABLE grn_photos ADD COLUMN file_name VARCHAR(255) NOT NULL`);
   }
 
+  if (!photoCols.has("file_path")) {
+    await q(`ALTER TABLE grn_photos ADD COLUMN file_path VARCHAR(500) NOT NULL`);
+  }
+
+  if (!photoCols.has("original_name")) {
+    await q(`ALTER TABLE grn_photos ADD COLUMN original_name VARCHAR(255) NULL`);
+  }
+
+  if (!photoCols.has("created_at")) {
+    await q(`ALTER TABLE grn_photos ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`);
+  }
+}
   clearCache();
   ensured = true;
 };

@@ -22,7 +22,7 @@ const money = (value) =>
 
 const statusLabel = (value) => {
   const text = String(value || "received").toLowerCase();
-  if (text === "pending_verification") return "Pending Verification";
+  if (text === "pending_verification") return "Pending Verify";
   if (text === "verified") return "Verified";
   return "Received";
 };
@@ -32,6 +32,14 @@ const badgeClass = (value) => {
   if (text === "pending_verification") return "badge bg-a";
   if (text === "verified") return "badge bg-b";
   return "badge bg-g";
+};
+const backendBase =
+  (import.meta.env.VITE_API_BASE_URL || "http://localhost:5001/api").replace(/\/api\/?$/, "");
+
+const getFileUrl = (filePath) => {
+  if (!filePath) return "";
+  if (filePath.startsWith("http://") || filePath.startsWith("https://")) return filePath;
+  return `${backendBase}${filePath.startsWith("/") ? filePath : `/${filePath}`}`;
 };
 
 export default function GrnDetailsPage() {
@@ -43,19 +51,23 @@ export default function GrnDetailsPage() {
   const [grn, setGrn] = useState(null);
   const [loading, setLoading] = useState(true);
   const [verifying, setVerifying] = useState(false);
+  const [error, setError] = useState("");
 
   const canVerify =
-    ["manager", "ops", "operations"].some((word) =>
+    ["manager", "ops", "operation"].some((word) =>
       String(user?.role || "").toLowerCase().includes(word)
-    ) &&
-    String(grn?.status || "").toLowerCase() === "pending_verification";
+    ) && String(grn?.status || "").toLowerCase() === "pending_verification";
 
   const loadGrn = async () => {
     try {
       setLoading(true);
+      setError("");
       const res = await api.get(`/grn/${id}`);
       setGrn(res.data || null);
     } catch (err) {
+      console.error(err);
+      setError(err?.response?.data?.message || "Failed to load GRN details");
+      setGrn(null);
       toast.error(err?.response?.data?.message || "Failed to load GRN details");
     } finally {
       setLoading(false);
@@ -69,9 +81,8 @@ export default function GrnDetailsPage() {
   const totals = useMemo(() => {
     const items = grn?.items || [];
     return {
-      totalReceived: items.reduce((sum, item) => sum + Number(item.received_qty || 0), 0),
-      totalVariance: items.reduce((sum, item) => sum + Number(item.variance_qty || 0), 0),
-      totalValue: items.reduce((sum, item) => sum + Number(item.line_total || 0), 0),
+      qty: items.reduce((sum, item) => sum + Number(item.received_qty || 0), 0),
+      value: items.reduce((sum, item) => sum + Number(item.line_total || 0), 0),
     };
   }, [grn]);
 
@@ -82,6 +93,7 @@ export default function GrnDetailsPage() {
       toast.success(res.data?.message || "GRN verified successfully");
       await loadGrn();
     } catch (err) {
+      console.error(err);
       toast.error(err?.response?.data?.message || "Failed to verify GRN");
     } finally {
       setVerifying(false);
@@ -89,30 +101,70 @@ export default function GrnDetailsPage() {
   };
 
   if (loading) {
-    return <div className="empty-row">Loading GRN details...</div>;
+    return (
+      <div className="content-card">
+        <div className="empty-row" style={{ padding: 28 }}>
+          Loading GRN details...
+        </div>
+      </div>
+    );
   }
 
-  if (!grn) return null;
+  if (error) {
+    return (
+      <>
+        <div className="fb" style={{ justifyContent: "space-between", alignItems: "center" }}>
+          <button type="button" className="btn btn-s" onClick={() => navigate("/grn")}>
+            <ArrowLeft size={16} /> Back
+          </button>
+        </div>
+
+        <div className="content-card">
+          <div className="empty-row" style={{ padding: 28, color: "#c84b2f" }}>
+            {error}
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  if (!grn) {
+    return (
+      <>
+        <div className="fb" style={{ justifyContent: "space-between", alignItems: "center" }}>
+          <button type="button" className="btn btn-s" onClick={() => navigate("/grn")}>
+            <ArrowLeft size={16} /> Back
+          </button>
+        </div>
+
+        <div className="content-card">
+          <div className="empty-row" style={{ padding: 28 }}>
+            GRN not found
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
-      <div className="fb" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <button type="button" className="btn btn-secondary" onClick={() => navigate("/grn")}>
+      <div className="fb" style={{ justifyContent: "space-between", alignItems: "center" }}>
+        <button type="button" className="btn btn-s" onClick={() => navigate("/grn")}>
           <ArrowLeft size={16} /> Back
         </button>
 
         {canVerify ? (
-          <button type="button" className="btn btn-primary" onClick={handleVerify} disabled={verifying}>
-            <CheckCircle2 size={16} /> {verifying ? "Verifying..." : "Verify GRN"}
+          <button
+            type="button"
+            className="btn btn-confirm-grn"
+            onClick={handleVerify}
+            disabled={verifying}
+          >
+            <CheckCircle2 size={16} />
+            {verifying ? "Verifying..." : "Verify GRN"}
           </button>
         ) : null}
       </div>
-
-      {String(grn.status || "").toLowerCase() === "pending_verification" ? (
-        <div className="notice-banner notice-warning" style={{ marginBottom: 16 }}>
-          <span>This GRN exceeded the allowed variance threshold and is waiting for Ops verification before inventory update.</span>
-        </div>
-      ) : null}
 
       <div className="krow k3">
         <div className="kc g">
@@ -120,11 +172,11 @@ export default function GrnDetailsPage() {
           <div className="kl">GRN Number</div>
         </div>
         <div className="kc a">
-          <div className="kv">{totals.totalReceived.toFixed(2)}</div>
+          <div className="kv">{totals.qty.toFixed(2)}</div>
           <div className="kl">Received Qty</div>
         </div>
         <div className="kc b">
-          <div className="kv">{money(totals.totalValue)}</div>
+          <div className="kv">{money(totals.value)}</div>
           <div className="kl">Total Value</div>
         </div>
       </div>
@@ -138,36 +190,36 @@ export default function GrnDetailsPage() {
         <div style={{ padding: 20 }}>
           <div className="details-panel-grid">
             <div className="details-stat-card">
-              <label>PO NUMBER</label>
-              <span>{grn.po_number}</span>
+              <label>LINKED PO</label>
+              <span>{grn.po_number || "—"}</span>
+            </div>
+            <div className="details-stat-card">
+              <label>SUPPLIER</label>
+              <span>{grn.supplier_name || "—"}</span>
+            </div>
+            <div className="details-stat-card">
+              <label>PO DATE</label>
+              <span>{fmtDate(grn.po_order_date)}</span>
             </div>
             <div className="details-stat-card">
               <label>RECEIVED DATE</label>
               <span>{fmtDate(grn.received_date)}</span>
             </div>
             <div className="details-stat-card">
-              <label>SUPPLIER</label>
-              <span>{grn.supplier_name}</span>
+              <label>SUPPLIER INVOICE NO.</label>
+              <span>{grn.supplier_invoice_no || "—"}</span>
             </div>
             <div className="details-stat-card">
-              <label>CREATED BY</label>
-              <span>{grn.created_by_name || "—"}</span>
+              <label>RECEIVED BY</label>
+              <span>{grn.received_by_name || "—"}</span>
             </div>
             <div className="details-stat-card">
-              <label>SUPPLIER EMAIL</label>
-              <span>{grn.email || "—"}</span>
-            </div>
-            <div className="details-stat-card">
-              <label>SUPPLIER MOBILE</label>
+              <label>CONTACT</label>
               <span>{grn.contact_number || "—"}</span>
             </div>
             <div className="details-stat-card">
-              <label>VERIFIED BY</label>
-              <span>{grn.verified_by_name || "—"}</span>
-            </div>
-            <div className="details-stat-card">
-              <label>VERIFIED AT</label>
-              <span>{fmtDate(grn.verified_at)}</span>
+              <label>EMAIL</label>
+              <span>{grn.email || "—"}</span>
             </div>
             <div className="details-stat-card details-stat-card-full">
               <label>REMARKS</label>
@@ -177,57 +229,90 @@ export default function GrnDetailsPage() {
         </div>
       </div>
 
-      <div className="content-card">
+      <div className="content-card" style={{ marginBottom: 16 }}>
         <div className="card-header-row">
-          <h3>Received Items</h3>
-          <span className="count-pill">{(grn.items || []).length} lines</span>
+          <h3>Items Received</h3>
+          <span className="count-pill">{(grn.items || []).length} items</span>
         </div>
 
         <div className="table-wrap">
           <table className="data-table">
             <thead>
               <tr>
-                <th>ITEM CODE</th>
-                <th>ITEM NAME</th>
+                <th>ITEM</th>
                 <th>ORDERED</th>
                 <th>RECEIVED</th>
-                <th>VARIANCE</th>
-                <th>%</th>
                 <th>BATCH</th>
                 <th>EXPIRY</th>
-                <th>UNIT COST</th>
-                <th>LINE TOTAL</th>
+                <th>QUALITY</th>
+                <th>VARIANCE</th>
               </tr>
             </thead>
             <tbody>
               {grn.items?.length ? (
                 grn.items.map((item) => (
                   <tr key={item.id}>
-                    <td className="code-cell">{item.item_code}</td>
                     <td className="strong-cell">{item.item_name}</td>
-                    <td>{Number(item.ordered_qty || 0).toFixed(2)} {item.unit}</td>
-                    <td>{Number(item.received_qty || 0).toFixed(2)} {item.unit}</td>
-                    <td className={Number(item.verification_required || 0) === 1 ? "no-text" : "yes-text"}>
-                      {Number(item.variance_qty || 0) > 0 ? "+" : ""}
-                      {Number(item.variance_qty || 0).toFixed(2)}
+                    <td>
+                      {Number(item.ordered_qty || 0).toFixed(2)} {item.unit}
                     </td>
-                    <td>{Number(item.variance_percent || 0).toFixed(2)}%</td>
+                    <td>
+                      {Number(item.received_qty || 0).toFixed(2)} {item.unit}
+                    </td>
                     <td>{item.batch_number || "—"}</td>
                     <td>{fmtDate(item.expiry_date)}</td>
-                    <td>{money(item.unit_cost)}</td>
-                    <td>{money(item.line_total)}</td>
+                    <td>{item.quality_grade || "—"}</td>
+                    <td className={Number(item.variance_qty || 0) === 0 ? "yes-text" : "no-text"}>
+                      {Number(item.variance_qty || 0) > 0 ? "+" : ""}
+                      {Number(item.variance_qty || 0).toFixed(2)} {item.unit}
+                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="10" className="empty-row">
-                    No GRN items found
+                  <td colSpan="7" className="empty-row">
+                    No items found
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="content-card">
+        <div className="card-header-row">
+          <h3>Photo Evidence</h3>
+          <span className="count-pill">{(grn.photos || []).length} photos</span>
+        </div>
+
+        <div className="grn-photo-gallery">
+        {grn.photos?.length ? (
+          grn.photos.map((photo) => {
+            const fileUrl = getFileUrl(photo.file_path);
+
+            return (
+              <a
+                key={photo.id}
+                href={fileUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="grn-photo-card"
+              >
+                <img
+                  src={fileUrl}
+                  alt={photo.original_name || photo.file_name}
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
+                <span>{photo.original_name || photo.file_name}</span>
+              </a>
+            );
+          })
+        ) : (
+  <div className="empty-row">No photo evidence uploaded</div>
+)}        </div>
       </div>
     </>
   );
