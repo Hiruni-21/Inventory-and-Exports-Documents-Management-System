@@ -1295,3 +1295,30 @@ textarea.fc{height:78px;padding:10px 12px;resize:vertical}
   background: rgba(232, 168, 56, 0.08) !important;
   box-shadow: inset 0 2px 0 #e8a838, inset 0 -2px 0 #e8a838 !important;
 }
+.supplier-organic-badge-wrap {
+  margin-top: 2px;
+}
+
+.details-stat-card .supplier-organic-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 6px 10px !important;
+  border-radius: 999px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+
+.details-stat-card .supplier-organic-badge.certified {
+  background: var(--s100) !important;
+  color: var(--s) !important;
+  border: 1px solid rgba(39, 143, 85, 0.18) !important;
+}
+
+.details-stat-card .supplier-organic-badge.not-certified {
+  background: var(--ivory2) !important;
+  color: var(--text2) !important;
+  border: 1px solid var(--border) !important;
+}
