@@ -13,21 +13,15 @@ const STORAGE_OPTIONS = [
   "Freezer (−18°C)",
 ];
 
-const tableCountStyle = {
-  color: "#7F978A",
-  fontSize: 13,
-  fontWeight: 500,
-};
-
 const codeCellStyle = {
-  fontWeight: 800,
-  color: "var(--g900)",
-  fontSize: 13,
-  letterSpacing: "0.01em",
+  fontFamily: "monospace",
+  fontWeight: 700,
+  color: "var(--g800)",
+  fontSize: 12,
 };
 
 const nameCellStyle = {
-  fontWeight: 800,
+  fontWeight: 700,
   fontSize: 13,
   color: "var(--g900)",
 };
@@ -35,14 +29,15 @@ const nameCellStyle = {
 const botanicalCellStyle = {
   fontStyle: "italic",
   fontWeight: 600,
-  fontSize: 13,
+  fontSize: 12,
   color: "#5B7764",
 };
 
 const supplierCellStyle = {
   color: "#5F7567",
   fontWeight: 500,
-  fontSize: 13,
+  fontSize: 12,
+  lineHeight: 1.2,
 };
 
 const tableHeaderCellStyle = {
@@ -54,7 +49,7 @@ const tableHeaderCellStyle = {
 };
 
 const editActionStyle = {
-  height: 36,
+  height: 34,
   padding: "0 14px",
   borderRadius: 14,
   border: "1.5px solid #CFE2D4",
@@ -66,19 +61,18 @@ const editActionStyle = {
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  gap: 6,
   whiteSpace: "nowrap",
 };
 
 const deleteActionStyle = {
-  width: 36,
-  height: 36,
+  width: 34,
+  height: 34,
   borderRadius: 14,
   border: "1.5px solid #CFE2D4",
   background: "#FFFFFF",
   color: "#6B7D71",
   fontWeight: 700,
-  fontSize: 13,
+  fontSize: 12,
   cursor: "pointer",
   display: "inline-flex",
   alignItems: "center",
@@ -204,30 +198,18 @@ const categoryBadgeStyle = (label) => {
   const value = String(label || "").toLowerCase();
 
   if (value.includes("micro")) {
-    return {
-      background: "#EAF2FF",
-      color: "#2F69C8",
-    };
+    return { background: "#EAF2FF", color: "#2F69C8" };
   }
 
   if (value.includes("exotic")) {
-    return {
-      background: "#FFF1DE",
-      color: "#D78918",
-    };
+    return { background: "#FFF1DE", color: "#D78918" };
   }
 
   if (value.includes("dry")) {
-    return {
-      background: "#EEE9DF",
-      color: "#5E7765",
-    };
+    return { background: "#EEE9DF", color: "#5E7765" };
   }
 
-  return {
-    background: "#E9F7EE",
-    color: "#2E8B57",
-  };
+  return { background: "#E9F7EE", color: "#2E8B57" };
 };
 
 const categoryBadgeBaseStyle = {
@@ -406,9 +388,7 @@ const getCategoryIdFromRow = (row, categories) => {
 };
 
 const buildNextItemCode = (rows) => {
-  const codes = rows
-    .map((row) => textValue(row.code, row.item_code))
-    .filter(Boolean);
+  const codes = rows.map((row) => textValue(row.code, row.item_code)).filter(Boolean);
 
   if (!codes.length) return "FW-PRD-001";
 
@@ -479,13 +459,11 @@ const ItemListPage = () => {
       setSuppliers(Array.isArray(suppliersRes.data) ? suppliersRes.data : []);
     } catch (err) {
       console.error("LOAD ITEM MASTER ERROR:", err?.response?.data || err);
-
       toast.error(
         err?.response?.data?.error ||
           err?.response?.data?.message ||
           "Failed to load Item Master"
       );
-
       setRows([]);
       setCategories([]);
       setSuppliers([]);
@@ -525,8 +503,7 @@ const ItemListPage = () => {
 
     if (typeFilter !== "All Types") {
       result = result.filter(
-        (row) =>
-          normalizeTypeLabel(row.type).toLowerCase() === typeFilter.toLowerCase()
+        (row) => normalizeTypeLabel(row.type).toLowerCase() === typeFilter.toLowerCase()
       );
     }
 
@@ -654,10 +631,8 @@ const ItemListPage = () => {
       storage_temp: form.storage_temp.trim(),
       unit_cost: Number(form.unit_cost || 0),
       returnable: Number(form.returnable_mode === "yes"),
-      supplier_ids: (form.supplier_ids || [])
-        .map((id) => Number(id))
-        .filter(Boolean),
-      description: form.description.trim(),
+      supplier_ids: (form.supplier_ids || []).map((id) => Number(id)).filter(Boolean),
+      description: "",
       status: "active",
     };
   };
@@ -677,7 +652,6 @@ const ItemListPage = () => {
 
     try {
       setSaving(true);
-
       const payload = buildPayload();
 
       if (editingItemId) {
@@ -692,7 +666,6 @@ const ItemListPage = () => {
       loadPage();
     } catch (err) {
       console.error("Save item error:", err?.response?.data || err);
-
       toast.error(
         err?.response?.data?.error ||
           err?.response?.data?.message ||
@@ -734,18 +707,16 @@ const ItemListPage = () => {
         storage_temp: textValue(row.storage_temp),
         unit_cost: numberValue(row.unit_cost),
         returnable: Number(normalizeReturnableMode(row) === "yes"),
-        supplier_ids: extractSupplierIds(row)
-          .map((id) => Number(id))
-          .filter(Boolean),
+        supplier_ids: extractSupplierIds(row).map((id) => Number(id)).filter(Boolean),
         description: textValue(row.description, row.notes),
         status: "inactive",
       };
+
       await api.put(`/items/${id}`, payload);
       toast.success("Item marked inactive");
       loadPage();
     } catch (err) {
       console.error("Deactivate item error:", err?.response?.data || err);
-
       toast.error(
         err?.response?.data?.error ||
           err?.response?.data?.message ||
@@ -823,13 +794,6 @@ const ItemListPage = () => {
       </div>
 
       <div className="tw" style={{ borderRadius: 24, overflow: "hidden" }}>
-        <div className="tw-h" style={{ padding: "20px 24px" }}>
-          <h3 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>Item Master</h3>
-          <span style={tableCountStyle}>
-            {filteredRows.length} items · Central product database
-          </span>
-        </div>
-
         <table>
           <thead>
             <tr>
@@ -884,28 +848,28 @@ const ItemListPage = () => {
                         style={{
                           ...categoryBadgeBaseStyle,
                           ...badgeTone,
-                          padding: "6px 14px",
-                          fontSize: 12,
+                          padding: "5px 12px",
+                          fontSize: 11,
                         }}
                       >
-                        <span style={{ fontSize: 10 }}>●</span>
+                        <span style={{ fontSize: 9 }}>●</span>
                         {categoryLabel}
                       </span>
                     </td>
 
-                    <td style={{ fontSize: 13, color: "var(--g900)" }}>
+                    <td style={{ fontSize: 12, color: "var(--g900)" }}>
                       {textValue(row.unit) || "—"}
                     </td>
 
-                    <td style={{ fontSize: 13, color: "var(--g900)" }}>
+                    <td style={{ fontSize: 12, color: "var(--g900)" }}>
                       {numberValue(row.reorder_level)} {textValue(row.unit)}
                     </td>
 
-                    <td style={{ fontSize: 13, color: "var(--g900)" }}>
+                    <td style={{ fontSize: 12, color: "var(--g900)" }}>
                       {formatStorageDisplay(textValue(row.storage_temp))}
                     </td>
 
-                    <td style={{ ...returnableColorStyle(row), fontSize: 13 }}>
+                    <td style={{ ...returnableColorStyle(row), fontSize: 12 }}>
                       {returnableLabel(row)}
                     </td>
 

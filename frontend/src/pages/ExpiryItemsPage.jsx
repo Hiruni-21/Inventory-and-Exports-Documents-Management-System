@@ -8,7 +8,6 @@ const GREEN_HOVER = "#14532D";
 const RED = "#C84E35";
 const RED_HOVER = "#B9381F";
 
-
 const getTabButtonStyle = (active, hovered) => ({
   height: 34,
   padding: "0 14px",
@@ -51,11 +50,7 @@ const getCompactActionStyle = (hovered, variant = "default") => {
       : isDanger
       ? "#FFF5F2"
       : "#FFFFFF",
-    color: hovered
-      ? "#FFFFFF"
-      : isDanger
-      ? RED
-      : "var(--g800)",
+    color: hovered ? "#FFFFFF" : isDanger ? RED : "var(--g800)",
     fontSize: 12,
     fontWeight: 800,
     cursor: "pointer",
@@ -68,6 +63,7 @@ const getCompactActionStyle = (hovered, variant = "default") => {
     boxShadow: "none",
   };
 };
+
 const priorityBadgeStyle = (days, label) => {
   let background = "#EAF7EE";
   let color = "#1F8B4C";
@@ -108,7 +104,6 @@ const ExpiryItemsPage = () => {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("All");
-
   const [hoveredTab, setHoveredTab] = useState("");
   const [hoveredAction, setHoveredAction] = useState("");
 
@@ -162,8 +157,8 @@ const ExpiryItemsPage = () => {
 
   const bannerText =
     criticalCount > 0
-      ? `${criticalCount} batches expiring within 3 days. FEFO — these must be dispatched before any newer stock. Every dispatch and export shipment automatically picks the nearest-expiry batch first.`
-      : "No critical batches within 3 days. FEFO still applies — dispatch older batches before newer stock.";
+      ? `${criticalCount} batches are expiring within 3 days. FEFO applies — dispatch older batches first before newer stock.`
+      : "No critical expiry batches within 3 days. FEFO still applies across all dispatches.";
 
   const getPriorityLabel = (index) => {
     if (index === 0) return "#1 Use Now";
@@ -191,7 +186,7 @@ const ExpiryItemsPage = () => {
   return (
     <>
       <div
-        className="ib ib-d"
+        className={criticalCount > 0 ? "ib ib-d" : "ib ib-s"}
         style={{
           marginBottom: 16,
           alignItems: "center",
@@ -199,7 +194,6 @@ const ExpiryItemsPage = () => {
           lineHeight: 1.45,
         }}
       >
-        <span>⏱</span>
         <div>{bannerText}</div>
       </div>
 
@@ -217,8 +211,6 @@ const ExpiryItemsPage = () => {
           onClick={() => setTab("All")}
           onMouseEnter={() => setHoveredTab("All")}
           onMouseLeave={() => setHoveredTab("")}
-          onFocus={() => setHoveredTab("All")}
-          onBlur={() => setHoveredTab("")}
         >
           All Batches
         </button>
@@ -229,10 +221,8 @@ const ExpiryItemsPage = () => {
           onClick={() => setTab("Critical")}
           onMouseEnter={() => setHoveredTab("Critical")}
           onMouseLeave={() => setHoveredTab("")}
-          onFocus={() => setHoveredTab("Critical")}
-          onBlur={() => setHoveredTab("")}
         >
-          🔴 Critical (≤3d)
+          Critical (≤3d)
         </button>
 
         <button
@@ -241,10 +231,8 @@ const ExpiryItemsPage = () => {
           onClick={() => setTab("Warning")}
           onMouseEnter={() => setHoveredTab("Warning")}
           onMouseLeave={() => setHoveredTab("")}
-          onFocus={() => setHoveredTab("Warning")}
-          onBlur={() => setHoveredTab("")}
         >
-          🟡 Warning (≤7d)
+          Warning (≤7d)
         </button>
 
         <button
@@ -253,21 +241,12 @@ const ExpiryItemsPage = () => {
           onClick={() => setTab("Safe")}
           onMouseEnter={() => setHoveredTab("Safe")}
           onMouseLeave={() => setHoveredTab("")}
-          onFocus={() => setHoveredTab("Safe")}
-          onBlur={() => setHoveredTab("")}
         >
-          ✅ Safe
+          Safe
         </button>
       </div>
 
       <div className="tw">
-        <div className="tw-h">
-          <h3>Expiry Items — All Active Batches</h3>
-          <span style={{ fontSize: 11, color: "var(--text3)" }}>
-            FEFO applied to all dispatches automatically
-          </span>
-        </div>
-
         <table>
           <thead>
             <tr>
@@ -307,9 +286,9 @@ const ExpiryItemsPage = () => {
                       {getBatchCode(row)}
                     </td>
 
-                    <td style={{ fontWeight: 700 }}>{getItemName(row)}</td>
+                    <td style={{ fontWeight: 700, fontSize: 13 }}>{getItemName(row)}</td>
 
-                    <td>
+                    <td style={{ fontSize: 12 }}>
                       {getQty(row)} {getUnit(row)}
                     </td>
 
@@ -320,7 +299,7 @@ const ExpiryItemsPage = () => {
                     <td>
                       <span
                         style={{
-                          fontSize: 18,
+                          fontSize: 17,
                           fontWeight: 800,
                           color: dayColor(days),
                         }}
@@ -345,12 +324,8 @@ const ExpiryItemsPage = () => {
                           style={getCompactActionStyle(hoveredAction === dispatchKey)}
                           onMouseEnter={() => setHoveredAction(dispatchKey)}
                           onMouseLeave={() => setHoveredAction("")}
-                          onFocus={() => setHoveredAction(dispatchKey)}
-                          onBlur={() => setHoveredAction("")}
                           onClick={() =>
-                            navigate(
-                              `/dispatch/local?itemId=${row.item_id}&batchId=${row.id}`
-                            )
+                            navigate(`/dispatch/local?itemId=${row.item_id}&batchId=${row.id}`)
                           }
                         >
                           Dispatch
@@ -365,12 +340,8 @@ const ExpiryItemsPage = () => {
                             )}
                             onMouseEnter={() => setHoveredAction(wasteKey)}
                             onMouseLeave={() => setHoveredAction("")}
-                            onFocus={() => setHoveredAction(wasteKey)}
-                            onBlur={() => setHoveredAction("")}
                             onClick={() =>
-                              navigate(
-                                `/wastage/add?itemId=${row.item_id}&batchId=${row.id}`
-                              )
+                              navigate(`/wastage/add?itemId=${row.item_id}&batchId=${row.id}`)
                             }
                           >
                             Waste
