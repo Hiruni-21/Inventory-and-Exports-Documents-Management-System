@@ -283,7 +283,6 @@ const pageMeta = {
 };
 
 const actionButtons = {
-  "/purchase-orders": [{ label: "+ Create PO", to: "/purchase-orders/add", className: "btn btn-p btn-sm" }],
   "/grn": [{ label: "+ New GRN", to: "/grn/add", className: "btn btn-p btn-sm" }],
   "/returns": [
     { label: "Record Return", to: "/returns/add", className: "btn btn-s btn-sm" },

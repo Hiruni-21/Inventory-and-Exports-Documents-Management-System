@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CheckCheck, Mail, MessageCircle, Send } from "lucide-react";
+import { ArrowLeft, Mail, MessageCircle, Send } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import api from "../utils/api";
 import { useAuth } from "../context/AuthContext";
@@ -49,7 +49,6 @@ export default function PurchaseOrderDetailsPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const canApprove = roleOf(user?.role).includes("manager");
   const canSend =
     roleOf(user?.role).includes("manager") ||
     roleOf(user?.role).includes("operation") ||
@@ -79,18 +78,6 @@ export default function PurchaseOrderDetailsPage() {
     );
   }, [purchaseOrder]);
 
-  const approvePo = async () => {
-    try {
-      setActionLoading(true);
-      await api.put(`/purchase-orders/${id}/approve`);
-      toast.success("Purchase order approved");
-      await loadPo();
-    } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to approve purchase order");
-    } finally {
-      setActionLoading(false);
-    }
-  };
 
   const sendPo = async () => {
     try {
@@ -151,16 +138,6 @@ export default function PurchaseOrderDetailsPage() {
         </div>
 
         <div className="fb" style={{ marginBottom: 0, gap: 10 }}>
-          {canApprove && (status === "pending_approval" || status === "draft") ? (
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={approvePo}
-              disabled={actionLoading}
-            >
-              <CheckCheck size={16} /> Approve PO
-            </button>
-          ) : null}
 
           {canSend && status === "approved" ? (
             <button
@@ -219,7 +196,7 @@ export default function PurchaseOrderDetailsPage() {
 
       <div className="content-card" style={{ marginBottom: 16 }}>
         <div className="card-header-row">
-          <h3>📋 Purchase Order Details</h3>
+          <h3>Purchase Order Details</h3>
           <span className={statusBadgeClass(purchaseOrder.status)}>
             {statusLabel(purchaseOrder.status)}
           </span>
@@ -310,7 +287,7 @@ export default function PurchaseOrderDetailsPage() {
 
       <div className="content-card" style={{ marginBottom: 16 }}>
         <div className="card-header-row">
-          <h3>📦 PO Items</h3>
+          <h3>PO Items</h3>
           <span className="count-pill">{totalQty.toFixed(2)} total qty</span>
         </div>
 
@@ -352,7 +329,7 @@ export default function PurchaseOrderDetailsPage() {
 
       <div className="content-card">
         <div className="card-header-row">
-          <h3>📨 Supplier Communication Log</h3>
+          <h3>Supplier Communication Log</h3>
           <span className="count-pill">
             {purchaseOrder.communications?.length || 0} messages
           </span>
