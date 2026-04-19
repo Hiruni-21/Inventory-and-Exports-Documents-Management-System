@@ -20,15 +20,15 @@ const tableCountStyle = {
 };
 
 const codeCellStyle = {
-  fontFamily: "monospace",
-  fontWeight: 700,
-  color: "#8EA694",
+  fontWeight: 800,
+  color: "var(--g900)",
   fontSize: 13,
+  letterSpacing: "0.01em",
 };
 
 const nameCellStyle = {
   fontWeight: 800,
-  fontSize: 15,
+  fontSize: 13,
   color: "var(--g900)",
 };
 
@@ -116,6 +116,42 @@ const pageActionButtonStyle = {
   whiteSpace: "nowrap",
 };
 
+const addSupplierButtonStyle = {
+  height: 38,
+  padding: "0 18px",
+  borderRadius: 999,
+  border: `1px solid ${PRIMARY_GREEN}`,
+  background: "#FFFFFF",
+  color: PRIMARY_GREEN,
+  fontWeight: 800,
+  fontSize: 14,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  boxSizing: "border-box",
+  whiteSpace: "nowrap",
+  boxShadow: "none",
+};
+
+const saveButtonStyle = {
+  height: 44,
+  padding: "0 18px",
+  borderRadius: 14,
+  border: `1px solid ${PRIMARY_GREEN}`,
+  background: PRIMARY_GREEN,
+  color: "#FFFFFF",
+  fontWeight: 800,
+  fontSize: 14,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  boxSizing: "border-box",
+  whiteSpace: "nowrap",
+  boxShadow: "none",
+};
+
 const modalSectionTitleStyle = {
   fontSize: 13,
   fontWeight: 800,
@@ -142,6 +178,7 @@ const toggleButtonStyle = (active) => ({
   alignItems: "center",
   justifyContent: "center",
   padding: "0 12px",
+  boxShadow: "none",
 });
 
 const chipStyle = {
@@ -205,8 +242,8 @@ const categoryBadgeBaseStyle = {
 };
 
 const modalCardStyle = {
-  maxWidth: 1020,
-  width: "92%",
+  maxWidth: 940,
+  width: "88%",
   maxHeight: "calc(100vh - 72px)",
   display: "flex",
   flexDirection: "column",
@@ -427,35 +464,35 @@ const ItemListPage = () => {
   const [form, setForm] = useState(createEmptyForm([]));
   const [supplierPickerId, setSupplierPickerId] = useState("");
 
-    const loadPage = async () => {
-      try {
-        setLoading(true);
+  const loadPage = async () => {
+    try {
+      setLoading(true);
 
-        const [itemsRes, categoriesRes, suppliersRes] = await Promise.all([
-          api.get("/items"),
-          api.get("/items/categories"),
-          api.get("/suppliers"),
-        ]);
+      const [itemsRes, categoriesRes, suppliersRes] = await Promise.all([
+        api.get("/items"),
+        api.get("/items/categories"),
+        api.get("/suppliers"),
+      ]);
 
-        setRows(Array.isArray(itemsRes.data) ? itemsRes.data : []);
-        setCategories(Array.isArray(categoriesRes.data) ? categoriesRes.data : []);
-        setSuppliers(Array.isArray(suppliersRes.data) ? suppliersRes.data : []);
-      } catch (err) {
-        console.error("LOAD ITEM MASTER ERROR:", err?.response?.data || err);
+      setRows(Array.isArray(itemsRes.data) ? itemsRes.data : []);
+      setCategories(Array.isArray(categoriesRes.data) ? categoriesRes.data : []);
+      setSuppliers(Array.isArray(suppliersRes.data) ? suppliersRes.data : []);
+    } catch (err) {
+      console.error("LOAD ITEM MASTER ERROR:", err?.response?.data || err);
 
-        toast.error(
-          err?.response?.data?.error ||
+      toast.error(
+        err?.response?.data?.error ||
           err?.response?.data?.message ||
           "Failed to load Item Master"
-        );
+      );
 
-        setRows([]);
-        setCategories([]);
-        setSuppliers([]);
-      } finally {
-        setLoading(false);
-      }
-    };
+      setRows([]);
+      setCategories([]);
+      setSuppliers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     loadPage();
@@ -595,35 +632,36 @@ const ItemListPage = () => {
     }));
   };
 
-const buildPayload = () => {
-  const categoryId =
-    form.category_id ||
-    categories.find(
-      (row) =>
-        textValue(row.category_name, row.name).toLowerCase() ===
-        String(form.category_id || "").toLowerCase()
-    )?.id ||
-    "";
+  const buildPayload = () => {
+    const categoryId =
+      form.category_id ||
+      categories.find(
+        (row) =>
+          textValue(row.category_name, row.name).toLowerCase() ===
+          String(form.category_id || "").toLowerCase()
+      )?.id ||
+      "";
 
-  return {
-    code: form.code.trim(),
-    name: form.name.trim(),
-    botanical_name: form.botanical_name.trim(),
-    category_id: Number(categoryId),
-    type: form.type === "n" ? "Non-Perishable" : "Perishable",
-    unit: form.unit.trim(),
-    reorder_level: Number(form.reorder_level || 0),
-    shelf_life_days: Number(form.shelf_life || 0),
-    storage_temp: form.storage_temp.trim(),
-    unit_cost: Number(form.unit_cost || 0),
-    returnable: Number(form.returnable_mode === "yes"),
-    supplier_ids: (form.supplier_ids || [])
-      .map((id) => Number(id))
-      .filter(Boolean),
-    description: form.description.trim(),
-    status: "active",
+    return {
+      code: form.code.trim(),
+      name: form.name.trim(),
+      botanical_name: form.botanical_name.trim(),
+      category_id: Number(categoryId),
+      type: form.type === "n" ? "Non-Perishable" : "Perishable",
+      unit: form.unit.trim(),
+      reorder_level: Number(form.reorder_level || 0),
+      shelf_life_days: Number(form.shelf_life || 0),
+      storage_temp: form.storage_temp.trim(),
+      unit_cost: Number(form.unit_cost || 0),
+      returnable: Number(form.returnable_mode === "yes"),
+      supplier_ids: (form.supplier_ids || [])
+        .map((id) => Number(id))
+        .filter(Boolean),
+      description: form.description.trim(),
+      status: "active",
+    };
   };
-};
+
   const handleSave = async (e) => {
     e.preventDefault();
 
@@ -657,8 +695,8 @@ const buildPayload = () => {
 
       toast.error(
         err?.response?.data?.error ||
-        err?.response?.data?.message ||
-        "Failed to save item"
+          err?.response?.data?.message ||
+          "Failed to save item"
       );
     } finally {
       setSaving(false);
@@ -710,8 +748,8 @@ const buildPayload = () => {
 
       toast.error(
         err?.response?.data?.error ||
-        err?.response?.data?.message ||
-        "Failed to deactivate item"
+          err?.response?.data?.message ||
+          "Failed to deactivate item"
       );
     }
   };
@@ -882,7 +920,7 @@ const buildPayload = () => {
                           style={editActionStyle}
                           onClick={() => openEditModal(row)}
                         >
-                          ✏️ Edit
+                          Edit
                         </button>
 
                         <button
@@ -911,7 +949,7 @@ const buildPayload = () => {
         <div className="modal-backdrop">
           <div className="md" style={modalCardStyle}>
             <div className="md-h">
-              <h3>{editingItemId ? "✏️ Edit Item" : "🌿 Add New Item"}</h3>
+              <h3>{editingItemId ? "Edit Item" : "🌿 Add New Item"}</h3>
               <button type="button" className="md-x" onClick={closeModal}>
                 ✕
               </button>
@@ -988,14 +1026,14 @@ const buildPayload = () => {
                           style={toggleButtonStyle(form.type === "p")}
                           onClick={() => setField("type", "p")}
                         >
-                          🍎 Perishable
+                          Perishable
                         </button>
                         <button
                           type="button"
                           style={toggleButtonStyle(form.type === "n")}
                           onClick={() => setField("type", "n")}
                         >
-                          📦 Non-Perishable
+                          Non-Perishable
                         </button>
                       </div>
                     </div>
@@ -1092,21 +1130,21 @@ const buildPayload = () => {
                         style={toggleButtonStyle(form.returnable_mode === "yes")}
                         onClick={() => setField("returnable_mode", "yes")}
                       >
-                        ✅ Yes — returnable
+                        Yes — returnable
                       </button>
                       <button
                         type="button"
                         style={toggleButtonStyle(form.returnable_mode === "no")}
                         onClick={() => setField("returnable_mode", "no")}
                       >
-                        ❌ No — wastage only
+                        No — wastage only
                       </button>
                       <button
                         type="button"
                         style={toggleButtonStyle(form.returnable_mode === "mkt")}
                         onClick={() => setField("returnable_mode", "mkt")}
                       >
-                        ❌ No (Market purchase)
+                        No (Market purchase)
                       </button>
                     </div>
                   </div>
@@ -1132,7 +1170,17 @@ const buildPayload = () => {
 
                     <button
                       type="button"
-                      className="btn btn-p btn-sm"
+                      style={addSupplierButtonStyle}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "#F4FBF6";
+                        e.currentTarget.style.color = PRIMARY_GREEN_HOVER;
+                        e.currentTarget.style.borderColor = PRIMARY_GREEN_HOVER;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "#FFFFFF";
+                        e.currentTarget.style.color = PRIMARY_GREEN;
+                        e.currentTarget.style.borderColor = PRIMARY_GREEN;
+                      }}
                       onClick={addSupplierToForm}
                     >
                       + Add
@@ -1154,7 +1202,7 @@ const buildPayload = () => {
                     {selectedSupplierRows.length ? (
                       selectedSupplierRows.map((row) => (
                         <span key={row.id} style={chipStyle}>
-                          🌿 {textValue(row.supplier_name, row.name, row.contact_person)}
+                          {textValue(row.supplier_name, row.name, row.contact_person)}
                           <span
                             onClick={() => removeSupplierFromForm(row.id)}
                             style={{ cursor: "pointer", fontWeight: 700 }}
@@ -1174,8 +1222,20 @@ const buildPayload = () => {
                 <button type="button" className="btn btn-s" onClick={closeModal}>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-p" disabled={saving}>
-                  {saving ? "Saving..." : "💾 Save Item"}
+                <button
+                  type="submit"
+                  style={saveButtonStyle}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = PRIMARY_GREEN_HOVER;
+                    e.currentTarget.style.borderColor = PRIMARY_GREEN_HOVER;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = PRIMARY_GREEN;
+                    e.currentTarget.style.borderColor = PRIMARY_GREEN;
+                  }}
+                  disabled={saving}
+                >
+                  {saving ? "Saving..." : "Save Item"}
                 </button>
               </div>
             </form>
