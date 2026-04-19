@@ -13,7 +13,7 @@ const overlayStyle = {
 };
 
 const modalStyle = {
-  width: "min(1280px, 96vw)",
+  width: "min(980px, 82vw)",
   maxHeight: "92vh",
   overflow: "auto",
   background: "var(--white)",
@@ -32,6 +32,29 @@ const closeBtnStyle = {
   justifyContent: "center",
   lineHeight: 1,
   fontSize: 24,
+};
+
+const detailSectionTitleStyle = {
+  fontSize: 12,
+  letterSpacing: ".12em",
+  textTransform: "uppercase",
+  color: "var(--text3)",
+  marginBottom: 14,
+};
+
+const detailRowStyle = {
+  display: "flex",
+  gap: 6,
+  alignItems: "baseline",
+  marginBottom: 8,
+  fontSize: 13,
+  lineHeight: 1.5,
+  color: "var(--text)",
+};
+
+const detailLabelStyle = {
+  fontWeight: 800,
+  color: "var(--text)",
 };
 
 const formatDate = (value) => {
@@ -125,9 +148,11 @@ const SupplierOrdersPage = () => {
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [message, setMessage] = useState({ type: "", text: "" });
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState({ type: "", text: "" });
+  const [acceptHover, setAcceptHover] = useState(false);
+  const [rejectHover, setRejectHover] = useState(false);
 
   const loadOrders = async () => {
     try {
@@ -189,6 +214,8 @@ const SupplierOrdersPage = () => {
       setSelectedOrderId(id);
       setLoadingDetails(true);
       setMessage({ type: "", text: "" });
+      setAcceptHover(false);
+      setRejectHover(false);
 
       const res = await api.get(`/supplier-portal/orders/${id}`);
       const data = res.data || null;
@@ -207,8 +234,10 @@ const SupplierOrdersPage = () => {
   const closeOrder = () => {
     setSelectedOrderId(null);
     setSelectedOrder(null);
-    setNote("");
     setMessage({ type: "", text: "" });
+    setNote("");
+    setAcceptHover(false);
+    setRejectHover(false);
   };
 
   const handleRespond = async (responseStatus) => {
@@ -244,6 +273,11 @@ const SupplierOrdersPage = () => {
       setSaving(false);
     }
   };
+
+  const isClosedOrder = useMemo(() => {
+    const s = normalizeStatus(selectedOrder?.status);
+    return s === "grn_created" || s === "closed" || s === "completed" || s === "delivered";
+  }, [selectedOrder]);
 
   return (
     <>
@@ -329,14 +363,14 @@ const SupplierOrdersPage = () => {
           <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
             <div
               style={{
-                padding: "18px 30px",
+                padding: "18px 26px",
                 borderBottom: "1px solid var(--border)",
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
               }}
             >
-              <div style={{ fontSize: 20, fontWeight: 800, color: "var(--text)" }}>
+              <div style={{ fontSize: 18, fontWeight: 800, color: "var(--text)" }}>
                 {selectedOrder?.po_number || "Purchase Order"} — Purchase Order
               </div>
 
@@ -349,7 +383,7 @@ const SupplierOrdersPage = () => {
               <div className="cc">Loading purchase order details...</div>
             ) : (
               <>
-                <div style={{ padding: 30 }}>
+                <div style={{ padding: 24 }}>
                   {message.text ? (
                     <div className={`ib ${message.type === "error" ? "ib-d" : "ib-s"}`}>
                       <div>{message.text}</div>
@@ -361,19 +395,19 @@ const SupplierOrdersPage = () => {
                       border: "1px solid var(--border)",
                       borderRadius: 14,
                       overflow: "hidden",
-                      marginBottom: 22,
+                      marginBottom: 18,
                     }}
                   >
                     <div
                       style={{
-                        padding: "22px 24px",
+                        padding: "20px 22px",
                         textAlign: "center",
                         borderBottom: "1px solid var(--border)",
                       }}
                     >
                       <div
                         style={{
-                          fontSize: 12,
+                          fontSize: 11,
                           letterSpacing: ".18em",
                           color: "var(--text3)",
                           textTransform: "uppercase",
@@ -381,7 +415,7 @@ const SupplierOrdersPage = () => {
                       >
                         Purchase Order
                       </div>
-                      <div style={{ fontSize: 24, fontWeight: 800, color: "var(--text)", marginTop: 6 }}>
+                      <div style={{ fontSize: 21, fontWeight: 800, color: "var(--text)", marginTop: 6 }}>
                         Fresh World Export (Pvt) Ltd
                       </div>
                       <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 4 }}>
@@ -396,68 +430,57 @@ const SupplierOrdersPage = () => {
                         borderBottom: "1px solid var(--border)",
                       }}
                     >
-                      <div style={{ padding: 24, borderRight: "1px solid var(--border)" }}>
-                        <div
-                          style={{
-                            fontSize: 12,
-                            letterSpacing: ".12em",
-                            textTransform: "uppercase",
-                            color: "var(--text3)",
-                            marginBottom: 12,
-                          }}
-                        >
-                          Supplier Details
+                      <div style={{ padding: 22, borderRight: "1px solid var(--border)" }}>
+                        <div style={detailSectionTitleStyle}>Supplier Details</div>
+
+                        <div style={detailRowStyle}>
+                          <span style={detailLabelStyle}>Name:</span>
+                          <span>{selectedOrder?.supplier_name || "—"}</span>
                         </div>
-                        <div style={{ lineHeight: 1.7 }}>
-                          <div>
-                            <strong>Name:</strong> {selectedOrder?.supplier_name || "—"}
-                          </div>
-                          <div>
-                            <strong>Address:</strong> {selectedOrder?.address || "—"}
-                          </div>
-                          <div>
-                            <strong>Contact:</strong> {selectedOrder?.contact_number || "—"}
-                          </div>
-                          <div>
-                            <strong>Email:</strong> {selectedOrder?.email || "—"}
-                          </div>
+                        <div style={detailRowStyle}>
+                          <span style={detailLabelStyle}>Address:</span>
+                          <span>{selectedOrder?.address || "—"}</span>
+                        </div>
+                        <div style={detailRowStyle}>
+                          <span style={detailLabelStyle}>Contact:</span>
+                          <span>{selectedOrder?.contact_number || "—"}</span>
+                        </div>
+                        <div style={detailRowStyle}>
+                          <span style={detailLabelStyle}>Email:</span>
+                          <span>{selectedOrder?.email || "—"}</span>
                         </div>
                       </div>
 
-                      <div style={{ padding: 24 }}>
-                        <div
-                          style={{
-                            fontSize: 12,
-                            letterSpacing: ".12em",
-                            textTransform: "uppercase",
-                            color: "var(--text3)",
-                            marginBottom: 12,
-                          }}
-                        >
-                          Order Details
+                      <div style={{ padding: 22 }}>
+                        <div style={detailSectionTitleStyle}>Order Details</div>
+
+                        <div style={detailRowStyle}>
+                          <span style={detailLabelStyle}>PO No:</span>
+                          <span>{selectedOrder?.po_number || "—"}</span>
                         </div>
-                        <div style={{ lineHeight: 1.7 }}>
-                          <div>
-                            <strong>PO No:</strong> {selectedOrder?.po_number || "—"}
-                          </div>
-                          <div>
-                            <strong>PO Date:</strong> {formatDate(selectedOrder?.order_date || selectedOrder?.created_at)}
-                          </div>
-                          <div>
-                            <strong>Required By:</strong> {formatDate(selectedOrder?.required_date)}
-                          </div>
-                          <div>
-                            <strong>Payment Terms:</strong> {selectedOrder?.payment_terms || "—"}
-                          </div>
-                          <div>
-                            <strong>Status:</strong>{" "}
+                        <div style={detailRowStyle}>
+                          <span style={detailLabelStyle}>PO Date:</span>
+                          <span>{formatDate(selectedOrder?.order_date || selectedOrder?.created_at)}</span>
+                        </div>
+                        <div style={detailRowStyle}>
+                          <span style={detailLabelStyle}>Required By:</span>
+                          <span>{formatDate(selectedOrder?.required_date)}</span>
+                        </div>
+                        <div style={detailRowStyle}>
+                          <span style={detailLabelStyle}>Payment Terms:</span>
+                          <span>{selectedOrder?.payment_terms || "—"}</span>
+                        </div>
+                        <div style={detailRowStyle}>
+                          <span style={detailLabelStyle}>Status:</span>
+                          <span>
                             <span className={`badge ${responseClass(selectedOrder?.supplier_response_status)}`}>
                               {responseText(selectedOrder?.supplier_response_status)}
                             </span>
-                          </div>
-                          <div>
-                            <strong>PO Status:</strong> {poStatusText(selectedOrder?.status)}
-                          </div>
+                          </span>
+                        </div>
+                        <div style={detailRowStyle}>
+                          <span style={detailLabelStyle}>PO Status:</span>
+                          <span>{poStatusText(selectedOrder?.status)}</span>
                         </div>
                       </div>
                     </div>
@@ -496,46 +519,114 @@ const SupplierOrdersPage = () => {
                       </tbody>
                     </table>
 
-                    <div style={{ padding: 24, borderTop: "1px solid var(--border)" }}>
-                      <div
-                        style={{
-                          fontSize: 12,
-                          letterSpacing: ".12em",
-                          textTransform: "uppercase",
-                          color: "var(--text3)",
-                          marginBottom: 10,
-                        }}
-                      >
-                        Instructions from Fresh World
+                    <div style={{ padding: 22, borderTop: "1px solid var(--border)" }}>
+                      <div style={detailSectionTitleStyle}>Instructions from Fresh World</div>
+                      <div style={{ color: "var(--text2)", fontSize: 13 }}>
+                        {selectedOrder?.notes || "No instructions available"}
                       </div>
-                      <div style={{ color: "var(--text2)" }}>{selectedOrder?.notes || "No instructions available"}</div>
                     </div>
 
-                    <div style={{ padding: 24, borderTop: "1px solid var(--border)" }}>
-                      <div
-                        style={{
-                          fontSize: 12,
-                          letterSpacing: ".12em",
-                          textTransform: "uppercase",
-                          color: "var(--text3)",
-                          marginBottom: 10,
-                        }}
-                      >
-                        Terms & Conditions
-                      </div>
-                      <ol style={{ margin: 0, paddingLeft: 20, lineHeight: 1.8, color: "var(--text2)" }}>
+                    <div style={{ padding: 22, borderTop: "1px solid var(--border)" }}>
+                      <div style={detailSectionTitleStyle}>Terms & Conditions</div>
+                      <ol style={{ margin: 0, paddingLeft: 20, lineHeight: 1.8, color: "var(--text2)", fontSize: 13 }}>
                         <li>Fresh World reserves the right to reject goods not meeting agreed specifications.</li>
-                        <li>Invoice from supplier must reference this PO number.</li>
                         <li>Delivery must be completed within the required-by date.</li>
-                        <li>Packing and delivery costs are borne by the supplier.</li>
                       </ol>
                     </div>
                   </div>
+
+                  {isClosedOrder ? (
+                    <div
+                      style={{
+                        padding: "20px 22px",
+                        border: "1px solid rgba(39,143,85,.24)",
+                        background: "rgba(39,143,85,.10)",
+                        color: "var(--g700)",
+                        borderRadius: 14,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 14,
+                        fontSize: 13,
+                        fontWeight: 500,
+                      }}
+                    >
+                      <span style={{ fontSize: 22, lineHeight: 1 }}>✓</span>
+                      <span>This PO has been fulfilled and closed. No further action required.</span>
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        border: "1px solid var(--border)",
+                        borderRadius: 14,
+                        padding: 22,
+                      }}
+                    >
+                      <div style={detailSectionTitleStyle}>Your Response</div>
+
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "1fr 1fr",
+                          gap: 12,
+                          marginBottom: 16,
+                        }}
+                      >
+                        <button
+                          type="button"
+                          className="btn btn-p btn-sm"
+                          disabled={saving}
+                          onClick={() => handleRespond("accepted")}
+                          onMouseEnter={() => !saving && setAcceptHover(true)}
+                          onMouseLeave={() => setAcceptHover(false)}
+                          style={{
+                            width: "100%",
+                            background: acceptHover ? "var(--g700)" : "var(--g900)",
+                            color: "var(--white)",
+                            border: "1px solid rgba(39,143,85,.45)",
+                            boxShadow: "none",
+                            transition: "all .18s ease",
+                          }}
+                        >
+                          {saving ? "Saving..." : "Accept PO"}
+                        </button>
+
+                        <button
+                          type="button"
+                          className="btn btn-s btn-sm"
+                          disabled={saving}
+                          onClick={() => handleRespond("rejected")}
+                          onMouseEnter={() => !saving && setRejectHover(true)}
+                          onMouseLeave={() => setRejectHover(false)}
+                          style={{
+                            width: "100%",
+                            background: rejectHover ? "var(--d)" : "var(--white)",
+                            color: rejectHover ? "var(--white)" : "var(--d)",
+                            border: "1px solid rgba(200,75,47,.28)",
+                            boxShadow: "none",
+                            transition: "all .18s ease",
+                          }}
+                        >
+                          {saving ? "Saving..." : "Reject PO"}
+                        </button>
+                      </div>
+
+                      <div className="ff" style={{ marginBottom: 0 }}>
+                        <label className="fl">Special Note (Optional)</label>
+                        <textarea
+                          className="fc"
+                          rows="4"
+                          value={note}
+                          onChange={(e) => setNote(e.target.value)}
+                          placeholder="Add any notes, partial delivery info, or delivery date confirmation..."
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div
                   style={{
-                    padding: "18px 30px",
+                    padding: "16px 24px",
                     borderTop: "1px solid var(--border)",
                     display: "flex",
                     justifyContent: "flex-end",
