@@ -105,8 +105,11 @@ export default function GrnListPage() {
         </span>
       </div>
 
-      <div className="fb grn-toolbar-row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-        <div className="fb grn-toolbar-left" style={{ marginBottom: 0, flexWrap: "wrap" }}>
+      <div
+        className="fb grn-toolbar-row"
+        style={{ justifyContent: "space-between", alignItems: "center" }}
+      >
+        <div className="fb grn-toolbar-left" style={{ marginBottom: 0 }}>
           <button
             type="button"
             className={`ft ${periodFilter === "this" ? "on" : ""}`}
@@ -131,7 +134,7 @@ export default function GrnListPage() {
             <FolderOpen size={14} /> GRN History
           </button>
 
-          <div className="search-field" style={{ minWidth: 280 }}>
+          <div className="search-field grn-search-field">
             <Search size={16} />
             <input
               type="text"
