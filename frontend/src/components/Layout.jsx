@@ -335,36 +335,81 @@ const Layout = () => {
   const location = useLocation();
   const [notifOpen, setNotifOpen] = useState(false);
   const [approvalCount, setApprovalCount] = useState(0);
+  const [expiryCount, setExpiryCount] = useState(0);
+  const [lowStockCount, setLowStockCount] = useState(0);
 
   const roleKey = normalizeRole(user?.role);
 
   useEffect(() => {
-    const loadApprovalCount = async () => {
+    const loadSidebarCounts = async () => {
       try {
-        if (roleKey !== "manager") {
+        const requests = [
+          roleKey === "manager" ? api.get("/approvals/counts") : Promise.resolve({ data: { total: 0 } }),
+          api.get("/inventory/expiry", { params: { days: 14 } }),
+          api.get("/inventory/low-stock"),
+        ];
+
+        const [approvalsRes, expiryRes, lowStockRes] = await Promise.allSettled(requests);
+
+        if (approvalsRes.status === "fulfilled") {
+          setApprovalCount(Number(approvalsRes.value?.data?.total || 0));
+        } else {
           setApprovalCount(0);
-          return;
         }
 
-        const res = await api.get("/approvals/counts");
-        setApprovalCount(Number(res.data?.total || 0));
-      } catch {
+        if (expiryRes.status === "fulfilled") {
+          setExpiryCount(Array.isArray(expiryRes.value?.data) ? expiryRes.value.data.length : 0);
+        } else {
+          setExpiryCount(0);
+        }
+
+        if (lowStockRes.status === "fulfilled") {
+          setLowStockCount(Array.isArray(lowStockRes.value?.data) ? lowStockRes.value.data.length : 0);
+        } else {
+          setLowStockCount(0);
+        }
+      } catch (err) {
+        console.error(err);
         setApprovalCount(0);
+        setExpiryCount(0);
+        setLowStockCount(0);
       }
     };
 
-    loadApprovalCount();
+    loadSidebarCounts();
   }, [roleKey, location.pathname]);
-
   const sections = useMemo(() => {
     const base = navByRole[roleKey] || navByRole.manager;
 
+    const withDynamicCounts = base.map((section) => ({
+      ...section,
+      items: section.items.map((item) => {
+        if (item.to === "/inventory/expiry") {
+          return {
+            ...item,
+            badge: expiryCount > 0 ? { text: String(expiryCount), cls: "nb-r" } : null,
+          };
+        }
+
+        if (item.to === "/inventory/low-stock") {
+          return {
+            ...item,
+            badge: lowStockCount > 0 ? { text: String(lowStockCount), cls: "nb-r" } : null,
+          };
+        }
+
+        return item;
+      }),
+    }));
+
     if (roleKey !== "manager") {
-      return base;
+      return withDynamicCounts;
     }
 
-    return base.map((section) => {
-      if (section.label !== "OVERVIEW") return section;
+    return withDynamicCounts.map((section) => {
+      if (section.label !== "OVERVIEW") {
+        return section;
+      }
 
       return {
         ...section,
@@ -379,7 +424,7 @@ const Layout = () => {
         ],
       };
     });
-  }, [roleKey, approvalCount]);
+  }, [roleKey, approvalCount, expiryCount, lowStockCount]);
 
   const meta = getMeta(location.pathname);
   const notifications = notificationsByRole[roleKey] || notificationsByRole.manager;

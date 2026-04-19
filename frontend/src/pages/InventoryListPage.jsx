@@ -89,6 +89,13 @@ const statusStyleMap = {
   },
 };
 
+const statusTooltipMap = {
+  in_stock: "Stock is available and above the reorder point.",
+  low_stock: "Stock is at or below the reorder point. Replenishment is needed soon.",
+  out_of_stock: "No available stock remains. Immediate replenishment is required.",
+  expiring: "This item has active batches nearing expiry and should follow FEFO priority.",
+};
+
 const cardStyle = {
   background: "var(--white)",
   border: "1px solid var(--border)",
@@ -107,6 +114,7 @@ const cardAccentStyle = (accent) => ({
   height: 4,
   background: accent,
 });
+
 const FILTER_CONTROL_HEIGHT = 36;
 const PRIMARY_GREEN = "#166534";
 const PRIMARY_GREEN_HOVER = "#14532D";
@@ -129,6 +137,7 @@ const filterButtonStyle = (active) => ({
   boxSizing: "border-box",
   transition: "all 0.18s ease",
 });
+
 const topActionButtonStyle = {
   height: 44,
   padding: "0 18px",
@@ -148,6 +157,7 @@ const topActionButtonStyle = {
   boxShadow: "0 2px 8px rgba(22,101,52,.12)",
   boxSizing: "border-box",
 };
+
 const statusBadgeStyle = (key) => {
   const config = statusStyleMap[key] || statusStyleMap.in_stock;
 
@@ -176,31 +186,32 @@ const statusDotStyle = (key) => {
     flexShrink: 0,
   };
 };
+
 const detailLabelStyle = {
-  fontSize: 12,
+  fontSize: 11,
   fontWeight: 700,
   letterSpacing: "0.08em",
   textTransform: "uppercase",
   color: "#9AA2B0",
-  marginBottom: 8,
+  marginBottom: 6,
 };
 
 const detailValueStyle = {
-  fontSize: 16,
+  fontSize: 14,
   fontWeight: 700,
   color: "var(--g900)",
 };
 
 const modalFooterButtonBaseStyle = {
-  height: 44,
-  padding: "0 16px",
-  minWidth: 86,
+  height: 40,
+  padding: "0 14px",
+  minWidth: 82,
   borderRadius: 10,
   border: "1px solid #CBD5D1",
   background: "var(--white)",
   color: "var(--g800)",
   fontWeight: 700,
-  fontSize: 14,
+  fontSize: 13,
   cursor: "pointer",
   display: "inline-flex",
   alignItems: "center",
@@ -236,10 +247,11 @@ const getModalFooterButtonStyle = (type, hovered) => {
     border: "1px solid var(--g900)",
   };
 };
+
 const recentMovementBoxStyle = {
   border: "1px solid var(--border)",
   borderRadius: 12,
-  padding: "0 22px",
+  padding: "0 18px",
   background: "var(--white)",
 };
 
@@ -421,24 +433,19 @@ const InventoryListPage = () => {
       result = result.filter((row) => row.categoryName === category);
     }
 
-if (tab === "Low Stock") {
-  result = result.filter((row) => row.statusKey === "low_stock");
-} else if (tab === "Out of Stock") {
-  result = result.filter((row) => row.statusKey === "out_of_stock");
-} else if (tab === "Expiring") {
-  result = result.filter((row) => row.expiring);
-}
+    if (tab === "Low Stock") {
+      result = result.filter((row) => row.statusKey === "low_stock");
+    } else if (tab === "Out of Stock") {
+      result = result.filter((row) => row.statusKey === "out_of_stock");
+    } else if (tab === "Expiring") {
+      result = result.filter((row) => row.expiring);
+    }
+
     const q = search.trim().toLowerCase();
 
     if (q) {
       result = result.filter((row) =>
-        [
-          row.itemCode,
-          row.itemName,
-          row.categoryName,
-          row.currentStock,
-          row.reorderPoint,
-        ]
+        [row.itemCode, row.itemName, row.categoryName, row.currentStock, row.reorderPoint]
           .join(" ")
           .toLowerCase()
           .includes(q)
@@ -450,9 +457,7 @@ if (tab === "Low Stock") {
 
   const summary = useMemo(() => {
     const totalItems = normalizedRows.length;
-    const lowStockCount = normalizedRows.filter(
-      (row) => row.statusKey === "low_stock"
-    ).length;
+    const lowStockCount = normalizedRows.filter((row) => row.statusKey === "low_stock").length;
     const outOfStockCount = normalizedRows.filter((row) => row.statusKey === "out_of_stock").length;
     const estimatedValue = normalizedRows.reduce(
       (sum, row) => sum + numberValue(row.estimatedValue),
@@ -498,28 +503,31 @@ if (tab === "Low Stock") {
     setDetailError("");
     setLoadingDetail(false);
   };
+
   const recentMovements = useMemo(() => {
-  if (!selectedRow) return [];
+    if (!selectedRow) return [];
 
-  const firstBatch = detailBatches[0];
-  const movements = [];
+    const firstBatch = detailBatches[0];
+    const movements = [];
 
-  if (selectedRow.lastUpdated) {
-    movements.push({
-      text: `Inventory updated for ${selectedRow.itemName}`,
-      date: formatLongDate(selectedRow.lastUpdated),
-    });
-  }
+    if (selectedRow.lastUpdated) {
+      movements.push({
+        text: `Inventory updated for ${selectedRow.itemName}`,
+        date: formatLongDate(selectedRow.lastUpdated),
+      });
+    }
 
-  if (firstBatch) {
-    movements.push({
-      text: `${textValue(firstBatch.batch_code, firstBatch.batch_number, firstBatch.code) || "First batch"} is first in FEFO order`,
-      date: formatLongDate(textValue(firstBatch.received_date, firstBatch.created_at)),
-    });
-  }
+    if (firstBatch) {
+      movements.push({
+        text: `${
+          textValue(firstBatch.batch_code, firstBatch.batch_number, firstBatch.code) || "First batch"
+        } is first in FEFO order`,
+        date: formatLongDate(textValue(firstBatch.received_date, firstBatch.created_at)),
+      });
+    }
 
-  return movements;
-}, [selectedRow, detailBatches]);
+    return movements;
+  }, [selectedRow, detailBatches]);
 
   return (
     <div>
@@ -634,7 +642,7 @@ if (tab === "Low Stock") {
 
         <select
           className="fc"
-          style={{ maxWidth: 190, height: FILTER_CONTROL_HEIGHT  }}
+          style={{ maxWidth: 190, height: FILTER_CONTROL_HEIGHT }}
           value={category}
           onChange={(e) => setCategory(e.target.value)}
         >
@@ -644,8 +652,8 @@ if (tab === "Low Stock") {
             </option>
           ))}
         </select>
+
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        
           {["All", "Low Stock", "Out of Stock", "Expiring"].map((tabName) => (
             <button
               key={tabName}
@@ -660,10 +668,6 @@ if (tab === "Low Stock") {
       </div>
 
       <div className="tw">
-        <div className="tw-h">
-          <h3>Inventory</h3>
-        </div>
-
         <table>
           <thead>
             <tr>
@@ -704,9 +708,14 @@ if (tab === "Low Stock") {
                   <td>{row.batches}</td>
                   <td>{formatShortDate(row.lastUpdated)}</td>
                   <td>
-                    <span style={statusBadgeStyle(row.statusKey)}>
-                      <span style={statusDotStyle(row.statusKey)} />
-                      {statusStyleMap[row.statusKey]?.label}
+                    <span
+                      title={statusTooltipMap[row.statusKey] || ""}
+                      style={{ display: "inline-flex" }}
+                    >
+                      <span style={statusBadgeStyle(row.statusKey)}>
+                        <span style={statusDotStyle(row.statusKey)} />
+                        {statusStyleMap[row.statusKey]?.label}
+                      </span>
                     </span>
                   </td>
                 </tr>
@@ -720,316 +729,318 @@ if (tab === "Low Stock") {
         </table>
       </div>
 
-{selectedRow ? (
-  <div className="modal-backdrop">
-    <div className="md" style={{ maxWidth: 1120, width: "88%" }}>
-      <div
-        className="md-h"
-        style={{
-          padding: "22px 26px",
-          borderBottom: "1px solid var(--border)",
-        }}
-      >
-        <h3 style={{ fontSize: 18, fontWeight: 800, color: "var(--g900)" }}>
-          {selectedRow.itemName} — Inventory Detail
-        </h3>
-        <button type="button" className="md-x" onClick={closeDetail}>
-          ✕
-        </button>
-      </div>
-
-      <div className="md-b" style={{ padding: 24 }}>
-        <div
-          style={{
-            border: "1px solid var(--border)",
-            borderRadius: 14,
-            overflow: "hidden",
-            marginBottom: 22,
-            background: "var(--white)",
-          }}
-        >
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
+      {selectedRow ? (
+        <div className="modal-backdrop">
+          <div className="md" style={{ maxWidth: 960, width: "82%" }}>
             <div
+              className="md-h"
               style={{
-                padding: "14px 20px",
-                borderRight: "1px solid var(--border)",
+                padding: "18px 22px",
                 borderBottom: "1px solid var(--border)",
               }}
             >
-              <div style={detailLabelStyle}>Item Code</div>
-              <div style={detailValueStyle}>{selectedRow.itemCode || "—"}</div>
+              <h3 style={{ fontSize: 16, fontWeight: 800, color: "var(--g900)" }}>
+                {selectedRow.itemName} — Inventory Detail
+              </h3>
+              <button type="button" className="md-x" onClick={closeDetail}>
+                ✕
+              </button>
             </div>
 
-            <div
-              style={{
-                padding: "14px 20px",
-                borderBottom: "1px solid var(--border)",
-              }}
-            >
-              <div style={detailLabelStyle}>Category</div>
-              <div style={detailValueStyle}>{selectedRow.categoryName || "—"}</div>
-            </div>
-
-            <div
-              style={{
-                padding: "14px 20px",
-                borderRight: "1px solid var(--border)",
-                borderBottom: "1px solid var(--border)",
-              }}
-            >
-              <div style={detailLabelStyle}>Current Stock</div>
-              <div style={detailValueStyle}>
-                {selectedRow.currentStock} {selectedRow.unit}
-              </div>
-            </div>
-
-            <div
-              style={{
-                padding: "14px 20px",
-                borderBottom: "1px solid var(--border)",
-              }}
-            >
-              <div style={detailLabelStyle}>Reorder Point</div>
-              <div style={detailValueStyle}>
-                {selectedRow.reorderPoint} {selectedRow.unit}
-              </div>
-            </div>
-
-            <div
-              style={{
-                padding: "14px 20px",
-                borderRight: "1px solid var(--border)",
-              }}
-            >
-              <div style={detailLabelStyle}>Status</div>
-              <div style={{ marginTop: 6 }}>
-                <span style={statusBadgeStyle(selectedRow.statusKey)}>
-                  <span style={statusDotStyle(selectedRow.statusKey)} />
-                  {statusStyleMap[selectedRow.statusKey]?.label}
-                </span>
-              </div>
-            </div>
-
-            <div style={{ padding: "14px 20px" }}>
-              <div style={detailLabelStyle}>Last Updated</div>
-              <div style={detailValueStyle}>
-                {formatShortDate(selectedRow.lastUpdated)}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div
-          style={{
-            marginBottom: 12,
-            fontWeight: 800,
-            fontSize: 15,
-            color: "var(--g900)",
-          }}
-        >
-          Active Batches (FEFO Order)
-        </div>
-
-        {detailError ? (
-          <div className="ib ib-d" style={{ marginBottom: 16 }}>
-            <span>⚠️</span>
-            <div>{detailError}</div>
-          </div>
-        ) : null}
-
-        <div className="tw" style={{ marginBottom: 22 }}>
-          <table>
-            <thead>
-              <tr>
-                <th>BATCH NO.</th>
-                <th>QTY REMAINING</th>
-                <th>RECEIVED</th>
-                <th>EXPIRY DATE</th>
-                <th>DAYS LEFT</th>
-                <th>FEFO PRIORITY</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {loadingDetail ? (
-                <tr>
-                  <td colSpan="6">Loading batches...</td>
-                </tr>
-              ) : detailBatches.length ? (
-                detailBatches.map((batch, index) => {
-                  const qty = numberValue(
-                    batch.available_quantity,
-                    batch.qty_remaining,
-                    batch.quantity,
-                    batch.qty_on_hand
-                  );
-                  const expiry = textValue(batch.expiry_date);
-                  const daysLeft = daysLeftFromDate(expiry);
-
-                  return (
-                    <tr key={batch.id || batch.batch_code || index}>
-                      <td>
-                        {textValue(batch.batch_code, batch.batch_number, batch.code) || "—"}
-                      </td>
-                      <td>
-                        {qty} {textValue(batch.unit, selectedRow.unit)}
-                      </td>
-                      <td>{formatLongDate(textValue(batch.received_date, batch.created_at))}</td>
-                      <td
-                        style={
-                          daysLeft !== null && daysLeft <= 7
-                            ? { color: "#9C2D22", fontWeight: 700 }
-                            : undefined
-                        }
-                      >
-                        {formatLongDate(expiry)}
-                      </td>
-                      <td
-                        style={
-                          daysLeft !== null && daysLeft <= 7
-                            ? { color: "#9C2D22", fontWeight: 700 }
-                            : { color: "var(--text2)" }
-                        }
-                      >
-                        {daysLeft === null ? "—" : `${daysLeft} days`}
-                      </td>
-                      <td
-                        style={
-                          index === 0
-                            ? { color: "#9C2D22", fontWeight: 700 }
-                            : { color: "#9AA2B0", fontWeight: 700 }
-                        }
-                      >
-                        {index === 0 ? "#1 — Dispatch First" : `#${index + 1}`}
-                      </td>
-                    </tr>
-                  );
-                })
-              ) : (
-                <tr>
-                  <td colSpan="6">No active batches found</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div
-          style={{
-            marginBottom: 12,
-            fontWeight: 800,
-            fontSize: 15,
-            color: "var(--g900)",
-          }}
-        >
-          Recent Movement
-        </div>
-
-        <div style={recentMovementBoxStyle}>
-          {recentMovements.length ? (
-            recentMovements.map((movement, index) => (
+            <div className="md-b" style={{ padding: 20 }}>
               <div
-                key={index}
                 style={{
-                  padding: "18px 0",
-                  borderBottom:
-                    index !== recentMovements.length - 1
-                      ? "1px solid var(--border)"
-                      : "none",
+                  border: "1px solid var(--border)",
+                  borderRadius: 14,
+                  overflow: "hidden",
+                  marginBottom: 18,
+                  background: "var(--white)",
                 }}
               >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: 12,
-                    color: "var(--text2)",
-                    fontSize: 15,
-                  }}
-                >
-                  <span
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
+                  <div
                     style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: "50%",
-                      background: "#C9CFD8",
-                      marginTop: 7,
-                      flexShrink: 0,
+                      padding: "12px 18px",
+                      borderRight: "1px solid var(--border)",
+                      borderBottom: "1px solid var(--border)",
                     }}
-                  />
-                  <div>
-                    <div>{movement.text}</div>
-                    <div
-                      style={{
-                        marginTop: 8,
-                        color: "#9AA2B0",
-                        fontSize: 13,
-                      }}
-                    >
-                      {movement.date || "—"}
+                  >
+                    <div style={detailLabelStyle}>Item Code</div>
+                    <div style={detailValueStyle}>{selectedRow.itemCode || "—"}</div>
+                  </div>
+
+                  <div
+                    style={{
+                      padding: "12px 18px",
+                      borderBottom: "1px solid var(--border)",
+                    }}
+                  >
+                    <div style={detailLabelStyle}>Category</div>
+                    <div style={detailValueStyle}>{selectedRow.categoryName || "—"}</div>
+                  </div>
+
+                  <div
+                    style={{
+                      padding: "12px 18px",
+                      borderRight: "1px solid var(--border)",
+                      borderBottom: "1px solid var(--border)",
+                    }}
+                  >
+                    <div style={detailLabelStyle}>Current Stock</div>
+                    <div style={detailValueStyle}>
+                      {selectedRow.currentStock} {selectedRow.unit}
                     </div>
+                  </div>
+
+                  <div
+                    style={{
+                      padding: "12px 18px",
+                      borderBottom: "1px solid var(--border)",
+                    }}
+                  >
+                    <div style={detailLabelStyle}>Reorder Point</div>
+                    <div style={detailValueStyle}>
+                      {selectedRow.reorderPoint} {selectedRow.unit}
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      padding: "12px 18px",
+                      borderRight: "1px solid var(--border)",
+                    }}
+                  >
+                    <div style={detailLabelStyle}>Status</div>
+                    <div style={{ marginTop: 4 }}>
+                      <span
+                        title={statusTooltipMap[selectedRow.statusKey] || ""}
+                        style={{ display: "inline-flex" }}
+                      >
+                        <span style={statusBadgeStyle(selectedRow.statusKey)}>
+                          <span style={statusDotStyle(selectedRow.statusKey)} />
+                          {statusStyleMap[selectedRow.statusKey]?.label}
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{ padding: "12px 18px" }}>
+                    <div style={detailLabelStyle}>Last Updated</div>
+                    <div style={detailValueStyle}>{formatShortDate(selectedRow.lastUpdated)}</div>
                   </div>
                 </div>
               </div>
-            ))
-          ) : (
-            <div style={{ padding: "20px 0", color: "#9AA2B0" }}>
-              No recent movement available
+
+              <div
+                style={{
+                  marginBottom: 10,
+                  fontWeight: 800,
+                  fontSize: 14,
+                  color: "var(--g900)",
+                }}
+              >
+                Active Batches (FEFO Order)
+              </div>
+
+              {detailError ? (
+                <div className="ib ib-d" style={{ marginBottom: 14 }}>
+                  <span>⚠️</span>
+                  <div>{detailError}</div>
+                </div>
+              ) : null}
+
+              <div className="tw" style={{ marginBottom: 18 }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>BATCH NO.</th>
+                      <th>QTY REMAINING</th>
+                      <th>RECEIVED</th>
+                      <th>EXPIRY DATE</th>
+                      <th>DAYS LEFT</th>
+                      <th>FEFO PRIORITY</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {loadingDetail ? (
+                      <tr>
+                        <td colSpan="6">Loading batches...</td>
+                      </tr>
+                    ) : detailBatches.length ? (
+                      detailBatches.map((batch, index) => {
+                        const qty = numberValue(
+                          batch.available_quantity,
+                          batch.qty_remaining,
+                          batch.quantity,
+                          batch.qty_on_hand
+                        );
+                        const expiry = textValue(batch.expiry_date);
+                        const daysLeft = daysLeftFromDate(expiry);
+
+                        return (
+                          <tr key={batch.id || batch.batch_code || index}>
+                            <td>
+                              {textValue(batch.batch_code, batch.batch_number, batch.code) || "—"}
+                            </td>
+                            <td>
+                              {qty} {textValue(batch.unit, selectedRow.unit)}
+                            </td>
+                            <td>{formatLongDate(textValue(batch.received_date, batch.created_at))}</td>
+                            <td
+                              style={
+                                daysLeft !== null && daysLeft <= 7
+                                  ? { color: "#9C2D22", fontWeight: 700 }
+                                  : undefined
+                              }
+                            >
+                              {formatLongDate(expiry)}
+                            </td>
+                            <td
+                              style={
+                                daysLeft !== null && daysLeft <= 7
+                                  ? { color: "#9C2D22", fontWeight: 700 }
+                                  : { color: "var(--text2)" }
+                              }
+                            >
+                              {daysLeft === null ? "—" : `${daysLeft} days`}
+                            </td>
+                            <td
+                              style={
+                                index === 0
+                                  ? { color: "#9C2D22", fontWeight: 700 }
+                                  : { color: "#9AA2B0", fontWeight: 700 }
+                              }
+                            >
+                              {index === 0 ? "#1 — Dispatch First" : `#${index + 1}`}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan="6">No active batches found</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div
+                style={{
+                  marginBottom: 10,
+                  fontWeight: 800,
+                  fontSize: 14,
+                  color: "var(--g900)",
+                }}
+              >
+                Recent Movement
+              </div>
+
+              <div style={recentMovementBoxStyle}>
+                {recentMovements.length ? (
+                  recentMovements.map((movement, index) => (
+                    <div
+                      key={index}
+                      style={{
+                        padding: "16px 0",
+                        borderBottom:
+                          index !== recentMovements.length - 1
+                            ? "1px solid var(--border)"
+                            : "none",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 12,
+                          color: "var(--text2)",
+                          fontSize: 14,
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: "50%",
+                            background: "#C9CFD8",
+                            marginTop: 6,
+                            flexShrink: 0,
+                          }}
+                        />
+                        <div>
+                          <div>{movement.text}</div>
+                          <div
+                            style={{
+                              marginTop: 6,
+                              color: "#9AA2B0",
+                              fontSize: 12,
+                            }}
+                          >
+                            {movement.date || "—"}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ padding: "18px 0", color: "#9AA2B0", fontSize: 13 }}>
+                    No recent movement available
+                  </div>
+                )}
+              </div>
             </div>
-          )}
+
+            <div
+              className="md-f"
+              style={{
+                padding: "16px 22px",
+                borderTop: "1px solid var(--border)",
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 10,
+              }}
+            >
+              <button
+                type="button"
+                style={getModalFooterButtonStyle("close", hoveredFooterBtn === "close")}
+                onMouseEnter={() => setHoveredFooterBtn("close")}
+                onMouseLeave={() => setHoveredFooterBtn("")}
+                onClick={closeDetail}
+              >
+                Close
+              </button>
+
+              <button
+                type="button"
+                style={getModalFooterButtonStyle("create", hoveredFooterBtn === "create")}
+                onMouseEnter={() => setHoveredFooterBtn("create")}
+                onMouseLeave={() => setHoveredFooterBtn("")}
+                onClick={() => navigate("/purchase-orders/add")}
+              >
+                + Create PO
+              </button>
+
+              <button
+                type="button"
+                style={topActionButtonStyle}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = PRIMARY_GREEN_HOVER;
+                  e.currentTarget.style.borderColor = PRIMARY_GREEN_HOVER;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = PRIMARY_GREEN;
+                  e.currentTarget.style.borderColor = PRIMARY_GREEN;
+                }}
+                onClick={() => navigate("/stock-adjustments")}
+              >
+                Adjust Stock
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
-
-      <div
-        className="md-f"
-        style={{
-          padding: "18px 26px",
-          borderTop: "1px solid var(--border)",
-          display: "flex",
-          justifyContent: "flex-end",
-          gap: 10,
-        }}
-      >
-<button
-  type="button"
-  style={getModalFooterButtonStyle("close", hoveredFooterBtn === "close")}
-  onMouseEnter={() => setHoveredFooterBtn("close")}
-  onMouseLeave={() => setHoveredFooterBtn("")}
-  onClick={closeDetail}
->
-  Close
-</button>
-
-<button
-  type="button"
-  style={getModalFooterButtonStyle("create", hoveredFooterBtn === "create")}
-  onMouseEnter={() => setHoveredFooterBtn("create")}
-  onMouseLeave={() => setHoveredFooterBtn("")}
-  onClick={() => navigate("/purchase-orders/add")}
->
-  + Create PO
-</button>
-
-<button
-  type="button"
-  style={topActionButtonStyle}
-  onMouseEnter={(e) => {
-    e.currentTarget.style.background = PRIMARY_GREEN_HOVER;
-    e.currentTarget.style.borderColor = PRIMARY_GREEN_HOVER;
-  }}
-  onMouseLeave={(e) => {
-    e.currentTarget.style.background = PRIMARY_GREEN;
-    e.currentTarget.style.borderColor = PRIMARY_GREEN;
-  }}
-  onClick={() => navigate("/stock-adjustments")}
->
-  Adjust Stock
-</button>      
-</div>
-    </div>
-  </div>
-) : null}
-
+      ) : null}
     </div>
   );
 };

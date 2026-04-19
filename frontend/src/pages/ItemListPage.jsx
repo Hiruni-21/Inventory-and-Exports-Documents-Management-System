@@ -13,36 +13,31 @@ const STORAGE_OPTIONS = [
   "Freezer (−18°C)",
 ];
 
-const tableCountStyle = {
-  color: "#7F978A",
-  fontSize: 13,
-  fontWeight: 500,
-};
-
 const codeCellStyle = {
   fontFamily: "monospace",
   fontWeight: 700,
-  color: "#8EA694",
-  fontSize: 13,
+  color: "var(--g800)",
+  fontSize: 12,
 };
 
 const nameCellStyle = {
-  fontWeight: 800,
-  fontSize: 15,
+  fontWeight: 700,
+  fontSize: 13,
   color: "var(--g900)",
 };
 
 const botanicalCellStyle = {
   fontStyle: "italic",
   fontWeight: 600,
-  fontSize: 13,
+  fontSize: 12,
   color: "#5B7764",
 };
 
 const supplierCellStyle = {
   color: "#5F7567",
   fontWeight: 500,
-  fontSize: 13,
+  fontSize: 12,
+  lineHeight: 1.2,
 };
 
 const tableHeaderCellStyle = {
@@ -54,7 +49,7 @@ const tableHeaderCellStyle = {
 };
 
 const editActionStyle = {
-  height: 36,
+  height: 34,
   padding: "0 14px",
   borderRadius: 14,
   border: "1.5px solid #CFE2D4",
@@ -66,19 +61,18 @@ const editActionStyle = {
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  gap: 6,
   whiteSpace: "nowrap",
 };
 
 const deleteActionStyle = {
-  width: 36,
-  height: 36,
+  width: 34,
+  height: 34,
   borderRadius: 14,
   border: "1.5px solid #CFE2D4",
   background: "#FFFFFF",
   color: "#6B7D71",
   fontWeight: 700,
-  fontSize: 13,
+  fontSize: 12,
   cursor: "pointer",
   display: "inline-flex",
   alignItems: "center",
@@ -116,6 +110,42 @@ const pageActionButtonStyle = {
   whiteSpace: "nowrap",
 };
 
+const addSupplierButtonStyle = {
+  height: 38,
+  padding: "0 18px",
+  borderRadius: 999,
+  border: `1px solid ${PRIMARY_GREEN}`,
+  background: "#FFFFFF",
+  color: PRIMARY_GREEN,
+  fontWeight: 800,
+  fontSize: 14,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  boxSizing: "border-box",
+  whiteSpace: "nowrap",
+  boxShadow: "none",
+};
+
+const saveButtonStyle = {
+  height: 44,
+  padding: "0 18px",
+  borderRadius: 14,
+  border: `1px solid ${PRIMARY_GREEN}`,
+  background: PRIMARY_GREEN,
+  color: "#FFFFFF",
+  fontWeight: 800,
+  fontSize: 14,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  boxSizing: "border-box",
+  whiteSpace: "nowrap",
+  boxShadow: "none",
+};
+
 const modalSectionTitleStyle = {
   fontSize: 13,
   fontWeight: 800,
@@ -142,6 +172,7 @@ const toggleButtonStyle = (active) => ({
   alignItems: "center",
   justifyContent: "center",
   padding: "0 12px",
+  boxShadow: "none",
 });
 
 const chipStyle = {
@@ -167,30 +198,18 @@ const categoryBadgeStyle = (label) => {
   const value = String(label || "").toLowerCase();
 
   if (value.includes("micro")) {
-    return {
-      background: "#EAF2FF",
-      color: "#2F69C8",
-    };
+    return { background: "#EAF2FF", color: "#2F69C8" };
   }
 
   if (value.includes("exotic")) {
-    return {
-      background: "#FFF1DE",
-      color: "#D78918",
-    };
+    return { background: "#FFF1DE", color: "#D78918" };
   }
 
   if (value.includes("dry")) {
-    return {
-      background: "#EEE9DF",
-      color: "#5E7765",
-    };
+    return { background: "#EEE9DF", color: "#5E7765" };
   }
 
-  return {
-    background: "#E9F7EE",
-    color: "#2E8B57",
-  };
+  return { background: "#E9F7EE", color: "#2E8B57" };
 };
 
 const categoryBadgeBaseStyle = {
@@ -205,8 +224,8 @@ const categoryBadgeBaseStyle = {
 };
 
 const modalCardStyle = {
-  maxWidth: 1020,
-  width: "92%",
+  maxWidth: 940,
+  width: "88%",
   maxHeight: "calc(100vh - 72px)",
   display: "flex",
   flexDirection: "column",
@@ -369,9 +388,7 @@ const getCategoryIdFromRow = (row, categories) => {
 };
 
 const buildNextItemCode = (rows) => {
-  const codes = rows
-    .map((row) => textValue(row.code, row.item_code))
-    .filter(Boolean);
+  const codes = rows.map((row) => textValue(row.code, row.item_code)).filter(Boolean);
 
   if (!codes.length) return "FW-PRD-001";
 
@@ -427,35 +444,33 @@ const ItemListPage = () => {
   const [form, setForm] = useState(createEmptyForm([]));
   const [supplierPickerId, setSupplierPickerId] = useState("");
 
-    const loadPage = async () => {
-      try {
-        setLoading(true);
+  const loadPage = async () => {
+    try {
+      setLoading(true);
 
-        const [itemsRes, categoriesRes, suppliersRes] = await Promise.all([
-          api.get("/items"),
-          api.get("/items/categories"),
-          api.get("/suppliers"),
-        ]);
+      const [itemsRes, categoriesRes, suppliersRes] = await Promise.all([
+        api.get("/items"),
+        api.get("/items/categories"),
+        api.get("/suppliers"),
+      ]);
 
-        setRows(Array.isArray(itemsRes.data) ? itemsRes.data : []);
-        setCategories(Array.isArray(categoriesRes.data) ? categoriesRes.data : []);
-        setSuppliers(Array.isArray(suppliersRes.data) ? suppliersRes.data : []);
-      } catch (err) {
-        console.error("LOAD ITEM MASTER ERROR:", err?.response?.data || err);
-
-        toast.error(
-          err?.response?.data?.error ||
+      setRows(Array.isArray(itemsRes.data) ? itemsRes.data : []);
+      setCategories(Array.isArray(categoriesRes.data) ? categoriesRes.data : []);
+      setSuppliers(Array.isArray(suppliersRes.data) ? suppliersRes.data : []);
+    } catch (err) {
+      console.error("LOAD ITEM MASTER ERROR:", err?.response?.data || err);
+      toast.error(
+        err?.response?.data?.error ||
           err?.response?.data?.message ||
           "Failed to load Item Master"
-        );
-
-        setRows([]);
-        setCategories([]);
-        setSuppliers([]);
-      } finally {
-        setLoading(false);
-      }
-    };
+      );
+      setRows([]);
+      setCategories([]);
+      setSuppliers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     loadPage();
@@ -488,8 +503,7 @@ const ItemListPage = () => {
 
     if (typeFilter !== "All Types") {
       result = result.filter(
-        (row) =>
-          normalizeTypeLabel(row.type).toLowerCase() === typeFilter.toLowerCase()
+        (row) => normalizeTypeLabel(row.type).toLowerCase() === typeFilter.toLowerCase()
       );
     }
 
@@ -595,35 +609,34 @@ const ItemListPage = () => {
     }));
   };
 
-const buildPayload = () => {
-  const categoryId =
-    form.category_id ||
-    categories.find(
-      (row) =>
-        textValue(row.category_name, row.name).toLowerCase() ===
-        String(form.category_id || "").toLowerCase()
-    )?.id ||
-    "";
+  const buildPayload = () => {
+    const categoryId =
+      form.category_id ||
+      categories.find(
+        (row) =>
+          textValue(row.category_name, row.name).toLowerCase() ===
+          String(form.category_id || "").toLowerCase()
+      )?.id ||
+      "";
 
-  return {
-    code: form.code.trim(),
-    name: form.name.trim(),
-    botanical_name: form.botanical_name.trim(),
-    category_id: Number(categoryId),
-    type: form.type === "n" ? "Non-Perishable" : "Perishable",
-    unit: form.unit.trim(),
-    reorder_level: Number(form.reorder_level || 0),
-    shelf_life_days: Number(form.shelf_life || 0),
-    storage_temp: form.storage_temp.trim(),
-    unit_cost: Number(form.unit_cost || 0),
-    returnable: Number(form.returnable_mode === "yes"),
-    supplier_ids: (form.supplier_ids || [])
-      .map((id) => Number(id))
-      .filter(Boolean),
-    description: form.description.trim(),
-    status: "active",
+    return {
+      code: form.code.trim(),
+      name: form.name.trim(),
+      botanical_name: form.botanical_name.trim(),
+      category_id: Number(categoryId),
+      type: form.type === "n" ? "Non-Perishable" : "Perishable",
+      unit: form.unit.trim(),
+      reorder_level: Number(form.reorder_level || 0),
+      shelf_life_days: Number(form.shelf_life || 0),
+      storage_temp: form.storage_temp.trim(),
+      unit_cost: Number(form.unit_cost || 0),
+      returnable: Number(form.returnable_mode === "yes"),
+      supplier_ids: (form.supplier_ids || []).map((id) => Number(id)).filter(Boolean),
+      description: "",
+      status: "active",
+    };
   };
-};
+
   const handleSave = async (e) => {
     e.preventDefault();
 
@@ -639,7 +652,6 @@ const buildPayload = () => {
 
     try {
       setSaving(true);
-
       const payload = buildPayload();
 
       if (editingItemId) {
@@ -654,11 +666,10 @@ const buildPayload = () => {
       loadPage();
     } catch (err) {
       console.error("Save item error:", err?.response?.data || err);
-
       toast.error(
         err?.response?.data?.error ||
-        err?.response?.data?.message ||
-        "Failed to save item"
+          err?.response?.data?.message ||
+          "Failed to save item"
       );
     } finally {
       setSaving(false);
@@ -696,22 +707,20 @@ const buildPayload = () => {
         storage_temp: textValue(row.storage_temp),
         unit_cost: numberValue(row.unit_cost),
         returnable: Number(normalizeReturnableMode(row) === "yes"),
-        supplier_ids: extractSupplierIds(row)
-          .map((id) => Number(id))
-          .filter(Boolean),
+        supplier_ids: extractSupplierIds(row).map((id) => Number(id)).filter(Boolean),
         description: textValue(row.description, row.notes),
         status: "inactive",
       };
+
       await api.put(`/items/${id}`, payload);
       toast.success("Item marked inactive");
       loadPage();
     } catch (err) {
       console.error("Deactivate item error:", err?.response?.data || err);
-
       toast.error(
         err?.response?.data?.error ||
-        err?.response?.data?.message ||
-        "Failed to deactivate item"
+          err?.response?.data?.message ||
+          "Failed to deactivate item"
       );
     }
   };
@@ -785,13 +794,6 @@ const buildPayload = () => {
       </div>
 
       <div className="tw" style={{ borderRadius: 24, overflow: "hidden" }}>
-        <div className="tw-h" style={{ padding: "20px 24px" }}>
-          <h3 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>Item Master</h3>
-          <span style={tableCountStyle}>
-            {filteredRows.length} items · Central product database
-          </span>
-        </div>
-
         <table>
           <thead>
             <tr>
@@ -846,28 +848,28 @@ const buildPayload = () => {
                         style={{
                           ...categoryBadgeBaseStyle,
                           ...badgeTone,
-                          padding: "6px 14px",
-                          fontSize: 12,
+                          padding: "5px 12px",
+                          fontSize: 11,
                         }}
                       >
-                        <span style={{ fontSize: 10 }}>●</span>
+                        <span style={{ fontSize: 9 }}>●</span>
                         {categoryLabel}
                       </span>
                     </td>
 
-                    <td style={{ fontSize: 13, color: "var(--g900)" }}>
+                    <td style={{ fontSize: 12, color: "var(--g900)" }}>
                       {textValue(row.unit) || "—"}
                     </td>
 
-                    <td style={{ fontSize: 13, color: "var(--g900)" }}>
+                    <td style={{ fontSize: 12, color: "var(--g900)" }}>
                       {numberValue(row.reorder_level)} {textValue(row.unit)}
                     </td>
 
-                    <td style={{ fontSize: 13, color: "var(--g900)" }}>
+                    <td style={{ fontSize: 12, color: "var(--g900)" }}>
                       {formatStorageDisplay(textValue(row.storage_temp))}
                     </td>
 
-                    <td style={{ ...returnableColorStyle(row), fontSize: 13 }}>
+                    <td style={{ ...returnableColorStyle(row), fontSize: 12 }}>
                       {returnableLabel(row)}
                     </td>
 
@@ -882,7 +884,7 @@ const buildPayload = () => {
                           style={editActionStyle}
                           onClick={() => openEditModal(row)}
                         >
-                          ✏️ Edit
+                          Edit
                         </button>
 
                         <button
@@ -911,7 +913,7 @@ const buildPayload = () => {
         <div className="modal-backdrop">
           <div className="md" style={modalCardStyle}>
             <div className="md-h">
-              <h3>{editingItemId ? "✏️ Edit Item" : "🌿 Add New Item"}</h3>
+              <h3>{editingItemId ? "Edit Item" : "🌿 Add New Item"}</h3>
               <button type="button" className="md-x" onClick={closeModal}>
                 ✕
               </button>
@@ -988,14 +990,14 @@ const buildPayload = () => {
                           style={toggleButtonStyle(form.type === "p")}
                           onClick={() => setField("type", "p")}
                         >
-                          🍎 Perishable
+                          Perishable
                         </button>
                         <button
                           type="button"
                           style={toggleButtonStyle(form.type === "n")}
                           onClick={() => setField("type", "n")}
                         >
-                          📦 Non-Perishable
+                          Non-Perishable
                         </button>
                       </div>
                     </div>
@@ -1092,21 +1094,21 @@ const buildPayload = () => {
                         style={toggleButtonStyle(form.returnable_mode === "yes")}
                         onClick={() => setField("returnable_mode", "yes")}
                       >
-                        ✅ Yes — returnable
+                        Yes — returnable
                       </button>
                       <button
                         type="button"
                         style={toggleButtonStyle(form.returnable_mode === "no")}
                         onClick={() => setField("returnable_mode", "no")}
                       >
-                        ❌ No — wastage only
+                        No — wastage only
                       </button>
                       <button
                         type="button"
                         style={toggleButtonStyle(form.returnable_mode === "mkt")}
                         onClick={() => setField("returnable_mode", "mkt")}
                       >
-                        ❌ No (Market purchase)
+                        No (Market purchase)
                       </button>
                     </div>
                   </div>
@@ -1132,7 +1134,17 @@ const buildPayload = () => {
 
                     <button
                       type="button"
-                      className="btn btn-p btn-sm"
+                      style={addSupplierButtonStyle}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "#F4FBF6";
+                        e.currentTarget.style.color = PRIMARY_GREEN_HOVER;
+                        e.currentTarget.style.borderColor = PRIMARY_GREEN_HOVER;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "#FFFFFF";
+                        e.currentTarget.style.color = PRIMARY_GREEN;
+                        e.currentTarget.style.borderColor = PRIMARY_GREEN;
+                      }}
                       onClick={addSupplierToForm}
                     >
                       + Add
@@ -1154,7 +1166,7 @@ const buildPayload = () => {
                     {selectedSupplierRows.length ? (
                       selectedSupplierRows.map((row) => (
                         <span key={row.id} style={chipStyle}>
-                          🌿 {textValue(row.supplier_name, row.name, row.contact_person)}
+                          {textValue(row.supplier_name, row.name, row.contact_person)}
                           <span
                             onClick={() => removeSupplierFromForm(row.id)}
                             style={{ cursor: "pointer", fontWeight: 700 }}
@@ -1174,8 +1186,20 @@ const buildPayload = () => {
                 <button type="button" className="btn btn-s" onClick={closeModal}>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-p" disabled={saving}>
-                  {saving ? "Saving..." : "💾 Save Item"}
+                <button
+                  type="submit"
+                  style={saveButtonStyle}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = PRIMARY_GREEN_HOVER;
+                    e.currentTarget.style.borderColor = PRIMARY_GREEN_HOVER;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = PRIMARY_GREEN;
+                    e.currentTarget.style.borderColor = PRIMARY_GREEN;
+                  }}
+                  disabled={saving}
+                >
+                  {saving ? "Saving..." : "Save Item"}
                 </button>
               </div>
             </form>

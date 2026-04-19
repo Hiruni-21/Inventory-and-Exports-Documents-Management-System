@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import api from "../utils/api";
 import { useToast } from "../context/ToastContext";
 
+const PRIMARY_GREEN = "#166534";
+const PRIMARY_GREEN_HOVER = "#14532D";
+
 const modalOverlayStyle = {
   position: "fixed",
   inset: 0,
@@ -91,13 +94,14 @@ const footerBtnPrimary = {
   height: "36px",
   padding: "0 18px",
   borderRadius: "10px",
-  border: "none",
-  background: "var(--g800)",
+  border: `1px solid ${PRIMARY_GREEN}`,
+  background: PRIMARY_GREEN,
   color: "var(--white)",
   fontFamily: "'Plus Jakarta Sans', sans-serif",
   fontSize: "12px",
   fontWeight: 700,
   cursor: "pointer",
+  boxShadow: "none",
 };
 
 const adjustmentBtnStyle = (active, variant) => {
@@ -273,16 +277,6 @@ const StockAdjustmentListPage = () => {
     notes: "",
   });
 
-  const selectedItem = useMemo(
-    () => inventory.find((item) => String(getItemId(item)) === String(form.item_id)),
-    [inventory, form.item_id]
-  );
-
-  const selectedBatch = useMemo(
-    () => batches.find((batch) => String(batch?.id) === String(form.batch_id)),
-    [batches, form.batch_id]
-  );
-
   const historyRows = useMemo(() => rows.map(normalizeHistoryRow), [rows]);
 
   const loadRows = async () => {
@@ -321,7 +315,7 @@ const StockAdjustmentListPage = () => {
     };
 
     loadInventory();
-  }, [showModal]);
+  }, [showModal, toast]);
 
   useEffect(() => {
     const loadBatches = async () => {
@@ -349,7 +343,7 @@ const StockAdjustmentListPage = () => {
     };
 
     loadBatches();
-  }, [showModal, form.item_id]);
+  }, [showModal, form.item_id, toast]);
 
   const openModal = () => {
     setForm({
@@ -448,9 +442,9 @@ const StockAdjustmentListPage = () => {
           style={{
             height: "36px",
             padding: "0 18px",
-            border: "none",
+            border: `1px solid ${PRIMARY_GREEN}`,
             borderRadius: "12px",
-            background: "var(--g800)",
+            background: PRIMARY_GREEN,
             color: "var(--white)",
             fontFamily: "'Plus Jakarta Sans', sans-serif",
             fontSize: "12px",
@@ -460,13 +454,19 @@ const StockAdjustmentListPage = () => {
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
-            gap: "6px",
             boxShadow: "none",
             whiteSpace: "nowrap",
           }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = PRIMARY_GREEN_HOVER;
+            e.currentTarget.style.borderColor = PRIMARY_GREEN_HOVER;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = PRIMARY_GREEN;
+            e.currentTarget.style.borderColor = PRIMARY_GREEN;
+          }}
         >
-          <span style={{ fontSize: "14px", fontWeight: 800, lineHeight: 1 }}>+</span>
-          <span>New Adjustment</span>
+          New Adjustment
         </button>
       </div>
 
@@ -740,7 +740,19 @@ const StockAdjustmentListPage = () => {
                   Cancel
                 </button>
 
-                <button type="submit" style={footerBtnPrimary} disabled={saving || inventoryLoading}>
+                <button
+                  type="submit"
+                  style={footerBtnPrimary}
+                  disabled={saving || inventoryLoading}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = PRIMARY_GREEN_HOVER;
+                    e.currentTarget.style.borderColor = PRIMARY_GREEN_HOVER;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = PRIMARY_GREEN;
+                    e.currentTarget.style.borderColor = PRIMARY_GREEN;
+                  }}
+                >
                   {saving ? "Applying..." : "Apply Adjustment"}
                 </button>
               </div>
