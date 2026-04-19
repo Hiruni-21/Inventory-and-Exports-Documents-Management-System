@@ -61,6 +61,9 @@ const IconUsers = () => (
 const IconShieldCheck = () => (
   <svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.5 8.5 8 9 4.5-.5 8-4 8-9V6l-8-3Z" /><path d="m9.5 12 1.8 1.8 3.7-3.8" /></svg>
 );
+const IconMessage = () => (
+  <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+);
 
 const notificationsByRole = {
   manager: [
@@ -74,15 +77,15 @@ const notificationsByRole = {
   ],
   supervisor: [
     { type: "Expiry", message: "Dragon Fruit BT-089 should dispatch first today.", time: "Just now", unread: true },
-    { type: "Notify Ops", message: "Low stock items need to be escalated to Kamal.", time: "45 min", unread: true },
+    { type: "Notify Ops", message: "Low stock items need to be escalated.", time: "45 min", unread: true },
   ],
   logistics: [
     { type: "Dispatch", message: "3 local dispatches are scheduled for today.", time: "Just now", unread: true },
     { type: "Export", message: "One export shipment is waiting for document completion.", time: "1 hour", unread: true },
   ],
   supplier: [
-    { type: "Order", message: "PO-2024-115 is awaiting delivery.", time: "2 hours", unread: true },
-    { type: "Return", message: "RN-2024-014 deduction is pending.", time: "Yesterday", unread: false },
+    { type: "Purchase Order", message: "Fresh World sent a purchase order for your review.", time: "Just now", unread: true },
+    { type: "Return Note", message: "A return note is awaiting your feedback.", time: "1 hour", unread: true },
   ],
 };
 
@@ -231,8 +234,9 @@ const navByRole = {
       label: "MY PORTAL",
       items: [
         { to: "/dashboard", text: "My Dashboard", icon: <IconDashboard /> },
-        { to: "/supplier/orders", text: "My Orders", icon: <IconFile /> },
+        { to: "/supplier/orders", text: "My Purchase Orders", icon: <IconFile /> },
         { to: "/supplier/returns", text: "My Return Notes", icon: <IconReturn /> },
+        { to: "/supplier/messages", text: "Messages", icon: <IconMessage /> },
       ],
     },
   ],
@@ -262,7 +266,7 @@ const pageMeta = {
   "/returns/add": { title: "Returns & Wastage", subtitle: "Record return" },
   "/wastage": { title: "Returns & Wastage", subtitle: "Wastage records" },
   "/wastage/add": { title: "Returns & Wastage", subtitle: "Record wastage" },
-  "/customers/local": { title: "Local Customers", subtitle: "Sri Lanka — 4 customers" },
+  "/customers/local": { title: "Local Customers", subtitle: "Sri Lanka customers" },
   "/customers/global": { title: "Global Customers", subtitle: "Export customers" },
   "/dispatch/local": { title: "Local Dispatch", subtitle: "Lorry deliveries · Sri Lanka" },
   "/dispatch/global": { title: "Global Dispatch", subtitle: "Export shipments · Maldives & international" },
@@ -274,6 +278,7 @@ const pageMeta = {
   "/activity": { title: "Activity Log", subtitle: "Immutable audit trail" },
   "/supplier/orders": { title: "My Purchase Orders", subtitle: "Supplier portal" },
   "/supplier/returns": { title: "My Return Notes", subtitle: "Supplier portal" },
+  "/supplier/messages": { title: "Messages", subtitle: "Supplier portal" },
   "/approvals": { title: "Approvals", subtitle: "Approval decisions and notes" },
 };
 
@@ -286,39 +291,17 @@ const actionButtons = {
     { label: "Record Wastage", to: "/wastage/add", className: "btn btn-p btn-sm" },
   ],
   "/wastage": [{ label: "Record Wastage", to: "/wastage/add", className: "btn btn-p btn-sm" }],
-  "/dispatch/local": [
-    {
-      label: "+ New Dispatch",
-      eventName: "fw-open-local-dispatch-modal",
-      className: "btn btn-p btn-sm",
-    },
-  ],
+  "/dispatch/local": [{ label: "+ New Dispatch", eventName: "fw-open-local-dispatch-modal", className: "btn btn-p btn-sm" }],
   "/dispatch/global": [{ label: "+ New Shipment", eventName: "fw-open-global-shipment-modal", className: "btn btn-p btn-sm" }],
   "/export-documents": [{ label: "+ Create Document Set", eventName: "fw-open-export-docs-modal", className: "btn btn-p btn-sm" }],
   "/users": [{ label: "+ Add User", to: "/users/add", className: "btn btn-p btn-sm", disabled: true }],
   "/customers/local": [
-    {
-      label: "+ Add Customer",
-      eventName: "fw-open-local-customer-modal",
-      className: "btn btn-p btn-sm",
-    },
-    {
-      label: "Export CSV",
-      eventName: "fw-export-local-customers",
-      className: "btn btn-s btn-sm",
-    },
+    { label: "+ Add Customer", eventName: "fw-open-local-customer-modal", className: "btn btn-p btn-sm" },
+    { label: "Export CSV", eventName: "fw-export-local-customers", className: "btn btn-s btn-sm" },
   ],
   "/customers/global": [
-    {
-      label: "+ Add Customer",
-      eventName: "fw-open-global-customer-modal",
-      className: "btn btn-p btn-sm",
-    },
-    {
-      label: "Export CSV",
-      eventName: "fw-export-global-customers",
-      className: "btn btn-s btn-sm",
-    },
+    { label: "+ Add Customer", eventName: "fw-open-global-customer-modal", className: "btn btn-p btn-sm" },
+    { label: "Export CSV", eventName: "fw-export-global-customers", className: "btn btn-s btn-sm" },
   ],
 };
 
@@ -342,7 +325,8 @@ const getMeta = (pathname) => {
   if (/^\/dispatch\/print\//.test(pathname)) return { title: "Dispatch", subtitle: "Printable dispatch sheet" };
   if (/^\/export-documents\/\d+$/.test(pathname)) return { title: "Export Documents", subtitle: "Document details" };
   if (/^\/export-documents\/print\//.test(pathname)) return { title: "Export Documents", subtitle: "Printable export document" };
-  if (/^\/items\/edit\/\d+$/.test(pathname)) return { title: "Item Master", subtitle: "Edit item" };
+  if (/^\/supplier\/orders\/\d+$/.test(pathname)) return { title: "Purchase Order Note", subtitle: "Supplier portal" };
+  if (/^\/supplier\/returns\/\d+$/.test(pathname)) return { title: "Return Note", subtitle: "Supplier portal" };
   return { title: "Dashboard", subtitle: "Fresh World Exporters ERP" };
 };
 
@@ -364,8 +348,7 @@ const Layout = () => {
 
         const res = await api.get("/approvals/counts");
         setApprovalCount(Number(res.data?.total || 0));
-      } catch (err) {
-        console.error(err);
+      } catch {
         setApprovalCount(0);
       }
     };
@@ -381,9 +364,7 @@ const Layout = () => {
     }
 
     return base.map((section) => {
-      if (section.label !== "OVERVIEW") {
-        return section;
-      }
+      if (section.label !== "OVERVIEW") return section;
 
       return {
         ...section,
