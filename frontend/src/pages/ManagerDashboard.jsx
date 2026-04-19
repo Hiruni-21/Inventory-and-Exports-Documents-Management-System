@@ -2,76 +2,259 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../utils/api";
 
-const fmtMoney = (value) => `LKR ${Number(value || 0).toLocaleString()}`;
+const formatCompactLkr = (value) => {
+  const amount = Number(value || 0);
 
-const fmtDate = (value) => {
+  if (amount >= 1000000) return `LKR ${(amount / 1000000).toFixed(1)}M`;
+  if (amount >= 1000) return `LKR ${Math.round(amount / 1000)}K`;
+
+  return `LKR ${Math.round(amount).toLocaleString("en-LK")}`;
+};
+
+const formatDate = (value) => {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
   return date.toLocaleDateString("en-CA");
 };
 
-const fmtDateTime = (value) => {
+const formatDateTime = (value) => {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
   return date.toLocaleString();
 };
 
+const normalizeStatus = (value) => String(value || "").trim().toLowerCase();
+
+const getDaysLeft = (value) => {
+  if (!value) return null;
+  const expiryDate = new Date(value);
+  if (Number.isNaN(expiryDate.getTime())) return null;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  expiryDate.setHours(0, 0, 0, 0);
+
+  return Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+};
+
+const getArray = async (url, options) => {
+  try {
+    const res = await api.get(url, options);
+    return Array.isArray(res.data) ? res.data : [];
+  } catch {
+    return [];
+  }
+};
+
+const getObject = async (url, options) => {
+  try {
+    const res = await api.get(url, options);
+    return res.data || {};
+  } catch {
+    return {};
+  }
+};
+
 const ManagerDashboard = () => {
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  const [stats, setStats] = useState(null);
-  const [valuation, setValuation] = useState(null);
+  const [stats, setStats] = useState({});
+  const [valuation, setValuation] = useState({});
   const [lowStock, setLowStock] = useState([]);
   const [expiry, setExpiry] = useState([]);
   const [adjustments, setAdjustments] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
+  const [localCustomers, setLocalCustomers] = useState([]);
+  const [globalCustomers, setGlobalCustomers] = useState([]);
+  const [localDispatches, setLocalDispatches] = useState([]);
+  const [globalDispatches, setGlobalDispatches] = useState([]);
+  const [exportDocs, setExportDocs] = useState([]);
+  const [grnList, setGrnList] = useState([]);
+  const [purchaseOrders, setPurchaseOrders] = useState([]);
 
   useEffect(() => {
     const loadDashboard = async () => {
-      try {
-        setLoading(true);
-        setError("");
+      setLoading(true);
 
-        const [statsRes, valuationRes, lowStockRes, expiryRes, adjustmentsRes] =
-          await Promise.all([
-            api.get("/dashboard/stats"),
-            api.get("/inventory/valuation"),
-            api.get("/inventory/low-stock"),
-            api.get("/inventory/expiry", { params: { days: 7 } }),
-            api.get("/stock-adjustments"),
-          ]);
+      const [
+        statsData,
+        valuationData,
+        lowStockData,
+        expiryData,
+        adjustmentsData,
+        suppliersData,
+        localCustomersData,
+        globalCustomersData,
+        localDispatchData,
+        globalDispatchData,
+        exportDocsData,
+        grnData,
+        purchaseOrdersData,
+      ] = await Promise.all([
+        getObject("/dashboard/stats"),
+        getObject("/inventory/valuation"),
+        getArray("/inventory/low-stock"),
+        getArray("/inventory/expiry", { params: { days: 14 } }),
+        getArray("/stock-adjustments"),
+        getArray("/suppliers"),
+        getArray("/customers", { params: { type: "local" } }),
+        getArray("/customers", { params: { type: "global" } }),
+        getArray("/dispatch"),
+        getArray("/dispatch/global"),
+        getArray("/export-docs"),
+        getArray("/grn"),
+        getArray("/purchase-orders"),
+      ]);
 
-        setStats(statsRes.data || {});
-        setValuation(valuationRes.data || {});
-        setLowStock(Array.isArray(lowStockRes.data) ? lowStockRes.data : []);
-        setExpiry(Array.isArray(expiryRes.data) ? expiryRes.data : []);
-        setAdjustments(Array.isArray(adjustmentsRes.data) ? adjustmentsRes.data : []);
-      } catch (err) {
-        console.error(err);
-        setError(err?.response?.data?.message || "Failed to load dashboard");
-      } finally {
-        setLoading(false);
-      }
+      setStats(statsData);
+      setValuation(valuationData);
+      setLowStock(lowStockData);
+      setExpiry(expiryData);
+      setAdjustments(adjustmentsData);
+      setSuppliers(suppliersData);
+      setLocalCustomers(localCustomersData);
+      setGlobalCustomers(globalCustomersData);
+      setLocalDispatches(localDispatchData);
+      setGlobalDispatches(globalDispatchData);
+      setExportDocs(exportDocsData);
+      setGrnList(grnData);
+      setPurchaseOrders(purchaseOrdersData);
+      setLoading(false);
     };
 
     loadDashboard();
   }, []);
 
-  const recentAdjustments = useMemo(() => adjustments.slice(0, 5), [adjustments]);
-  const expiringSoon = useMemo(() => expiry.slice(0, 5), [expiry]);
-  const lowStockPreview = useMemo(() => lowStock.slice(0, 5), [lowStock]);
+  const expiringSoon = useMemo(
+    () =>
+      [...expiry]
+        .map((row) => ({ ...row, days_left: getDaysLeft(row.expiry_date) }))
+        .sort((a, b) => Number(a.days_left ?? 9999) - Number(b.days_left ?? 9999))
+        .slice(0, 4),
+    [expiry]
+  );
+
+  const criticalExpiryCount = useMemo(
+    () =>
+      expiry.filter((row) => {
+        const days = getDaysLeft(row.expiry_date);
+        return days !== null && days <= 3;
+      }).length,
+    [expiry]
+  );
+
+  const totalCustomers = useMemo(
+    () => localCustomers.length + globalCustomers.length,
+    [localCustomers, globalCustomers]
+  );
+
+  const activeExportShipments = useMemo(
+    () =>
+      globalDispatches.filter((row) => normalizeStatus(row.status) !== "delivered").length,
+    [globalDispatches]
+  );
+
+  const pendingApprovals = useMemo(
+    () =>
+      purchaseOrders.filter((row) => {
+        const status = normalizeStatus(row.status);
+        return status === "pending_approval" || status === "draft" || status.includes("await");
+      }),
+    [purchaseOrders]
+  );
+
+  const incompleteExportDocs = useMemo(
+    () => exportDocs.filter((row) => !Number(row.all_cleared || 0)),
+    [exportDocs]
+  );
+
+  const urgentActions = useMemo(() => {
+    const rows = [];
+
+    if (lowStock[0]) {
+      rows.push({
+        key: `low-${lowStock[0].item_id || lowStock[0].id}`,
+        title: `${lowStock[0].name || lowStock[0].item_name} below reorder level`,
+        subtitle: `${Number(lowStock[0].qty_available || lowStock[0].qty_on_hand || 0)} ${lowStock[0].unit || ""} available`,
+        to: "/inventory/low-stock",
+        color: "var(--d)",
+      });
+    }
+
+    if (pendingApprovals[0]) {
+      rows.push({
+        key: `po-${pendingApprovals[0].id}`,
+        title: `${pendingApprovals[0].po_number || "Purchase order"} awaiting approval`,
+        subtitle: pendingApprovals[0].supplier_name || "Manager review needed",
+        to: "/purchase-orders",
+        color: "var(--a500)",
+      });
+    }
+
+    if (incompleteExportDocs[0]) {
+      rows.push({
+        key: `docs-${incompleteExportDocs[0].id}`,
+        title: `${incompleteExportDocs[0].dispatch_number || "Shipment"} documents incomplete`,
+        subtitle: incompleteExportDocs[0].customer_name || "Cannot clear shipment yet",
+        to: "/export-documents",
+        color: "var(--d)",
+      });
+    }
+
+    if (expiringSoon[0]) {
+      rows.push({
+        key: `exp-${expiringSoon[0].id}`,
+        title: `${expiringSoon[0].name || expiringSoon[0].item_name} expiring soon`,
+        subtitle: `${expiringSoon[0].batch_code || expiringSoon[0].batch_number} · ${expiringSoon[0].days_left ?? "—"}d left`,
+        to: "/inventory/expiry",
+        color: "var(--d)",
+      });
+    }
+
+    return rows.slice(0, 4);
+  }, [lowStock, pendingApprovals, incompleteExportDocs, expiringSoon]);
+
+  const todaysSchedule = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+
+    const localRows = localDispatches
+      .filter((row) => String(row.dispatch_date || "").slice(0, 10) === today)
+      .slice(0, 2)
+      .map((row) => ({
+        key: `local-${row.id}`,
+        title: `${row.client_name || "Local Dispatch"} — ${row.delivery_window || formatDate(row.dispatch_date)}`,
+        subtitle: `${row.dispatch_number || "Dispatch"} · ${row.status || "scheduled"}`,
+        to: "/dispatch/local",
+      }));
+
+    const globalRows = globalDispatches
+      .filter((row) => String(row.dispatch_date || "").slice(0, 10) === today)
+      .slice(0, 1)
+      .map((row) => ({
+        key: `global-${row.id}`,
+        title: `${row.customer_name || "Export Shipment"} — ${row.flight_no || row.airline || "Flight pending"}`,
+        subtitle: `${row.dispatch_number || "Shipment"} · ${row.status || "docs_pending"}`,
+        to: "/dispatch/global",
+      }));
+
+    const grnRows = grnList
+      .filter((row) => String(row.received_date || "").slice(0, 10) === today)
+      .slice(0, 1)
+      .map((row) => ({
+        key: `grn-${row.id}`,
+        title: `${row.grn_number || "GRN"} goods received today`,
+        subtitle: row.supplier_name || "Goods receiving entry",
+        to: "/grn",
+      }));
+
+    return [...localRows, ...globalRows, ...grnRows].slice(0, 4);
+  }, [localDispatches, globalDispatches, grnList]);
+
+  const recentAdjustments = useMemo(() => adjustments.slice(0, 4), [adjustments]);
 
   return (
     <>
-      {error ? (
-        <div className="ib ib-d">
-          <span>⚠️</span>
-          <div>{error}</div>
-        </div>
-      ) : null}
-
       {loading ? (
         <div className="ib ib-i">
           <span>⏳</span>
@@ -81,87 +264,142 @@ const ManagerDashboard = () => {
         <>
           <div className="krow k4">
             <div className="kc g">
-              <span className="ki">📦</span>
-              <div className="kv">{Number(stats?.items || 0)}</div>
-              <div className="kl">Active Items</div>
-            </div>
-
-            <div className="kc a">
-              <span className="ki">🌿</span>
-              <div className="kv">{Number(stats?.suppliers || 0)}</div>
-              <div className="kl">Active Suppliers</div>
+              <div className="kv">{Number(stats.items || 0)}</div>
+              <div className="kl">Items in Stock</div>
             </div>
 
             <div className="kc r">
-              <span className="ki">⚠️</span>
-              <div className="kv">{Number(stats?.lowStock || 0)}</div>
-              <div className="kl">Low Stock Alerts</div>
+              <div className="kv">{criticalExpiryCount}</div>
+              <div className="kl">Expiring in 3 Days</div>
+            </div>
+
+            <div className="kc r">
+              <div className="kv">{Number(stats.lowStock || lowStock.length || 0)}</div>
+              <div className="kl">Low Stock Items</div>
             </div>
 
             <div className="kc b">
-              <span className="ki">💰</span>
-              <div className="kv">{fmtMoney(valuation?.total_inventory_value || 0)}</div>
-              <div className="kl">Stock Value</div>
+              <div className="kv">{formatCompactLkr(valuation.total_inventory_value || 0)}</div>
+              <div className="kl">Stock Valuation</div>
             </div>
           </div>
 
-          <div className="krow k4" style={{ marginTop: 16 }}>
-            <div className="kc a">
-              <span className="ki">🚚</span>
-              <div className="kv">{Number(stats?.localDispatch || 0)}</div>
+          <div className="krow k4">
+            <div className="kc b">
+              <div className="kv">{Number(stats.localDispatch || localDispatches.length || 0)}</div>
               <div className="kl">Local Dispatches</div>
             </div>
 
-            <div className="kc b">
-              <span className="ki">✈️</span>
-              <div className="kv">{Number(stats?.globalDispatch || 0)}</div>
-              <div className="kl">Global Shipments</div>
-            </div>
-
-            <div className="kc r">
-              <span className="ki">⏱</span>
-              <div className="kv">{expiry.length}</div>
-              <div className="kl">Expiring in 7 Days</div>
+            <div className="kc a">
+              <div className="kv">{activeExportShipments || Number(stats.globalDispatch || 0)}</div>
+              <div className="kl">Active Export Shipments</div>
             </div>
 
             <div className="kc g">
-              <span className="ki">⚖️</span>
-              <div className="kv">{adjustments.length}</div>
-              <div className="kl">Stock Adjustments</div>
+              <div className="kv">
+                {suppliers.filter((row) => normalizeStatus(row.status || "active") === "active").length ||
+                  Number(stats.suppliers || 0)}
+              </div>
+              <div className="kl">Active Suppliers</div>
+            </div>
+
+            <div className="kc p">
+              <div className="kv">{totalCustomers}</div>
+              <div className="kl">Total Customers</div>
             </div>
           </div>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 16,
-              marginTop: 16,
-            }}
-          >
-            <div className="tw">
-              <div className="tw-h">
-                <h3>Low Stock Preview</h3>
-                <Link to="/inventory/low-stock" className="btn btn-s btn-xs">
-                  View All
-                </Link>
-              </div>
+          <div className="g2">
+            <div className="cc">
+              <h3>Expiry Watch — Next 14 Days</h3>
+              <p>FEFO priority batches</p>
+
+              {expiringSoon.length ? (
+                expiringSoon.map((row, index) => (
+                  <Link
+                    key={row.id}
+                    to="/inventory/expiry"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "9px 0",
+                      borderBottom: index === expiringSoon.length - 1 ? "none" : "1px solid var(--border)",
+                      textDecoration: "none",
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--g900)" }}>
+                        {row.name || row.item_name}
+                      </div>
+                      <div style={{ fontSize: 10, color: "var(--text3)" }}>
+                        {row.batch_code || row.batch_number} · {row.days_left ?? "—"}d left
+                      </div>
+                    </div>
+                  </Link>
+                ))
+              ) : (
+                <div style={{ fontSize: 12, color: "var(--text3)" }}>No expiry alerts</div>
+              )}
+            </div>
+
+            <div className="cc">
+              <h3>Urgent Actions</h3>
+              <p>Needs attention now</p>
+
+              {urgentActions.length ? (
+                urgentActions.map((action) => (
+                  <Link
+                    key={action.key}
+                    to={action.to}
+                    style={{
+                      display: "flex",
+                      gap: 8,
+                      padding: "9px 10px",
+                      borderRadius: 8,
+                      background: "var(--ivory)",
+                      borderLeft: `3px solid ${action.color}`,
+                      marginBottom: 8,
+                      textDecoration: "none",
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: "var(--g900)" }}>
+                        {action.title}
+                      </div>
+                      <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 2 }}>
+                        {action.subtitle}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 10, color: "var(--text3)", alignSelf: "center" }}>→</span>
+                  </Link>
+                ))
+              ) : (
+                <div style={{ fontSize: 12, color: "var(--text3)" }}>No urgent actions</div>
+              )}
+            </div>
+          </div>
+
+          <div className="g3">
+            <div className="cc">
+              <h3>Low Stock Preview</h3>
+              <p>Sorted by urgency</p>
 
               <table>
                 <thead>
                   <tr>
-                    <th>ITEM</th>
-                    <th>AVAILABLE</th>
-                    <th>REORDER</th>
+                    <th>Item</th>
+                    <th>Available</th>
+                    <th>Reorder</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {lowStockPreview.length ? (
-                    lowStockPreview.map((row) => (
+                  {lowStock.slice(0, 4).length ? (
+                    lowStock.slice(0, 4).map((row) => (
                       <tr key={row.item_id || row.id}>
                         <td style={{ fontWeight: 600 }}>{row.name || row.item_name}</td>
-                        <td>{Number(row.qty_available || 0)} {row.unit}</td>
-                        <td>{Number(row.reorder_level || 0)} {row.unit}</td>
+                        <td>{Number(row.qty_available || row.qty_on_hand || 0)} {row.unit || ""}</td>
+                        <td>{Number(row.reorder_level || 0)} {row.unit || ""}</td>
                       </tr>
                     ))
                   ) : (
@@ -173,83 +411,64 @@ const ManagerDashboard = () => {
               </table>
             </div>
 
-            <div className="tw">
-              <div className="tw-h">
-                <h3>Expiry Preview</h3>
-                <Link to="/inventory/expiry" className="btn btn-s btn-xs">
-                  View All
-                </Link>
-              </div>
+            <div className="cc">
+              <h3>Today&apos;s Schedule</h3>
+              <p>Dispatches and goods receiving</p>
 
-              <table>
-                <thead>
-                  <tr>
-                    <th>ITEM</th>
-                    <th>BATCH</th>
-                    <th>EXPIRY</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {expiringSoon.length ? (
-                    expiringSoon.map((row) => (
-                      <tr key={row.id}>
-                        <td style={{ fontWeight: 600 }}>{row.name || row.item_name}</td>
-                        <td>{row.batch_code || row.batch_number}</td>
-                        <td>{fmtDate(row.expiry_date)}</td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="3">No batches expiring soon</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+              {todaysSchedule.length ? (
+                todaysSchedule.map((row, index) => (
+                  <Link
+                    key={row.key}
+                    to={row.to}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "8px 0",
+                      borderBottom: index === todaysSchedule.length - 1 ? "none" : "1px solid var(--border)",
+                      textDecoration: "none",
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: "var(--g900)" }}>{row.title}</div>
+                      <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 2 }}>{row.subtitle}</div>
+                    </div>
+                    <span style={{ fontSize: 10, color: "var(--text3)" }}>→</span>
+                  </Link>
+                ))
+              ) : (
+                <div style={{ fontSize: 12, color: "var(--text3)" }}>No items scheduled today</div>
+              )}
             </div>
-          </div>
 
-          <div className="tw" style={{ marginTop: 16 }}>
-            <div className="tw-h">
+            <div className="cc">
               <h3>Recent Stock Adjustments</h3>
-              <Link to="/stock-adjustments" className="btn btn-s btn-xs">
-                View All
-              </Link>
-            </div>
+              <p>Latest audit trail entries</p>
 
-            <table>
-              <thead>
-                <tr>
-                  <th>DATE</th>
-                  <th>ITEM</th>
-                  <th>BATCH</th>
-                  <th>TYPE</th>
-                  <th>QTY</th>
-                  <th>REASON</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentAdjustments.length ? (
-                  recentAdjustments.map((row) => (
-                    <tr key={row.id}>
-                      <td>{fmtDateTime(row.created_at)}</td>
-                      <td style={{ fontWeight: 600 }}>{row.item_name}</td>
-                      <td>{row.batch_code}</td>
-                      <td>
-                        <span className={`badge ${row.adjustment_type === "IN" ? "bg-g" : "bg-r"}`}>
-                          {row.adjustment_type === "IN" ? "Increase" : "Decrease"}
-                        </span>
-                      </td>
-                      <td>{Number(row.quantity || 0)}</td>
-                      <td>{row.reason || "—"}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="6">No stock adjustments yet</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+              {recentAdjustments.length ? (
+                recentAdjustments.map((row, index) => (
+                  <Link
+                    key={row.id}
+                    to="/stock-adjustments"
+                    style={{
+                      display: "block",
+                      padding: "8px 0",
+                      borderBottom: index === recentAdjustments.length - 1 ? "none" : "1px solid var(--border)",
+                      textDecoration: "none",
+                    }}
+                  >
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--g900)" }}>
+                      {row.item_name || "Stock Adjustment"}
+                    </div>
+                    <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 2 }}>
+                      {formatDateTime(row.created_at)} · {row.reason || "Adjustment recorded"}
+                    </div>
+                  </Link>
+                ))
+              ) : (
+                <div style={{ fontSize: 12, color: "var(--text3)" }}>No recent adjustments</div>
+              )}
+            </div>
           </div>
         </>
       )}

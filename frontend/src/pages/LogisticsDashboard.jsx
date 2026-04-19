@@ -2,76 +2,73 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../utils/api";
 
-const fmtDate = (value) => {
+const formatDate = (value) => {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
   return date.toLocaleDateString("en-CA");
 };
 
+const normalizeStatus = (value) => String(value || "").trim().toLowerCase();
+
+const getArray = async (url, options) => {
+  try {
+    const res = await api.get(url, options);
+    return Array.isArray(res.data) ? res.data : [];
+  } catch {
+    return [];
+  }
+};
+
 const LogisticsDashboard = () => {
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
   const [localDispatch, setLocalDispatch] = useState([]);
   const [globalDispatch, setGlobalDispatch] = useState([]);
   const [exportDocs, setExportDocs] = useState([]);
+  const [localCustomers, setLocalCustomers] = useState([]);
+  const [globalCustomers, setGlobalCustomers] = useState([]);
 
   useEffect(() => {
     const loadDashboard = async () => {
-      try {
-        setLoading(true);
-        setError("");
+      setLoading(true);
 
-        const [localRes, globalRes, docsRes] = await Promise.all([
-          api.get("/dispatch/local"),
-          api.get("/dispatch/global"),
-          api.get("/export-docs"),
+      const [localData, globalData, docsData, localCustomersData, globalCustomersData] =
+        await Promise.all([
+          getArray("/dispatch"),
+          getArray("/dispatch/global"),
+          getArray("/export-docs"),
+          getArray("/customers", { params: { type: "local" } }),
+          getArray("/customers", { params: { type: "global" } }),
         ]);
 
-        setLocalDispatch(Array.isArray(localRes.data) ? localRes.data : []);
-        setGlobalDispatch(Array.isArray(globalRes.data) ? globalRes.data : []);
-        setExportDocs(Array.isArray(docsRes.data) ? docsRes.data : []);
-      } catch (err) {
-        console.error(err);
-        setError(err?.response?.data?.message || "Failed to load logistics dashboard");
-      } finally {
-        setLoading(false);
-      }
+      setLocalDispatch(localData);
+      setGlobalDispatch(globalData);
+      setExportDocs(docsData);
+      setLocalCustomers(localCustomersData);
+      setGlobalCustomers(globalCustomersData);
+      setLoading(false);
     };
 
     loadDashboard();
   }, []);
 
   const pendingDocs = useMemo(
-    () => exportDocs.filter((row) => !Number(row.all_cleared || 0)).length,
+    () => exportDocs.filter((row) => !Number(row.all_cleared || 0)),
     [exportDocs]
   );
 
-  const packingPending = useMemo(
-    () => exportDocs.filter((row) => String(row.packing_list_status || "") !== "done").length,
-    [exportDocs]
+  const clearedShipments = useMemo(
+    () => globalDispatch.filter((row) => normalizeStatus(row.status) === "cleared").length,
+    [globalDispatch]
   );
 
-  const invoicePending = useMemo(
-    () => exportDocs.filter((row) => String(row.commercial_invoice_status || "") !== "done").length,
-    [exportDocs]
-  );
-
-  const shipmentCount = useMemo(
-    () => localDispatch.length + globalDispatch.length,
-    [localDispatch, globalDispatch]
+  const activeGlobalShipments = useMemo(
+    () => globalDispatch.filter((row) => normalizeStatus(row.status) !== "delivered").length,
+    [globalDispatch]
   );
 
   return (
     <>
-      {error ? (
-        <div className="ib ib-d">
-          <span>⚠️</span>
-          <div>{error}</div>
-        </div>
-      ) : null}
-
       {loading ? (
         <div className="ib ib-i">
           <span>⏳</span>
@@ -80,83 +77,178 @@ const LogisticsDashboard = () => {
       ) : (
         <>
           <div className="krow k4">
-            <div className="kc a">
-              <span className="ki">📄</span>
-              <div className="kv">{pendingDocs}</div>
-              <div className="kl">Pending Documents</div>
+            <div className="kc b">
+              <span className="ki">🚚</span>
+              <div className="kv">{localDispatch.length}</div>
+              <div className="kl">Local Dispatches</div>
             </div>
 
-            <div className="kc b">
+            <div className="kc a">
+              <span className="ki">✈️</span>
+              <div className="kv">{activeGlobalShipments}</div>
+              <div className="kl">Active Export Shipments</div>
+            </div>
+
+            <div className="kc r">
+              <span className="ki">📄</span>
+              <div className="kv">{pendingDocs.length}</div>
+              <div className="kl">Pending Document Sets</div>
+            </div>
+
+            <div className="kc g">
+              <span className="ki">✅</span>
+              <div className="kv">{clearedShipments}</div>
+              <div className="kl">Cleared Shipments</div>
+            </div>
+          </div>
+
+          <div className="krow k4">
+            <div className="kc p">
+              <span className="ki">🏨</span>
+              <div className="kv">{localCustomers.length}</div>
+              <div className="kl">Local Customers</div>
+            </div>
+
+            <div className="kc p">
+              <span className="ki">🌍</span>
+              <div className="kv">{globalCustomers.length}</div>
+              <div className="kl">Global Customers</div>
+            </div>
+
+            <div className="kc a">
               <span className="ki">📦</span>
-              <div className="kv">{packingPending}</div>
+              <div className="kv">
+                {pendingDocs.filter((row) => String(row.packing_list_status || "").toLowerCase() !== "done").length}
+              </div>
               <div className="kl">Packing Lists Pending</div>
             </div>
 
             <div className="kc r">
               <span className="ki">🧾</span>
-              <div className="kv">{invoicePending}</div>
+              <div className="kv">
+                {pendingDocs.filter((row) => String(row.commercial_invoice_status || "").toLowerCase() !== "done").length}
+              </div>
               <div className="kl">Invoices Pending</div>
-            </div>
-
-            <div className="kc g">
-              <span className="ki">✈️</span>
-              <div className="kv">{shipmentCount}</div>
-              <div className="kl">Total Dispatches</div>
             </div>
           </div>
 
-          <div className="tw" style={{ marginTop: 16 }}>
-            <div className="tw-h">
-              <h3>Recent Global Shipments</h3>
-              <Link to="/dispatch/global" className="btn btn-s btn-xs">
-                View All
-              </Link>
+          <div className="g2">
+            <div className="tw">
+              <div className="tw-h">
+                <h3>Recent Local Dispatches</h3>
+                <Link to="/dispatch/local" className="btn btn-s btn-xs">
+                  View All
+                </Link>
+              </div>
+
+              <table>
+                <thead>
+                  <tr>
+                    <th>Dispatch</th>
+                    <th>Customer</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {localDispatch.slice(0, 5).length ? (
+                    localDispatch.slice(0, 5).map((row) => (
+                      <tr key={row.id}>
+                        <td style={{ fontFamily: "monospace", fontWeight: 700, color: "var(--g800)" }}>
+                          {row.dispatch_number}
+                        </td>
+                        <td>{row.client_name || "—"}</td>
+                        <td>{formatDate(row.dispatch_date)}</td>
+                        <td>
+                          <span
+                            className={`badge ${
+                              normalizeStatus(row.status) === "delivered" ? "bg-g" : "bg-a"
+                            }`}
+                          >
+                            {row.status || "scheduled"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="4">No local dispatches found</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
 
-            <table>
-              <thead>
-                <tr>
-                  <th>SHIPMENT</th>
-                  <th>CUSTOMER</th>
-                  <th>DATE</th>
-                  <th>STATUS</th>
-                  <th>DOCS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {globalDispatch.slice(0, 6).length ? (
-                  globalDispatch.slice(0, 6).map((row) => (
-                    <tr key={row.id}>
-                      <td style={{ fontFamily: "monospace", fontWeight: 700 }}>
-                        {row.dispatch_number}
-                      </td>
-                      <td>{row.customer_name || "—"}</td>
-                      <td>{fmtDate(row.dispatch_date)}</td>
-                      <td>
-                        <span className={`badge ${
-                          String(row.status || "").toLowerCase() === "delivered"
-                            ? "bg-g"
-                            : String(row.status || "").toLowerCase() === "cleared"
-                            ? "bg-b"
-                            : "bg-a"
-                        }`}>
-                          {row.status || "docs_pending"}
-                        </span>
-                      </td>
-                      <td>
-                        <span className="badge bg-a">
-                          {Number(row.docs_done_count || 0)}/{Number(row.required_docs_count || 7)}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
+            <div className="tw">
+              <div className="tw-h">
+                <h3>Recent Global Shipments</h3>
+                <Link to="/dispatch/global" className="btn btn-s btn-xs">
+                  View All
+                </Link>
+              </div>
+
+              <table>
+                <thead>
                   <tr>
-                    <td colSpan="5">No global shipments found</td>
+                    <th>Shipment</th>
+                    <th>Customer</th>
+                    <th>Date</th>
+                    <th>Docs</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {globalDispatch.slice(0, 5).length ? (
+                    globalDispatch.slice(0, 5).map((row) => (
+                      <tr key={row.id}>
+                        <td style={{ fontFamily: "monospace", fontWeight: 700, color: "var(--g800)" }}>
+                          {row.dispatch_number}
+                        </td>
+                        <td>{row.customer_name || "—"}</td>
+                        <td>{formatDate(row.dispatch_date)}</td>
+                        <td>
+                          <span className={`badge ${Number(row.docs_done_count || 0) >= Number(row.required_docs_count || 7) ? "bg-g" : "bg-a"}`}>
+                            {Number(row.docs_done_count || 0)}/{Number(row.required_docs_count || 7)}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="4">No global shipments found</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="cc">
+            <h3>Document Completion Queue</h3>
+            <p>Shipments waiting for missing documents</p>
+
+            {pendingDocs.slice(0, 6).length ? (
+              pendingDocs.slice(0, 6).map((row, index) => (
+                <Link
+                  key={row.id}
+                  to="/export-documents"
+                  style={{
+                    display: "block",
+                    textDecoration: "none",
+                    padding: "8px 0",
+                    borderBottom: index === Math.min(pendingDocs.length, 6) - 1 ? "none" : "1px solid var(--border)",
+                  }}
+                >
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "var(--g900)" }}>
+                    {row.dispatch_number} — {row.customer_name || "Shipment"}
+                  </div>
+                  <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 2 }}>
+                    Airline: {row.airline || "—"} · Flight: {row.flight_no || "—"} · Status: {row.dispatch_status || "docs_pending"}
+                  </div>
+                </Link>
+              ))
+            ) : (
+              <div style={{ fontSize: 12, color: "var(--text3)" }}>All export document sets are up to date</div>
+            )}
           </div>
         </>
       )}

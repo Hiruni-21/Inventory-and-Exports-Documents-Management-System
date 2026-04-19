@@ -2,17 +2,36 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../utils/api";
 
-const fmtDate = (value) => {
+const formatDate = (value) => {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
   return date.toLocaleDateString("en-CA");
 };
 
+const getDaysLeft = (value) => {
+  if (!value) return null;
+  const expiryDate = new Date(value);
+  if (Number.isNaN(expiryDate.getTime())) return null;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  expiryDate.setHours(0, 0, 0, 0);
+
+  return Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+};
+
+const getArray = async (url, options) => {
+  try {
+    const res = await api.get(url, options);
+    return Array.isArray(res.data) ? res.data : [];
+  } catch {
+    return [];
+  }
+};
+
 const SupervisorDashboard = () => {
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
   const [grnList, setGrnList] = useState([]);
   const [wastage, setWastage] = useState([]);
   const [lowStock, setLowStock] = useState([]);
@@ -21,30 +40,23 @@ const SupervisorDashboard = () => {
 
   useEffect(() => {
     const loadDashboard = async () => {
-      try {
-        setLoading(true);
-        setError("");
+      setLoading(true);
 
-        const [grnRes, wastageRes, lowStockRes, expiryRes, adjustmentsRes] =
-          await Promise.all([
-            api.get("/grn"),
-            api.get("/wastage"),
-            api.get("/inventory/low-stock"),
-            api.get("/inventory/expiry", { params: { days: 7 } }),
-            api.get("/stock-adjustments"),
-          ]);
+      const [grnData, wastageData, lowStockData, expiryData, adjustmentsData] =
+        await Promise.all([
+          getArray("/grn"),
+          getArray("/wastage"),
+          getArray("/inventory/low-stock"),
+          getArray("/inventory/expiry", { params: { days: 14 } }),
+          getArray("/stock-adjustments"),
+        ]);
 
-        setGrnList(Array.isArray(grnRes.data) ? grnRes.data : []);
-        setWastage(Array.isArray(wastageRes.data) ? wastageRes.data : []);
-        setLowStock(Array.isArray(lowStockRes.data) ? lowStockRes.data : []);
-        setExpiry(Array.isArray(expiryRes.data) ? expiryRes.data : []);
-        setAdjustments(Array.isArray(adjustmentsRes.data) ? adjustmentsRes.data : []);
-      } catch (err) {
-        console.error(err);
-        setError(err?.response?.data?.message || "Failed to load supervisor dashboard");
-      } finally {
-        setLoading(false);
-      }
+      setGrnList(grnData);
+      setWastage(wastageData);
+      setLowStock(lowStockData);
+      setExpiry(expiryData);
+      setAdjustments(adjustmentsData);
+      setLoading(false);
     };
 
     loadDashboard();
@@ -57,25 +69,35 @@ const SupervisorDashboard = () => {
     [grnList, today]
   );
 
-  const wastageRecords = useMemo(() => wastage.length, [wastage]);
-  const lowStockAlerts = useMemo(() => lowStock.length, [lowStock]);
-  const stockCountVariances = useMemo(() => {
-    return adjustments.filter((row) => {
-      const reason = String(row.reason || "").toLowerCase();
-      const notes = String(row.notes || "").toLowerCase();
-      return reason.includes("physical stock count") || notes.includes("physical stock count");
-    }).length;
-  }, [adjustments]);
+  const lowStockAlerts = lowStock.length;
+  const wastageRecords = wastage.length;
+
+  const stockCountVariances = useMemo(
+    () =>
+      adjustments.filter((row) => {
+        const reason = String(row.reason || "").toLowerCase();
+        const notes = String(row.notes || "").toLowerCase();
+        const type = String(row.adjustment_type || "").toLowerCase();
+        return (
+          reason.includes("physical stock count") ||
+          notes.includes("physical stock count") ||
+          type === "stock_count"
+        );
+      }).length,
+    [adjustments]
+  );
+
+  const expiryRows = useMemo(
+    () =>
+      [...expiry]
+        .map((row) => ({ ...row, days_left: getDaysLeft(row.expiry_date) }))
+        .sort((a, b) => Number(a.days_left ?? 9999) - Number(b.days_left ?? 9999))
+        .slice(0, 5),
+    [expiry]
+  );
 
   return (
     <>
-      {error ? (
-        <div className="ib ib-d">
-          <span>⚠️</span>
-          <div>{error}</div>
-        </div>
-      ) : null}
-
       {loading ? (
         <div className="ib ib-i">
           <span>⏳</span>
@@ -87,7 +109,7 @@ const SupervisorDashboard = () => {
             <div className="kc g">
               <span className="ki">📥</span>
               <div className="kv">{todaysGoodsReceived}</div>
-              <div className="kl">Today’s Goods Received</div>
+              <div className="kl">Today&apos;s Goods Received</div>
             </div>
 
             <div className="kc r">
@@ -109,14 +131,7 @@ const SupervisorDashboard = () => {
             </div>
           </div>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 16,
-              marginTop: 16,
-            }}
-          >
+          <div className="g2">
             <div className="tw">
               <div className="tw-h">
                 <h3>Expiry Priority</h3>
@@ -128,20 +143,20 @@ const SupervisorDashboard = () => {
               <table>
                 <thead>
                   <tr>
-                    <th>ITEM</th>
-                    <th>BATCH</th>
-                    <th>DAYS LEFT</th>
+                    <th>Item</th>
+                    <th>Batch</th>
+                    <th>Days Left</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {expiry.slice(0, 5).length ? (
-                    expiry.slice(0, 5).map((row) => (
+                  {expiryRows.length ? (
+                    expiryRows.map((row) => (
                       <tr key={row.id}>
                         <td style={{ fontWeight: 600 }}>{row.name || row.item_name}</td>
                         <td>{row.batch_code || row.batch_number}</td>
                         <td>
                           <span className={`badge ${Number(row.days_left || 0) <= 3 ? "bg-r" : "bg-a"}`}>
-                            {Number(row.days_left || 0)}d
+                            {row.days_left ?? "—"}d
                           </span>
                         </td>
                       </tr>
@@ -166,20 +181,20 @@ const SupervisorDashboard = () => {
               <table>
                 <thead>
                   <tr>
-                    <th>ITEM</th>
-                    <th>BATCH</th>
-                    <th>QTY</th>
-                    <th>DATE</th>
+                    <th>Item</th>
+                    <th>Batch</th>
+                    <th>Qty</th>
+                    <th>Date</th>
                   </tr>
                 </thead>
                 <tbody>
                   {wastage.slice(0, 5).length ? (
                     wastage.slice(0, 5).map((row) => (
                       <tr key={row.id}>
-                        <td style={{ fontWeight: 600 }}>{row.item_name}</td>
-                        <td>{row.batch_code}</td>
-                        <td>{Number(row.quantity || 0)}</td>
-                        <td>{fmtDate(row.created_at)}</td>
+                        <td style={{ fontWeight: 600 }}>{row.item_name || "—"}</td>
+                        <td>{row.batch_code || "—"}</td>
+                        <td>{Number(row.quantity || row.qty || 0)}</td>
+                        <td>{formatDate(row.created_at || row.wastage_date)}</td>
                       </tr>
                     ))
                   ) : (
@@ -189,6 +204,89 @@ const SupervisorDashboard = () => {
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+
+          <div className="g2">
+            <div className="cc">
+              <h3>Low Stock Watch</h3>
+              <p>Notify operations for urgent reorders</p>
+
+              {lowStock.slice(0, 4).length ? (
+                lowStock.slice(0, 4).map((row, index) => (
+                  <Link
+                    key={row.item_id || row.id}
+                    to="/inventory/low-stock"
+                    style={{
+                      display: "block",
+                      textDecoration: "none",
+                      padding: "8px 0",
+                      borderBottom: index === 3 ? "none" : "1px solid var(--border)",
+                    }}
+                  >
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--g900)" }}>
+                      {row.name || row.item_name}
+                    </div>
+                    <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 2 }}>
+                      {Number(row.qty_available || row.qty_on_hand || 0)} {row.unit || ""} available · reorder at {Number(row.reorder_level || 0)} {row.unit || ""}
+                    </div>
+                  </Link>
+                ))
+              ) : (
+                <div style={{ fontSize: 12, color: "var(--text3)" }}>No low stock alerts</div>
+              )}
+            </div>
+
+            <div className="cc">
+              <h3>Recent Count Adjustments</h3>
+              <p>Physical stock count corrections</p>
+
+              {adjustments
+                .filter((row) => {
+                  const reason = String(row.reason || "").toLowerCase();
+                  const notes = String(row.notes || "").toLowerCase();
+                  const type = String(row.adjustment_type || "").toLowerCase();
+                  return (
+                    reason.includes("physical stock count") ||
+                    notes.includes("physical stock count") ||
+                    type === "stock_count"
+                  );
+                })
+                .slice(0, 4).length ? (
+                adjustments
+                  .filter((row) => {
+                    const reason = String(row.reason || "").toLowerCase();
+                    const notes = String(row.notes || "").toLowerCase();
+                    const type = String(row.adjustment_type || "").toLowerCase();
+                    return (
+                      reason.includes("physical stock count") ||
+                      notes.includes("physical stock count") ||
+                      type === "stock_count"
+                    );
+                  })
+                  .slice(0, 4)
+                  .map((row, index) => (
+                    <Link
+                      key={row.id}
+                      to="/stock-adjustments"
+                      style={{
+                        display: "block",
+                        textDecoration: "none",
+                        padding: "8px 0",
+                        borderBottom: index === 3 ? "none" : "1px solid var(--border)",
+                      }}
+                    >
+                      <div style={{ fontSize: 11, fontWeight: 600, color: "var(--g900)" }}>
+                        {row.item_name || "Adjustment"}
+                      </div>
+                      <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 2 }}>
+                        {String(row.adjustment_type || "").toLowerCase() === "increase" ? "Increase" : "Decrease"} · {Number(row.quantity || row.adjustment_qty || 0)} · {row.reason || "Physical stock count"}
+                      </div>
+                    </Link>
+                  ))
+              ) : (
+                <div style={{ fontSize: 12, color: "var(--text3)" }}>No recent count adjustments</div>
+              )}
             </div>
           </div>
         </>
