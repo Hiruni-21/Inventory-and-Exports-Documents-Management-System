@@ -1,5 +1,14 @@
 const db = require("../config/db");
-const { refreshInventorySnapshot } = require("./inventoryController");
+
+let refreshInventorySnapshot = null;
+try {
+  const inventoryController = require("./inventoryController");
+  if (typeof inventoryController.refreshInventorySnapshot === "function") {
+    refreshInventorySnapshot = inventoryController.refreshInventorySnapshot;
+  }
+} catch (err) {
+  refreshInventorySnapshot = null;
+}
 
 const q = (sql, params = []) =>
   new Promise((resolve, reject) => {
@@ -9,12 +18,31 @@ const q = (sql, params = []) =>
     });
   });
 
-let tableCache = {};
 let ensured = false;
+let tableCache = {};
 
 const clearCache = () => {
-  tableCache = {};
   ensured = false;
+  tableCache = {};
+};
+
+const safeText = (value) => String(value || "").trim();
+const safeNumber = (value, fallback = 0) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+};
+
+const tableExists = async (tableName) => {
+  const rows = await q(
+    `
+      SELECT COUNT(*) AS total
+      FROM INFORMATION_SCHEMA.TABLES
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = ?
+    `,
+    [tableName]
+  );
+  return Number(rows?.[0]?.total || 0) > 0;
 };
 
 const getTableColumns = async (tableName) => {
@@ -30,155 +58,118 @@ const getTableColumns = async (tableName) => {
     [tableName]
   );
 
-  const set = new Set(rows.map((row) => row.COLUMN_NAME));
+  const set = new Set(rows.map((r) => r.COLUMN_NAME));
   tableCache[tableName] = set;
   return set;
 };
 
-const tableExists = async (tableName) => {
-  const rows = await q(
-    `
-      SELECT COUNT(*) AS total
-      FROM INFORMATION_SCHEMA.TABLES
-      WHERE TABLE_SCHEMA = DATABASE()
-        AND TABLE_NAME = ?
-    `,
-    [tableName]
-  );
-
-  return Number(rows?.[0]?.total || 0) > 0;
-};
-
-const ensureGrnRuntimeSchema = async () => {
+const ensureRuntimeSchema = async () => {
   if (ensured) return;
 
-  if (!(await tableExists("grn"))) {
-    throw new Error("grn table does not exist");
-  }
-
-  if (!(await tableExists("grn_items"))) {
-    throw new Error("grn_items table does not exist");
-  }
+  if (!(await tableExists("grn"))) throw new Error("grn table does not exist");
+  if (!(await tableExists("grn_items"))) throw new Error("grn_items table does not exist");
 
   const grnCols = await getTableColumns("grn");
   const grnAlters = [];
 
+  if (!grnCols.has("supplier_invoice_no")) grnAlters.push("ADD COLUMN supplier_invoice_no VARCHAR(120) NULL");
+  if (!grnCols.has("po_order_date")) grnAlters.push("ADD COLUMN po_order_date DATE NULL");
+  if (!grnCols.has("received_by_name")) grnAlters.push("ADD COLUMN received_by_name VARCHAR(150) NULL");
   if (!grnCols.has("remarks")) grnAlters.push("ADD COLUMN remarks TEXT NULL");
   if (!grnCols.has("status")) grnAlters.push("ADD COLUMN status VARCHAR(40) NOT NULL DEFAULT 'received'");
-  if (!grnCols.has("verification_required"))
-    grnAlters.push("ADD COLUMN verification_required TINYINT(1) NOT NULL DEFAULT 0");
-  if (!grnCols.has("inventory_posted"))
-    grnAlters.push("ADD COLUMN inventory_posted TINYINT(1) NOT NULL DEFAULT 0");
+  if (!grnCols.has("verification_required")) grnAlters.push("ADD COLUMN verification_required TINYINT(1) NOT NULL DEFAULT 0");
+  if (!grnCols.has("inventory_posted")) grnAlters.push("ADD COLUMN inventory_posted TINYINT(1) NOT NULL DEFAULT 0");
   if (!grnCols.has("verified_by")) grnAlters.push("ADD COLUMN verified_by INT NULL");
   if (!grnCols.has("verified_at")) grnAlters.push("ADD COLUMN verified_at DATETIME NULL");
 
-  for (const statement of grnAlters) {
-    await q(`ALTER TABLE grn ${statement}`);
+  for (const sql of grnAlters) {
+    await q(`ALTER TABLE grn ${sql}`);
   }
 
-  const grnItemCols = await getTableColumns("grn_items");
-  const grnItemAlters = [];
+  const itemCols = await getTableColumns("grn_items");
+  const itemAlters = [];
 
-  if (!grnItemCols.has("purchase_order_item_id"))
-    grnItemAlters.push("ADD COLUMN purchase_order_item_id INT NULL");
-  if (!grnItemCols.has("ordered_qty"))
-    grnItemAlters.push("ADD COLUMN ordered_qty DECIMAL(12,2) NOT NULL DEFAULT 0");
-  if (!grnItemCols.has("received_qty"))
-    grnItemAlters.push("ADD COLUMN received_qty DECIMAL(12,2) NOT NULL DEFAULT 0");
-  if (!grnItemCols.has("variance_qty"))
-    grnItemAlters.push("ADD COLUMN variance_qty DECIMAL(12,2) NOT NULL DEFAULT 0");
-  if (!grnItemCols.has("variance_percent"))
-    grnItemAlters.push("ADD COLUMN variance_percent DECIMAL(12,2) NOT NULL DEFAULT 0");
-  if (!grnItemCols.has("batch_number"))
-    grnItemAlters.push("ADD COLUMN batch_number VARCHAR(120) NULL");
-  if (!grnItemCols.has("expiry_date"))
-    grnItemAlters.push("ADD COLUMN expiry_date DATE NULL");
-  if (!grnItemCols.has("unit_cost"))
-    grnItemAlters.push("ADD COLUMN unit_cost DECIMAL(12,2) NOT NULL DEFAULT 0");
-  if (!grnItemCols.has("line_total"))
-    grnItemAlters.push("ADD COLUMN line_total DECIMAL(12,2) NOT NULL DEFAULT 0");
-  if (!grnItemCols.has("notes")) grnItemAlters.push("ADD COLUMN notes TEXT NULL");
-  if (!grnItemCols.has("verification_required"))
-    grnItemAlters.push("ADD COLUMN verification_required TINYINT(1) NOT NULL DEFAULT 0");
+  if (!itemCols.has("purchase_order_item_id")) itemAlters.push("ADD COLUMN purchase_order_item_id INT NULL");
+  if (!itemCols.has("ordered_qty")) itemAlters.push("ADD COLUMN ordered_qty DECIMAL(12,2) NOT NULL DEFAULT 0");
+  if (!itemCols.has("received_qty")) itemAlters.push("ADD COLUMN received_qty DECIMAL(12,2) NOT NULL DEFAULT 0");
+  if (!itemCols.has("variance_qty")) itemAlters.push("ADD COLUMN variance_qty DECIMAL(12,2) NOT NULL DEFAULT 0");
+  if (!itemCols.has("variance_percent")) itemAlters.push("ADD COLUMN variance_percent DECIMAL(12,2) NOT NULL DEFAULT 0");
+  if (!itemCols.has("batch_number")) itemAlters.push("ADD COLUMN batch_number VARCHAR(120) NULL");
+  if (!itemCols.has("expiry_date")) itemAlters.push("ADD COLUMN expiry_date DATE NULL");
+  if (!itemCols.has("quality_grade")) itemAlters.push("ADD COLUMN quality_grade VARCHAR(40) NULL");
+  if (!itemCols.has("unit_cost")) itemAlters.push("ADD COLUMN unit_cost DECIMAL(12,2) NOT NULL DEFAULT 0");
+  if (!itemCols.has("line_total")) itemAlters.push("ADD COLUMN line_total DECIMAL(12,2) NOT NULL DEFAULT 0");
+  if (!itemCols.has("notes")) itemAlters.push("ADD COLUMN notes TEXT NULL");
+  if (!itemCols.has("verification_required")) itemAlters.push("ADD COLUMN verification_required TINYINT(1) NOT NULL DEFAULT 0");
 
-  for (const statement of grnItemAlters) {
-    await q(`ALTER TABLE grn_items ${statement}`);
+  for (const sql of itemAlters) {
+    await q(`ALTER TABLE grn_items ${sql}`);
   }
 
+  if (!(await tableExists("grn_photos"))) {
+    await q(`
+      CREATE TABLE grn_photos (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        grn_id INT NOT NULL,
+        file_name VARCHAR(255) NOT NULL,
+        file_path VARCHAR(500) NOT NULL,
+        original_name VARCHAR(255) NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_grn_photos_grn (grn_id)
+      )
+    `);
+  }
+
+  clearCache();
   ensured = true;
 };
-
-const formatStatusLabel = (value) => {
-  const text = String(value || "received").toLowerCase();
-  return text;
-};
-
-const safeNumber = (value, fallback = 0) => {
-  const num = Number(value);
-  return Number.isFinite(num) ? num : fallback;
-};
-
-const safeText = (value) => String(value || "").trim();
 
 const wrapRefreshInventorySnapshot = (itemId) =>
   new Promise((resolve, reject) => {
     if (typeof refreshInventorySnapshot !== "function") return resolve();
-    refreshInventorySnapshot(itemId, (err) => {
-      if (err) return reject(err);
-      resolve();
-    });
+    refreshInventorySnapshot(itemId, (err) => (err ? reject(err) : resolve()));
   });
 
 const generateGrnNumber = async () => {
   const year = new Date().getFullYear();
-
   const rows = await q(
     `
       SELECT grn_number
       FROM grn
       WHERE grn_number LIKE ?
       ORDER BY id DESC
+      LIMIT 100
     `,
     [`GRN-${year}-%`]
   );
 
   let maxNo = 0;
-
   rows.forEach((row) => {
     const match = String(row.grn_number || "").match(/GRN-\d{4}-(\d+)$/);
-    if (!match) return;
-    const current = Number(match[1]);
-    if (Number.isFinite(current) && current > maxNo) {
-      maxNo = current;
+    if (match) {
+      maxNo = Math.max(maxNo, Number(match[1] || 0));
     }
   });
 
   return `GRN-${year}-${String(maxNo + 1).padStart(3, "0")}`;
 };
 
-const needsVarianceVerification = (orderedQty, receivedQty) => {
+const varianceMeta = (orderedQty, receivedQty) => {
   const ordered = safeNumber(orderedQty, 0);
   const received = safeNumber(receivedQty, 0);
   const varianceQty = received - ordered;
   const variancePercent = ordered > 0 ? (Math.abs(varianceQty) / ordered) * 100 : received > 0 ? 100 : 0;
-
-  return {
-    varianceQty,
-    variancePercent,
-    required: Math.abs(varianceQty) > 1 || variancePercent > 5,
-  };
+  const verificationRequired = Math.abs(varianceQty) > 1 || variancePercent > 5;
+  return { varianceQty, variancePercent, verificationRequired };
 };
 
 const getPoItemSource = async (purchaseOrderId) => {
-  const hasModern = await tableExists("po_items");
-  const hasLegacy = await tableExists("purchase_order_items");
-
-  if (hasModern) {
+  if (await tableExists("po_items")) {
     const rows = await q(`SELECT COUNT(*) AS total FROM po_items WHERE purchase_order_id = ?`, [purchaseOrderId]);
     if (Number(rows?.[0]?.total || 0) > 0) return "po_items";
   }
 
-  if (hasLegacy) {
+  if (await tableExists("purchase_order_items")) {
     const rows = await q(
       `SELECT COUNT(*) AS total FROM purchase_order_items WHERE purchase_order_id = ?`,
       [purchaseOrderId]
@@ -191,29 +182,30 @@ const getPoItemSource = async (purchaseOrderId) => {
 
 const getPurchaseOrderItemsForGrn = async (req, res) => {
   try {
-    await ensureGrnRuntimeSchema();
+    await ensureRuntimeSchema();
 
     const purchaseOrderId = Number(req.params.purchaseOrderId || 0);
     const source = await getPoItemSource(purchaseOrderId);
 
     if (!source) {
-      return res.status(404).json({ message: "No purchase order items found for this PO" });
+      return res.status(404).json({ message: "No PO items found for this purchase order" });
     }
 
     let sql = "";
+
     if (source === "po_items") {
       sql = `
         SELECT
           poi.id AS purchase_order_item_id,
           poi.item_id,
           COALESCE(poi.ordered_qty, 0) AS ordered_quantity,
+          COALESCE(poi.unit_price, 0) AS unit_price,
           COALESCE(poi.unit, i.unit, '') AS unit,
-          COALESCE(poi.unit_price, i.unit_cost, 0) AS unit_price,
           i.name AS item_name,
           i.code AS item_code,
           po.id AS purchase_order_id,
           po.po_number,
-          po.status AS purchase_order_status,
+          COALESCE(po.order_date, DATE(po.created_at)) AS po_order_date,
           po.supplier_id,
           s.supplier_name
         FROM po_items poi
@@ -226,16 +218,16 @@ const getPurchaseOrderItemsForGrn = async (req, res) => {
     } else {
       sql = `
         SELECT
-          NULL AS purchase_order_item_id,
+          poi.id AS purchase_order_item_id,
           poi.item_id,
           COALESCE(poi.quantity, 0) AS ordered_quantity,
-          COALESCE(i.unit, '') AS unit,
           COALESCE(i.unit_cost, 0) AS unit_price,
+          COALESCE(i.unit, '') AS unit,
           i.name AS item_name,
           i.code AS item_code,
           po.id AS purchase_order_id,
           po.po_number,
-          po.status AS purchase_order_status,
+          COALESCE(po.order_date, DATE(po.created_at)) AS po_order_date,
           po.supplier_id,
           s.supplier_name
         FROM purchase_order_items poi
@@ -251,148 +243,7 @@ const getPurchaseOrderItemsForGrn = async (req, res) => {
     res.json(rows);
   } catch (err) {
     console.error("getPurchaseOrderItemsForGrn error:", err);
-    res.status(500).json({
-      message: "Failed to load purchase order items for GRN",
-      error: err.message,
-    });
-  }
-};
-
-const getAllGrn = async (req, res) => {
-  try {
-    await ensureGrnRuntimeSchema();
-
-    const rows = await q(`
-      SELECT
-        g.id,
-        g.grn_number,
-        g.received_date,
-        g.created_at,
-        g.status,
-        g.verification_required,
-        g.inventory_posted,
-        g.purchase_order_id,
-        g.supplier_id,
-        po.po_number,
-        s.supplier_name,
-        u.full_name AS created_by_name,
-        COUNT(gi.id) AS item_count,
-        COALESCE(SUM(gi.received_qty), 0) AS total_received_qty
-      FROM grn g
-      JOIN purchase_orders po ON g.purchase_order_id = po.id
-      JOIN suppliers s ON g.supplier_id = s.id
-      LEFT JOIN users u ON g.created_by = u.id
-      LEFT JOIN grn_items gi ON gi.grn_id = g.id
-      GROUP BY
-        g.id,
-        g.grn_number,
-        g.received_date,
-        g.created_at,
-        g.status,
-        g.verification_required,
-        g.inventory_posted,
-        g.purchase_order_id,
-        g.supplier_id,
-        po.po_number,
-        s.supplier_name,
-        u.full_name
-      ORDER BY g.id DESC
-    `);
-
-    res.json(
-      rows.map((row) => ({
-        ...row,
-        item_count: Number(row.item_count || 0),
-        total_received_qty: Number(row.total_received_qty || 0),
-      }))
-    );
-  } catch (err) {
-    console.error("getAllGrn error:", err);
-    res.status(500).json({
-      message: "Failed to load GRNs",
-      error: err.message,
-    });
-  }
-};
-
-const getGrnById = async (req, res) => {
-  try {
-    await ensureGrnRuntimeSchema();
-
-    const id = Number(req.params.id || 0);
-
-    const headerRows = await q(
-      `
-        SELECT
-          g.*,
-          po.po_number,
-          po.status AS purchase_order_status,
-          s.supplier_name,
-          s.contact_number,
-          s.email,
-          u.full_name AS created_by_name,
-          vu.full_name AS verified_by_name
-        FROM grn g
-        JOIN purchase_orders po ON g.purchase_order_id = po.id
-        JOIN suppliers s ON g.supplier_id = s.id
-        LEFT JOIN users u ON g.created_by = u.id
-        LEFT JOIN users vu ON g.verified_by = vu.id
-        WHERE g.id = ?
-        LIMIT 1
-      `,
-      [id]
-    );
-
-    if (!headerRows.length) {
-      return res.status(404).json({ message: "GRN not found" });
-    }
-
-    const itemRows = await q(
-      `
-        SELECT
-          gi.id,
-          gi.purchase_order_item_id,
-          gi.item_id,
-          gi.ordered_qty,
-          gi.received_qty,
-          gi.variance_qty,
-          gi.variance_percent,
-          gi.batch_number,
-          gi.expiry_date,
-          gi.unit_cost,
-          gi.line_total,
-          gi.notes,
-          gi.verification_required,
-          i.name AS item_name,
-          i.code AS item_code,
-          i.unit
-        FROM grn_items gi
-        JOIN items i ON gi.item_id = i.id
-        WHERE gi.grn_id = ?
-        ORDER BY gi.id ASC
-      `,
-      [id]
-    );
-
-    res.json({
-      ...headerRows[0],
-      items: itemRows.map((row) => ({
-        ...row,
-        ordered_qty: Number(row.ordered_qty || 0),
-        received_qty: Number(row.received_qty || 0),
-        variance_qty: Number(row.variance_qty || 0),
-        variance_percent: Number(row.variance_percent || 0),
-        unit_cost: Number(row.unit_cost || 0),
-        line_total: Number(row.line_total || 0),
-        verification_required: Number(row.verification_required || 0),
-      })),
-    });
-  } catch (err) {
-    console.error("getGrnById error:", err);
-    res.status(500).json({
-      message: "Failed to load GRN details",
-      error: err.message,
-    });
+    res.status(500).json({ message: "Failed to load PO items", error: err.message });
   }
 };
 
@@ -405,9 +256,7 @@ const insertInventoryBatch = async ({
   receivedDate,
   expiryDate,
 }) => {
-  if (!(await tableExists("inventory_batches"))) {
-    throw new Error("inventory_batches table does not exist");
-  }
+  if (!(await tableExists("inventory_batches"))) return;
 
   const cols = await getTableColumns("inventory_batches");
   const fields = [];
@@ -498,8 +347,8 @@ const insertStockMovement = async ({ itemId, grnId, quantity, grnNumber }) => {
   );
 };
 
-const postGrnInventory = async (grnId, grnNumber) => {
-  const itemRows = await q(
+const postInventoryFromGrn = async (grnId, grnNumber) => {
+  const rows = await q(
     `
       SELECT
         gi.item_id,
@@ -515,51 +364,222 @@ const postGrnInventory = async (grnId, grnNumber) => {
     [grnId]
   );
 
-  const headerRows = await q(`SELECT received_date FROM grn WHERE id = ? LIMIT 1`, [grnId]);
-  const receivedDate = headerRows?.[0]?.received_date;
+  const header = await q(`SELECT received_date FROM grn WHERE id = ? LIMIT 1`, [grnId]);
+  const receivedDate = header?.[0]?.received_date || null;
 
-  for (const item of itemRows) {
+  for (const row of rows) {
     await insertInventoryBatch({
-      itemId: item.item_id,
+      itemId: row.item_id,
       grnId,
-      batchCode: item.batch_number || `BT-${grnId}-${item.item_id}`,
-      receivedQty: Number(item.received_qty || 0),
-      unit: item.unit || "",
+      batchCode: row.batch_number || `BT-${grnId}-${row.item_id}`,
+      receivedQty: Number(row.received_qty || 0),
+      unit: row.unit || "",
       receivedDate,
-      expiryDate: item.expiry_date || null,
+      expiryDate: row.expiry_date || null,
     });
 
     await insertStockMovement({
-      itemId: item.item_id,
+      itemId: row.item_id,
       grnId,
-      quantity: Number(item.received_qty || 0),
+      quantity: Number(row.received_qty || 0),
       grnNumber,
     });
 
-    await wrapRefreshInventorySnapshot(item.item_id);
+    try {
+      await wrapRefreshInventorySnapshot(row.item_id);
+    } catch (err) {
+      console.error("refreshInventorySnapshot error:", err.message);
+    }
   }
 
   await q(`UPDATE grn SET inventory_posted = 1 WHERE id = ?`, [grnId]);
 };
 
-const updatePurchaseOrderAfterGrn = async (purchaseOrderId) => {
+const updatePurchaseOrderStatus = async (purchaseOrderId) => {
   if (!(await tableExists("purchase_orders"))) return;
   const cols = await getTableColumns("purchase_orders");
   if (!cols.has("status")) return;
-
   await q(`UPDATE purchase_orders SET status = 'grn_created' WHERE id = ?`, [purchaseOrderId]);
+};
+
+const getAllGrn = async (_req, res) => {
+  try {
+    await ensureRuntimeSchema();
+
+    const rows = await q(`
+      SELECT
+        g.id,
+        g.grn_number,
+        g.po_order_date,
+        g.received_date,
+        g.received_by_name,
+        g.status,
+        g.verification_required,
+        g.inventory_posted,
+        g.purchase_order_id,
+        g.supplier_id,
+        po.po_number,
+        s.supplier_name,
+        COALESCE(COUNT(DISTINCT gi.id), 0) AS item_count,
+        COALESCE(SUM(gi.received_qty), 0) AS total_received_qty,
+        COALESCE(SUM(gi.variance_qty), 0) AS total_variance_qty,
+        COALESCE(COUNT(DISTINCT gp.id), 0) AS photo_count
+      FROM grn g
+      JOIN purchase_orders po ON po.id = g.purchase_order_id
+      JOIN suppliers s ON s.id = g.supplier_id
+      LEFT JOIN grn_items gi ON gi.grn_id = g.id
+      LEFT JOIN grn_photos gp ON gp.grn_id = g.id
+      GROUP BY
+        g.id,
+        g.grn_number,
+        g.po_order_date,
+        g.received_date,
+        g.received_by_name,
+        g.status,
+        g.verification_required,
+        g.inventory_posted,
+        g.purchase_order_id,
+        g.supplier_id,
+        po.po_number,
+        s.supplier_name
+      ORDER BY g.id DESC
+    `);
+
+    res.json(
+      rows.map((row) => ({
+        ...row,
+        created_by_name: row.received_by_name || "—",
+        verified_by_name:
+          Number(row.verification_required || 0) === 1 && String(row.status || "").toLowerCase() !== "verified"
+            ? "Pending Ops"
+            : String(row.status || "").toLowerCase() === "verified"
+            ? "Verified"
+            : "—",
+        item_count: Number(row.item_count || 0),
+        total_received_qty: Number(row.total_received_qty || 0),
+        total_variance_qty: Number(row.total_variance_qty || 0),
+        photo_count: Number(row.photo_count || 0),
+      }))
+    );
+  } catch (err) {
+    console.error("getAllGrn error:", err);
+    res.status(500).json({ message: "Failed to load GRNs", error: err.message });
+  }
+};
+
+const getGrnById = async (req, res) => {
+  try {
+    await ensureRuntimeSchema();
+
+    const grnId = Number(req.params.id || 0);
+
+    const headerRows = await q(
+      `
+        SELECT
+          g.*,
+          po.po_number,
+          s.supplier_name,
+          s.contact_number,
+          s.whatsapp_number,
+          s.email,
+          s.address,
+          s.city
+        FROM grn g
+        JOIN purchase_orders po ON po.id = g.purchase_order_id
+        JOIN suppliers s ON s.id = g.supplier_id
+        WHERE g.id = ?
+        LIMIT 1
+      `,
+      [grnId]
+    );
+
+    if (!headerRows.length) {
+      return res.status(404).json({ message: "GRN not found" });
+    }
+
+    const items = await q(
+      `
+        SELECT
+          gi.*,
+          i.name AS item_name,
+          i.code AS item_code,
+          i.unit
+        FROM grn_items gi
+        JOIN items i ON i.id = gi.item_id
+        WHERE gi.grn_id = ?
+        ORDER BY gi.id ASC
+      `,
+      [grnId]
+    );
+
+    let photos = [];
+    if (await tableExists("grn_photos")) {
+      photos = await q(
+        `
+          SELECT
+            id,
+            file_name,
+            file_path,
+            original_name,
+            created_at
+          FROM grn_photos
+          WHERE grn_id = ?
+          ORDER BY id ASC
+        `,
+        [grnId]
+      );
+    }
+
+    const header = headerRows[0];
+
+    res.json({
+      ...header,
+      created_by_name: header.received_by_name || "—",
+      verified_by_name:
+        String(header.status || "").toLowerCase() === "verified"
+          ? "Verified"
+          : Number(header.verification_required || 0) === 1
+          ? "Pending Ops"
+          : "—",
+      items: items.map((row) => ({
+        ...row,
+        ordered_qty: Number(row.ordered_qty || 0),
+        received_qty: Number(row.received_qty || 0),
+        variance_qty: Number(row.variance_qty || 0),
+        variance_percent: Number(row.variance_percent || 0),
+        unit_cost: Number(row.unit_cost || 0),
+        line_total: Number(row.line_total || 0),
+        verification_required: Number(row.verification_required || 0),
+      })),
+      photos: photos.map((photo) => ({
+        ...photo,
+        file_path:
+          photo.file_path && String(photo.file_path).startsWith("/uploads")
+            ? photo.file_path
+            : `/uploads/grn-photos/${photo.file_name}`,
+      })),
+    });
+  } catch (err) {
+    console.error("getGrnById error:", err);
+    res.status(500).json({ message: "Failed to load GRN details", error: err.message });
+  }
 };
 
 const createGrn = async (req, res) => {
   try {
-    await ensureGrnRuntimeSchema();
+    await ensureRuntimeSchema();
 
     const purchaseOrderId = Number(req.body.purchase_order_id || 0);
     const supplierId = Number(req.body.supplier_id || 0);
     const receivedDate = safeText(req.body.received_date);
+    const supplierInvoiceNo = safeText(req.body.supplier_invoice_no);
+    const receivedByName = safeText(req.body.received_by_name || req.user?.full_name || req.user?.name || "");
     const remarks = safeText(req.body.remarks);
     const createdBy = req.user?.id || null;
-    const items = Array.isArray(req.body.items) ? req.body.items : [];
+
+    const bodyItems =
+      typeof req.body.items === "string" ? JSON.parse(req.body.items || "[]") : req.body.items;
+    const items = Array.isArray(bodyItems) ? bodyItems : [];
 
     if (!purchaseOrderId || !supplierId || !receivedDate || !items.length) {
       return res.status(400).json({
@@ -569,9 +589,12 @@ const createGrn = async (req, res) => {
 
     const poRows = await q(
       `
-        SELECT po.id, po.po_number, po.supplier_id, po.status, s.supplier_name
+        SELECT
+          po.id,
+          po.po_number,
+          po.supplier_id,
+          COALESCE(po.order_date, DATE(po.created_at)) AS po_order_date
         FROM purchase_orders po
-        JOIN suppliers s ON s.id = po.supplier_id
         WHERE po.id = ?
         LIMIT 1
       `,
@@ -583,116 +606,86 @@ const createGrn = async (req, res) => {
     }
 
     const po = poRows[0];
-
     if (Number(po.supplier_id) !== supplierId) {
-      return res.status(400).json({ message: "Supplier does not match the selected purchase order" });
+      return res.status(400).json({ message: "Supplier does not match selected PO" });
     }
 
-    const poItems = await new Promise((resolve, reject) => {
-      const fakeReq = { params: { purchaseOrderId } };
-      const fakeRes = {
-        json: resolve,
-        status(code) {
-          this.statusCode = code;
-          return this;
-        },
-        send: reject,
-      };
-      getPurchaseOrderItemsForGrn(fakeReq, fakeRes).catch(reject);
-    });
-
-    const poItemMap = new Map(
-      poItems.map((item) => [
-        String(item.item_id),
-        {
-          purchase_order_item_id: item.purchase_order_item_id || null,
-          ordered_quantity: Number(item.ordered_quantity || 0),
-          unit: item.unit || "",
-          unit_price: Number(item.unit_price || 0),
-        },
-      ])
-    );
-
     const validItems = items
-      .map((row, index) => {
-        const itemId = Number(row.item_id || 0);
-        const sourceItem = poItemMap.get(String(itemId));
-        if (!itemId || !sourceItem) return null;
+      .map((item) => {
+        const orderedQty = safeNumber(item.ordered_quantity, 0);
+        const receivedQty = safeNumber(item.received_qty ?? item.delivered_quantity, 0);
+        if (!Number(item.item_id) || receivedQty <= 0) return null;
 
-        const orderedQty = Number(
-          row.ordered_quantity !== undefined ? row.ordered_quantity : sourceItem.ordered_quantity
-        );
-        const receivedQty = Number(
-          row.received_qty !== undefined ? row.received_qty : row.delivered_quantity
-        );
-        const unitCost = Number(
-          row.unit_cost !== undefined ? row.unit_cost : sourceItem.unit_price
-        );
-        const batchNumber = safeText(row.batch_number) || `BT-${Date.now()}-${index + 1}`;
-        const expiryDate = safeText(row.expiry_date) || null;
-        const notes = safeText(row.notes);
-
-        if (receivedQty <= 0) return null;
-
-        const variance = needsVarianceVerification(orderedQty, receivedQty);
+        const meta = varianceMeta(orderedQty, receivedQty);
 
         return {
-          item_id: itemId,
-          purchase_order_item_id: sourceItem.purchase_order_item_id,
+          purchase_order_item_id: item.purchase_order_item_id ? Number(item.purchase_order_item_id) : null,
+          item_id: Number(item.item_id),
           ordered_qty: orderedQty,
           received_qty: receivedQty,
-          variance_qty: variance.varianceQty,
-          variance_percent: variance.variancePercent,
-          batch_number: batchNumber,
-          expiry_date: expiryDate,
-          unit_cost: unitCost,
-          line_total: receivedQty * unitCost,
-          notes,
-          verification_required: variance.required ? 1 : 0,
+          variance_qty: meta.varianceQty,
+          variance_percent: meta.variancePercent,
+          batch_number: safeText(item.batch_number),
+          expiry_date: safeText(item.expiry_date) || null,
+          quality_grade: safeText(item.quality_grade || "Grade A"),
+          unit_cost: safeNumber(item.unit_cost, 0),
+          line_total: receivedQty * safeNumber(item.unit_cost, 0),
+          notes: safeText(item.notes),
+          verification_required: meta.verificationRequired ? 1 : 0,
         };
       })
       .filter(Boolean);
 
     if (!validItems.length) {
-      return res.status(400).json({
-        message: "At least one received quantity must be greater than 0",
-      });
+      return res.status(400).json({ message: "At least one received item is required" });
     }
 
-    const verificationRequired = validItems.some((item) => Number(item.verification_required) === 1);
+    const anyVariance = validItems.some((item) => Number(item.verification_required) === 1);
+    const files = Array.isArray(req.files) ? req.files : [];
+
+    if (anyVariance && files.length === 0) {
+      return res.status(400).json({ message: "Photo evidence is required when variance exists" });
+    }
+
     const grnNumber = await generateGrnNumber();
 
-    const result = await q(
+    const insertHeader = await q(
       `
         INSERT INTO grn (
           grn_number,
           purchase_order_id,
           supplier_id,
+          supplier_invoice_no,
+          po_order_date,
           received_date,
+          received_by_name,
           remarks,
           created_by,
           status,
           verification_required,
           inventory_posted
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         grnNumber,
         purchaseOrderId,
         supplierId,
+        supplierInvoiceNo || null,
+        po.po_order_date || null,
         receivedDate,
+        receivedByName || null,
         remarks || null,
         createdBy,
-        verificationRequired ? "pending_verification" : "received",
-        verificationRequired ? 1 : 0,
+        anyVariance ? "pending_verification" : "received",
+        anyVariance ? 1 : 0,
         0,
       ]
     );
 
-    const grnId = result.insertId;
+    const grnId = insertHeader.insertId;
 
-    const values = validItems.map((item) => [
+    const itemValues = validItems.map((item) => [
       grnId,
       item.purchase_order_item_id,
       item.item_id,
@@ -700,8 +693,9 @@ const createGrn = async (req, res) => {
       item.received_qty,
       item.variance_qty,
       item.variance_percent,
-      item.batch_number,
+      item.batch_number || `BT-${grnId}-${item.item_id}`,
       item.expiry_date,
+      item.quality_grade,
       item.unit_cost,
       item.line_total,
       item.notes || remarks || null,
@@ -720,6 +714,7 @@ const createGrn = async (req, res) => {
           variance_percent,
           batch_number,
           expiry_date,
+          quality_grade,
           unit_cost,
           line_total,
           notes,
@@ -727,38 +722,55 @@ const createGrn = async (req, res) => {
         )
         VALUES ?
       `,
-      [values]
+      [itemValues]
     );
 
-    if (!verificationRequired) {
-      await postGrnInventory(grnId, grnNumber);
+    if (files.length) {
+      const photoValues = files.map((file) => [
+        grnId,
+        file.filename,
+        `/uploads/grn-photos/${file.filename}`,
+        file.originalname || file.filename,
+      ]);
+
+      await q(
+        `
+          INSERT INTO grn_photos (
+            grn_id,
+            file_name,
+            file_path,
+            original_name
+          )
+          VALUES ?
+        `,
+        [photoValues]
+      );
     }
 
-    await updatePurchaseOrderAfterGrn(purchaseOrderId);
+    if (!anyVariance) {
+      await postInventoryFromGrn(grnId, grnNumber);
+    }
 
+    await updatePurchaseOrderStatus(purchaseOrderId);
     clearCache();
 
-    return res.status(201).json({
-      message: verificationRequired
-        ? "GRN created and sent for Ops verification"
-        : "GRN created successfully and inventory updated",
+    res.status(201).json({
+      message: anyVariance
+        ? "GRN created. Ops verification required before stock update."
+        : "GRN created and stock updated successfully",
       grnId,
       grnNumber,
-      status: verificationRequired ? "pending_verification" : "received",
-      verificationRequired,
+      verificationRequired: anyVariance,
     });
   } catch (err) {
     console.error("createGrn error:", err);
-    return res.status(500).json({
-      message: "Failed to create GRN",
-      error: err.message,
-    });
+    res.status(500).json({ message: "Failed to create GRN", error: err.message });
   }
 };
 
 const verifyGrn = async (req, res) => {
   try {
-    await ensureGrnRuntimeSchema();
+    await ensureRuntimeSchema();
 
     const grnId = Number(req.params.id || 0);
     const verifierId = req.user?.id || null;
@@ -771,10 +783,10 @@ const verifyGrn = async (req, res) => {
     const grn = rows[0];
 
     if (Number(grn.inventory_posted || 0) === 1) {
-      return res.json({ message: "GRN inventory is already posted" });
+      return res.json({ message: "Inventory already posted for this GRN" });
     }
 
-    await postGrnInventory(grnId, grn.grn_number);
+    await postInventoryFromGrn(grnId, grn.grn_number);
 
     await q(
       `
@@ -789,18 +801,12 @@ const verifyGrn = async (req, res) => {
       [verifierId, grnId]
     );
 
-    await updatePurchaseOrderAfterGrn(grn.purchase_order_id);
+    await updatePurchaseOrderStatus(grn.purchase_order_id);
 
-    return res.json({
-      message: "GRN verified and inventory updated successfully",
-      grnId,
-    });
+    res.json({ message: "GRN verified and stock updated successfully" });
   } catch (err) {
     console.error("verifyGrn error:", err);
-    return res.status(500).json({
-      message: "Failed to verify GRN",
-      error: err.message,
-    });
+    res.status(500).json({ message: "Failed to verify GRN", error: err.message });
   }
 };
 
