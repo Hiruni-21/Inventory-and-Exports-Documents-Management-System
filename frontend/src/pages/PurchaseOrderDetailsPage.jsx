@@ -1,9 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Mail, MessageCircle, Send } from "lucide-react";
+import { ArrowLeft, Eye, FileText, Mail, MessageCircle } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import api from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
+
+const API_ROOT =
+  import.meta.env.VITE_API_BASE_URL ||
+  import.meta.env.VITE_API_URL ||
+  "http://localhost:5001/api";
+
+const BACKEND_BASE_URL = API_ROOT.replace(/\/api\/?$/, "");
 
 const fmtDate = (value) => {
   if (!value) return "—";
@@ -46,8 +53,9 @@ export default function PurchaseOrderDetailsPage() {
 
   const [purchaseOrder, setPurchaseOrder] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [pageError, setPageError] = useState("");
+  const [actionLoading, setActionLoading] = useState("");
+  const [lastPdfUrl, setLastPdfUrl] = useState("");
 
   const canSend =
     roleOf(user?.role).includes("manager") ||
@@ -57,11 +65,11 @@ export default function PurchaseOrderDetailsPage() {
   const loadPo = async () => {
     try {
       setLoading(true);
-      setError("");
+      setPageError("");
       const res = await api.get(`/purchase-orders/${id}`);
-      setPurchaseOrder(res.data);
+      setPurchaseOrder(res.data || null);
     } catch (err) {
-      setError(err?.response?.data?.message || "Failed to load purchase order details");
+      setPageError(err?.response?.data?.message || "Failed to load purchase order details");
     } finally {
       setLoading(false);
     }
@@ -78,24 +86,82 @@ export default function PurchaseOrderDetailsPage() {
     );
   }, [purchaseOrder]);
 
+  const status = String(purchaseOrder?.status || "draft").toLowerCase();
+  const sendAllowed = canSend && ["approved", "sent", "grn_created", "closed"].includes(status);
 
-  const sendPo = async () => {
+  const buildAbsoluteFileUrl = (fileUrl) => {
+    if (!fileUrl) return "";
+    if (/^https?:\/\//i.test(fileUrl)) return fileUrl;
+    return `${BACKEND_BASE_URL}${fileUrl}`;
+  };
+
+  const renderPdf = async (openAfterRender = false) => {
     try {
-      setActionLoading(true);
-      const res = await api.put(`/purchase-orders/${id}/send`);
-      toast.success("Purchase order marked as sent");
+      setActionLoading(openAfterRender ? "view-pdf" : "render-pdf");
 
-      if (res.data?.whatsapp_link) {
-        window.open(res.data.whatsapp_link, "_blank", "noopener,noreferrer");
-      } else if (res.data?.email_link) {
-        window.open(res.data.email_link, "_blank", "noopener,noreferrer");
+      const res = await api.post(`/purchase-orders/${id}/render-pdf`);
+      const url =
+        res.data?.downloadUrl ||
+        buildAbsoluteFileUrl(res.data?.fileUrl || `/uploads/purchase-orders/${purchaseOrder?.po_number}.pdf`);
+
+      if (url) {
+        setLastPdfUrl(url);
       }
 
+      toast.success("Purchase order PDF generated");
+
+      if (openAfterRender && url) {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to generate PDF");
+    } finally {
+      setActionLoading("");
+    }
+  };
+
+  const viewPdf = async () => {
+    if (lastPdfUrl) {
+      window.open(lastPdfUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    await renderPdf(true);
+  };
+
+  const sendEmail = async () => {
+    try {
+      setActionLoading("send-email");
+      const res = await api.post(`/purchase-orders/${id}/send-email`);
+
+      if (res.data?.fileUrl) {
+        setLastPdfUrl(buildAbsoluteFileUrl(res.data.fileUrl));
+      }
+
+      toast.success(res.data?.message || "Purchase order email sent");
       await loadPo();
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to send purchase order");
+      toast.error(err?.response?.data?.message || "Failed to send purchase order email");
     } finally {
-      setActionLoading(false);
+      setActionLoading("");
+    }
+  };
+
+  const sendWhatsapp = async () => {
+    try {
+      setActionLoading("send-whatsapp");
+      const res = await api.post(`/purchase-orders/${id}/send-whatsapp`);
+
+      if (res.data?.fileUrl) {
+        setLastPdfUrl(buildAbsoluteFileUrl(res.data.fileUrl));
+      }
+
+      toast.success(res.data?.message || "Purchase order WhatsApp message sent");
+      await loadPo();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to send purchase order WhatsApp");
+    } finally {
+      setActionLoading("");
     }
   };
 
@@ -108,24 +174,22 @@ export default function PurchaseOrderDetailsPage() {
     );
   }
 
-  if (error) {
+  if (pageError) {
     return (
       <div className="ib ib-d">
         <span>⚠️</span>
-        <div>{error}</div>
+        <div>{pageError}</div>
       </div>
     );
   }
 
   if (!purchaseOrder) return null;
 
-  const status = String(purchaseOrder.status || "draft").toLowerCase();
-
   return (
     <>
       <div
         className="fb"
-        style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}
+        style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 12, flexWrap: "wrap" }}
       >
         <div className="fb" style={{ marginBottom: 0, gap: 10 }}>
           <button
@@ -137,17 +201,45 @@ export default function PurchaseOrderDetailsPage() {
           </button>
         </div>
 
-        <div className="fb" style={{ marginBottom: 0, gap: 10 }}>
+        <div className="fb" style={{ marginBottom: 0, gap: 10, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => renderPdf(false)}
+            disabled={actionLoading === "render-pdf"}
+          >
+            <FileText size={16} /> {actionLoading === "render-pdf" ? "Rendering..." : "Render PDF"}
+          </button>
 
-          {canSend && status === "approved" ? (
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={sendPo}
-              disabled={actionLoading}
-            >
-              <Send size={16} /> Send to Supplier
-            </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={viewPdf}
+            disabled={actionLoading === "view-pdf"}
+          >
+            <Eye size={16} /> {actionLoading === "view-pdf" ? "Opening..." : "View PDF"}
+          </button>
+
+          {sendAllowed ? (
+            <>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={sendEmail}
+                disabled={actionLoading === "send-email"}
+              >
+                <Mail size={16} /> {actionLoading === "send-email" ? "Sending..." : "Send Email"}
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={sendWhatsapp}
+                disabled={actionLoading === "send-whatsapp"}
+              >
+                <MessageCircle size={16} /> {actionLoading === "send-whatsapp" ? "Sending..." : "Send WhatsApp"}
+              </button>
+            </>
           ) : null}
 
           {(status === "sent" || status === "grn_created") ? (
@@ -157,6 +249,24 @@ export default function PurchaseOrderDetailsPage() {
           ) : null}
         </div>
       </div>
+
+      {status === "pending_approval" ? (
+        <div className="ib ib-w">
+          <span>⚠️</span>
+          <div>
+            This PO is waiting for manager approval. Send actions will appear after approval.
+          </div>
+        </div>
+      ) : null}
+
+      {status === "approved" ? (
+        <div className="ib ib-s">
+          <span>✅</span>
+          <div>
+            This PO is approved and ready to be sent to the supplier.
+          </div>
+        </div>
+      ) : null}
 
       <div className="krow k3">
         <div className="kc g">
@@ -174,25 +284,6 @@ export default function PurchaseOrderDetailsPage() {
           <div className="kl">Total Value</div>
         </div>
       </div>
-
-      {status === "pending_approval" ? (
-        <div className="ib ib-w">
-          <span>⚠️</span>
-          <div>
-            This PO is waiting for manager approval before it can be sent to the supplier.
-          </div>
-        </div>
-      ) : null}
-
-      {status === "approved" ? (
-        <div className="ib ib-s">
-          <span>✅</span>
-          <div>
-            This PO is approved and ready to be sent to the supplier by Operations or
-            Manager.
-          </div>
-        </div>
-      ) : null}
 
       <div className="content-card" style={{ marginBottom: 16 }}>
         <div className="card-header-row">
@@ -241,46 +332,13 @@ export default function PurchaseOrderDetailsPage() {
 
             <div className="details-stat-card">
               <label>WHATSAPP</label>
-              <span>
-                {purchaseOrder.whatsapp_number || purchaseOrder.contact_number || "—"}
-              </span>
+              <span>{purchaseOrder.whatsapp_number || purchaseOrder.contact_number || "—"}</span>
             </div>
 
             <div className="details-stat-card details-stat-card-full">
               <label>NOTES</label>
               <span>{purchaseOrder.notes || "—"}</span>
             </div>
-          </div>
-
-          <div className="fb" style={{ marginBottom: 0, gap: 10 }}>
-            {purchaseOrder.email ? (
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() =>
-                  window.open(`mailto:${purchaseOrder.email}`, "_blank", "noopener,noreferrer")
-                }
-              >
-                <Mail size={16} /> Email
-              </button>
-            ) : null}
-
-            {purchaseOrder.whatsapp_number || purchaseOrder.contact_number ? (
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => {
-                  const phone = String(
-                    purchaseOrder.whatsapp_number || purchaseOrder.contact_number || ""
-                  ).replace(/\D/g, "");
-                  if (phone) {
-                    window.open(`https://wa.me/${phone}`, "_blank", "noopener,noreferrer");
-                  }
-                }}
-              >
-                <MessageCircle size={16} /> WhatsApp
-              </button>
-            ) : null}
           </div>
         </div>
       </div>
@@ -309,7 +367,7 @@ export default function PurchaseOrderDetailsPage() {
                   <tr key={item.id}>
                     <td className="code-cell">{item.item_code}</td>
                     <td className="strong-cell">{item.item_name}</td>
-                    <td>{item.unit || item.item_master_unit || "—"}</td>
+                    <td>{item.unit || "—"}</td>
                     <td>{Number(item.ordered_qty || 0).toFixed(2)}</td>
                     <td>{money(item.unit_price)}</td>
                     <td>{money(item.line_total)}</td>
