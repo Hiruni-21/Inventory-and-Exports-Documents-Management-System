@@ -1,32 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import { CheckCheck, Eye, Plus, Search, Send } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../utils/api";
-
-const statusClassMap = {
-  draft: "bg-x",
-  pending: "bg-a",
-  awaiting: "bg-a",
-  approved: "bg-g",
-  sent: "bg-b",
-  closed: "bg-p",
-  received: "bg-p",
-};
-
-const getBadgeClass = (status) => {
-  const value = String(status || "pending").toLowerCase();
-  const key = Object.keys(statusClassMap).find((entry) => value.includes(entry));
-  return statusClassMap[key] || "bg-a";
-};
-
-const getStatusLabel = (status) => {
-  const value = String(status || "pending").toLowerCase();
-  if (value.includes("await") || value.includes("pending")) return "Awaiting Approval";
-  if (value.includes("approved")) return "Approved";
-  if (value.includes("sent")) return "Sent";
-  if (value.includes("closed") || value.includes("received")) return "Closed";
-  if (value.includes("draft")) return "Draft";
-  return status || "Pending";
-};
+import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 
 const fmtDate = (value) => {
   if (!value) return "—";
@@ -35,198 +12,353 @@ const fmtDate = (value) => {
   return date.toLocaleDateString("en-CA");
 };
 
-const PurchaseOrderListPage = () => {
-  const navigate = useNavigate();
+const formatMoney = (value) =>
+  Number(value || 0).toLocaleString("en-LK", {
+    style: "currency",
+    currency: "LKR",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
 
-  const [purchaseOrders, setPurchaseOrders] = useState([]);
-  const [error, setError] = useState("");
+const roleOf = (role) => String(role || "").toLowerCase();
+
+const statusLabel = (status) => {
+  const value = String(status || "draft").toLowerCase();
+  if (value === "pending_approval") return "Awaiting Approval";
+  if (value === "approved") return "Approved";
+  if (value === "sent") return "Sent to Supplier";
+  if (value === "grn_created") return "GRN Created";
+  if (value === "closed") return "Closed";
+  return "Draft";
+};
+
+const statusClass = (status) => {
+  const value = String(status || "draft").toLowerCase();
+  if (value === "approved") return "tag-pill yes-text";
+  if (value === "sent" || value === "grn_created" || value === "closed") {
+    return "tag-pill tag-soft";
+  }
+  if (value === "draft") return "tag-pill tag-soft";
+  return "tag-pill tag-orange";
+};
+
+export default function PurchaseOrderListPage() {
+  const navigate = useNavigate();
+  const toast = useToast();
+  const { user } = useAuth();
+
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
-  const [loading, setLoading] = useState(true);
+  const [actionId, setActionId] = useState(null);
+
+  const canApprove = roleOf(user?.role).includes("manager");
+  const canSend =
+    roleOf(user?.role).includes("manager") ||
+    roleOf(user?.role).includes("operation") ||
+    roleOf(user?.role).includes("ops");
+
+  const loadRows = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get("/purchase-orders");
+      setRows(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to load purchase orders");
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchPurchaseOrders = async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const res = await api.get("/purchase-orders");
-        setPurchaseOrders(Array.isArray(res.data) ? res.data : []);
-      } catch (err) {
-        setError(err.response?.data?.message || "Failed to load purchase orders");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPurchaseOrders();
+    loadRows();
   }, []);
 
   const counts = useMemo(() => {
-    return purchaseOrders.reduce(
-      (acc, po) => {
-        const value = String(po.status || "pending").toLowerCase();
+    return rows.reduce(
+      (acc, row) => {
+        const value = String(row.status || "draft").toLowerCase();
         acc.all += 1;
-        if (value.includes("await") || value.includes("pending")) acc.awaiting += 1;
-        if (value.includes("approved")) acc.approved += 1;
-        if (value.includes("sent")) acc.sent += 1;
-        if (value.includes("closed") || value.includes("received")) acc.closed += 1;
+        if (value === "draft") acc.draft += 1;
+        if (value === "pending_approval") acc.awaiting += 1;
+        if (value === "approved") acc.approved += 1;
+        if (value === "sent") acc.sent += 1;
+        if (value === "grn_created" || value === "closed") acc.closed += 1;
         return acc;
       },
-      { all: 0, awaiting: 0, approved: 0, sent: 0, closed: 0 }
+      { all: 0, draft: 0, awaiting: 0, approved: 0, sent: 0, closed: 0 }
     );
-  }, [purchaseOrders]);
+  }, [rows]);
 
-  const filteredOrders = useMemo(() => {
-    return purchaseOrders.filter((po) => {
-      const q = search.trim().toLowerCase();
-      const status = String(po.status || "").toLowerCase();
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+
+    return rows.filter((row) => {
+      const status = String(row.status || "draft").toLowerCase();
 
       const matchesSearch =
         !q ||
-        String(po.po_number || "").toLowerCase().includes(q) ||
-        String(po.supplier_name || "").toLowerCase().includes(q) ||
-        String(po.created_by_name || "").toLowerCase().includes(q);
+        [
+          row.po_number,
+          row.supplier_name,
+          row.requested_by_name,
+          row.approved_by_name,
+          row.sent_by_name,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(q);
 
       const matchesFilter =
         filter === "all" ||
-        (filter === "awaiting" && (status.includes("await") || status.includes("pending"))) ||
-        (filter === "approved" && status.includes("approved")) ||
-        (filter === "sent" && status.includes("sent")) ||
-        (filter === "closed" && (status.includes("closed") || status.includes("received")));
+        (filter === "draft" && status === "draft") ||
+        (filter === "awaiting" && status === "pending_approval") ||
+        (filter === "approved" && status === "approved") ||
+        (filter === "sent" && status === "sent") ||
+        (filter === "closed" &&
+          (status === "grn_created" || status === "closed"));
 
       return matchesSearch && matchesFilter;
     });
-  }, [filter, purchaseOrders, search]);
+  }, [rows, search, filter]);
+
+  const approvePo = async (e, id) => {
+    e.stopPropagation();
+
+    try {
+      setActionId(id);
+      await api.put(`/purchase-orders/${id}/approve`);
+      toast.success("Purchase order approved");
+      await loadRows();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to approve purchase order");
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const sendPo = async (e, row) => {
+    e.stopPropagation();
+
+    try {
+      setActionId(row.id);
+      const res = await api.put(`/purchase-orders/${row.id}/send`);
+      toast.success("Purchase order marked as sent");
+
+      if (res.data?.whatsapp_link) {
+        window.open(res.data.whatsapp_link, "_blank", "noopener,noreferrer");
+      } else if (res.data?.email_link) {
+        window.open(res.data.email_link, "_blank", "noopener,noreferrer");
+      }
+
+      await loadRows();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to send purchase order");
+    } finally {
+      setActionId(null);
+    }
+  };
 
   return (
-    <div>
-      <div className="fb">
-        <button
-          type="button"
-          className={`ft ${filter === "all" ? "on" : ""}`}
-          onClick={() => setFilter("all")}
-        >
-          All ({counts.all})
-        </button>
+    <>
+      <div className="notice-banner notice-success">
+        <span>📋</span>
+        <span>Create, approve, send, and track purchase orders from this page.</span>
+      </div>
 
-        <button
-          type="button"
-          className={`ft ${filter === "awaiting" ? "on" : ""}`}
-          onClick={() => setFilter("awaiting")}
+      <div
+        className="fb"
+        style={{
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 12,
+          flexWrap: "wrap",
+          marginBottom: 16,
+          paddingLeft: 4,
+          paddingRight: 4,
+        }}
+      >
+        <div
+          className="fb"
+          style={{
+            marginBottom: 0,
+            gap: 10,
+            flex: "1 1 auto",
+            minWidth: 0,
+            flexWrap: "wrap",
+          }}
         >
-          Awaiting Approval ({counts.awaiting})
-        </button>
+          <div className="search-field" style={{ minWidth: 260 }}>
+            <Search size={16} />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search POs..."
+            />
+          </div>
 
-        <button
-          type="button"
-          className={`ft ${filter === "approved" ? "on" : ""}`}
-          onClick={() => setFilter("approved")}
+          <button
+            type="button"
+            className={`ft ${filter === "all" ? "on" : ""}`}
+            onClick={() => setFilter("all")}
+          >
+            All ({counts.all})
+          </button>
+
+          <button
+            type="button"
+            className={`ft ${filter === "awaiting" ? "on" : ""}`}
+            onClick={() => setFilter("awaiting")}
+          >
+            Awaiting Approval ({counts.awaiting})
+          </button>
+
+          <button
+            type="button"
+            className={`ft ${filter === "approved" ? "on" : ""}`}
+            onClick={() => setFilter("approved")}
+          >
+            Approved ({counts.approved})
+          </button>
+
+          <button
+            type="button"
+            className={`ft ${filter === "sent" ? "on" : ""}`}
+            onClick={() => setFilter("sent")}
+          >
+            Sent ({counts.sent})
+          </button>
+
+          <button
+            type="button"
+            className={`ft ${filter === "closed" ? "on" : ""}`}
+            onClick={() => setFilter("closed")}
+          >
+            Closed ({counts.closed})
+          </button>
+        </div>
+
+        <div
+          className="fb"
+          style={{
+            marginBottom: 0,
+            marginLeft: "auto",
+            flexShrink: 0,
+            gap: 10,
+          }}
         >
-          Approved ({counts.approved})
-        </button>
-
-        <button
-          type="button"
-          className={`ft ${filter === "sent" ? "on" : ""}`}
-          onClick={() => setFilter("sent")}
-        >
-          Sent ({counts.sent})
-        </button>
-
-        <button
-          type="button"
-          className={`ft ${filter === "closed" ? "on" : ""}`}
-          onClick={() => setFilter("closed")}
-        >
-          Closed ({counts.closed})
-        </button>
-
-        <div className="sw" style={{ marginLeft: "auto" }}>
-          <input
-            className="si"
-            placeholder="Search purchase orders..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => navigate("/purchase-orders/add")}
+          >
+            <Plus size={16} /> Create PO
+          </button>
         </div>
       </div>
 
-      {loading ? (
-        <div className="ib ib-i">
-          <span>⏳</span>
-          <div>Loading purchase orders...</div>
-        </div>
-      ) : null}
-
-      {error ? (
-        <div className="ib ib-d">
-          <span>⚠️</span>
-          <div>{error}</div>
-        </div>
-      ) : null}
-
-      <div className="tw">
-        <div className="tw-h">
-          <h3>Purchase Orders</h3>
+      <div className="content-card">
+        <div className="card-header-row">
+          <h3>📋 Purchase Orders</h3>
+          <span className="count-pill">{filtered.length} orders</span>
         </div>
 
-        <table>
-          <thead>
-            <tr>
-              <th>PO Number</th>
-              <th>Supplier</th>
-              <th>Date Placed</th>
-              <th>Required By</th>
-              <th>Status</th>
-              <th>Created By</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredOrders.length > 0 ? (
-              filteredOrders.map((po) => (
-                <tr key={po.id}>
-                  <td style={{ fontFamily: "monospace", fontWeight: 700, color: "var(--g800)" }}>
-                    {po.po_number}
-                  </td>
-                  <td style={{ fontWeight: 600 }}>{po.supplier_name || "—"}</td>
-                  <td>{fmtDate(po.order_date || po.created_at)}</td>
-                  <td>{fmtDate(po.expected_delivery_date)}</td>
-                  <td>
-                    <span className={`badge ${getBadgeClass(po.status)}`}>
-                      {getStatusLabel(po.status)}
-                    </span>
-                  </td>
-                  <td>{po.created_by_name || "—"}</td>
-                  <td>
-                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-                      <Link to={`/purchase-orders/${po.id}`} className="ab" title="View PO">
-                        👁
-                      </Link>
-                      <button
-                        type="button"
-                        className="ab"
-                        title="Create GRN from this PO"
-                        onClick={() => navigate(`/grn/add?po=${po.id}`)}
-                      >
-                        📥
-                      </button>
-                    </div>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>PO NUMBER</th>
+                <th>SUPPLIER</th>
+                <th>DATE PLACED</th>
+                <th>REQUIRED BY</th>
+                <th>ITEMS</th>
+                <th>TOTAL</th>
+                <th>STATUS</th>
+                <th>ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan="8" className="empty-row">
+                    Loading purchase orders...
                   </td>
                 </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="7" style={{ textAlign: "center", color: "var(--text3)" }}>
-                  No purchase orders found
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-};
+              ) : filtered.length ? (
+                filtered.map((row) => {
+                  const status = String(row.status || "draft").toLowerCase();
 
-export default PurchaseOrderListPage;
+                  return (
+                    <tr
+                      key={row.id}
+                      style={{ cursor: "pointer" }}
+                      onClick={() => navigate(`/purchase-orders/${row.id}`)}
+                    >
+                      <td className="code-cell">{row.po_number}</td>
+                      <td className="strong-cell">{row.supplier_name || "—"}</td>
+                      <td>{fmtDate(row.order_date || row.created_at)}</td>
+                      <td>{fmtDate(row.expected_date)}</td>
+                      <td>{Number(row.item_count || 0)}</td>
+                      <td>{formatMoney(row.total_amount)}</td>
+                      <td>
+                        <span className={statusClass(row.status)}>
+                          {statusLabel(row.status)}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="table-actions">
+                          <Link
+                            to={`/purchase-orders/${row.id}`}
+                            className="table-icon-btn"
+                            title="View PO"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Eye size={15} />
+                          </Link>
+
+                          {canApprove &&
+                          (status === "pending_approval" || status === "draft") ? (
+                            <button
+                              type="button"
+                              className="table-icon-btn"
+                              title="Approve PO"
+                              onClick={(e) => approvePo(e, row.id)}
+                              disabled={actionId === row.id}
+                            >
+                              <CheckCheck size={15} />
+                            </button>
+                          ) : null}
+
+                          {canSend && status === "approved" ? (
+                            <button
+                              type="button"
+                              className="table-icon-btn"
+                              title="Send to supplier"
+                              onClick={(e) => sendPo(e, row)}
+                              disabled={actionId === row.id}
+                            >
+                              <Send size={15} />
+                            </button>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan="8" className="empty-row">
+                    No purchase orders found
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  );
+}

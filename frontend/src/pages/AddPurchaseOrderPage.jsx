@@ -165,19 +165,25 @@ const AddPurchaseOrderPage = () => {
       await api.post("/purchase-orders", {
         supplier_id: Number(form.supplier_id),
         expected_delivery_date: form.expected_delivery_date,
-        remarks: [
+        payment_terms: paymentTerms,
+        notes: [
           form.remarks,
           instructions,
           internalNotes,
-          `Payment Terms: ${paymentTerms}`,
           `Priority: ${priority}`,
-          mode === "draft" ? "Saved as Draft" : "Submitted for Approval",
         ]
           .filter(Boolean)
           .join("\n"),
-        items: cleanItems,
+        save_mode: mode,
+        items: enrichedLines
+          .filter((line) => line.item_id && Number(line.quantity) > 0)
+          .map((line) => ({
+            item_id: Number(line.item_id),
+            quantity: Number(line.quantity),
+            unit: line.unit || "",
+            price: Number(line.price || 0),
+          })),
       });
-
       setSuccess(
         mode === "draft"
           ? "Purchase order draft saved successfully"
