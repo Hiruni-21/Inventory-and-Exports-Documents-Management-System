@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { FolderOpen, Plus, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
 import { useToast } from "../context/ToastContext";
@@ -11,9 +11,15 @@ const fmtDate = (value) => {
   return date.toLocaleDateString("en-CA");
 };
 
+const monthKey = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getFullYear()}-${date.getMonth()}`;
+};
+
 const statusLabel = (value) => {
   const text = String(value || "received").toLowerCase();
-  if (text === "pending_verification") return "Pending Verification";
+  if (text === "pending_verification") return "Pending Verify";
   if (text === "verified") return "Verified";
   return "Received";
 };
@@ -32,6 +38,7 @@ export default function GrnListPage() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [periodFilter, setPeriodFilter] = useState("this");
 
   const loadRows = async () => {
     try {
@@ -39,6 +46,7 @@ export default function GrnListPage() {
       const res = await api.get("/grn");
       setRows(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
+      console.error(err);
       toast.error(err?.response?.data?.message || "Failed to load GRNs");
       setRows([]);
     } finally {
@@ -52,39 +60,95 @@ export default function GrnListPage() {
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return rows;
 
-    return rows.filter((row) =>
-      [
-        row.grn_number,
-        row.po_number,
-        row.supplier_name,
-        row.created_by_name,
-        row.status,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-        .includes(q)
-    );
-  }, [rows, search]);
+    const now = new Date();
+    const thisMonth = `${now.getFullYear()}-${now.getMonth()}`;
+    const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonth = `${lastMonthDate.getFullYear()}-${lastMonthDate.getMonth()}`;
+
+    return rows.filter((row) => {
+      const textMatch =
+        q === ""
+          ? true
+          : [
+              row.grn_number,
+              row.po_number,
+              row.supplier_name,
+              row.received_by_name,
+              row.verified_by_name,
+              row.status,
+            ]
+              .filter(Boolean)
+              .join(" ")
+              .toLowerCase()
+              .includes(q);
+
+      const rowMonth = monthKey(row.received_date);
+
+      const periodMatch =
+        periodFilter === "history"
+          ? true
+          : periodFilter === "last"
+          ? rowMonth === lastMonth
+          : rowMonth === thisMonth;
+
+      return textMatch && periodMatch;
+    });
+  }, [rows, search, periodFilter]);
 
   return (
     <>
       <div className="notice-banner notice-success">
-        <span>Goods Receiving is now backend-connected. GRNs with high variance wait for Ops verification before stock is updated.</span>
+        <span>
+          Goods Receiving is now backend-connected. GRNs with high variance wait for Ops
+          verification before stock is updated.
+        </span>
       </div>
 
-      <div className="fb" style={{ justifyContent: "space-between", alignItems: "center" }}>
-        <div className="search-field" style={{ minWidth: 280 }}>
-          <Search size={16} />
-          <input
-            type="text"
-            placeholder="Search GRNs..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      <div className="fb grn-toolbar-row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+        <div className="fb grn-toolbar-left" style={{ marginBottom: 0, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            className={`ft ${periodFilter === "this" ? "on" : ""}`}
+            onClick={() => setPeriodFilter("this")}
+          >
+            This Month
+          </button>
+
+          <button
+            type="button"
+            className={`ft ${periodFilter === "last" ? "on" : ""}`}
+            onClick={() => setPeriodFilter("last")}
+          >
+            Last Month
+          </button>
+
+          <button
+            type="button"
+            className={`ft ${periodFilter === "history" ? "on" : ""}`}
+            onClick={() => setPeriodFilter("history")}
+          >
+            <FolderOpen size={14} /> GRN History
+          </button>
+
+          <div className="search-field" style={{ minWidth: 280 }}>
+            <Search size={16} />
+            <input
+              type="text"
+              placeholder="Search GRNs..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
         </div>
+
+        <button
+          type="button"
+          className="btn btn-medium-green"
+          onClick={() => navigate("/grn/add")}
+        >
+          <Plus size={16} /> New GRN
+        </button>
       </div>
 
       <div className="content-card">
@@ -128,9 +192,11 @@ export default function GrnListPage() {
                     <td>{Number(row.item_count || 0)}</td>
                     <td>{Number(row.total_received_qty || 0).toFixed(2)}</td>
                     <td>
-                      <span className={badgeClass(row.status)}>{statusLabel(row.status)}</span>
+                      <span className={badgeClass(row.status)}>
+                        {statusLabel(row.status)}
+                      </span>
                     </td>
-                    <td>{row.created_by_name || "—"}</td>
+                    <td>{row.created_by_name || row.received_by_name || "—"}</td>
                   </tr>
                 ))
               ) : (
