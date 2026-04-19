@@ -11,6 +11,9 @@ const q = (sql, params = []) =>
 const normalizeAirlinePreference = (value) => {
   const raw = String(value || "").trim().toUpperCase();
   if (raw === "Q2" || raw.includes("Q2") || raw.includes("MALDIV")) return "Q2";
+  if (raw === "EK" || raw.includes("EK") || raw.includes("EMIRATES")) return "EK";
+  if (raw === "QR" || raw.includes("QR") || raw.includes("QATAR")) return "QR";
+  if (raw === "OTHER") return "OTHER";
   return "UL";
 };
 
@@ -32,24 +35,27 @@ let customerSchemaCache = null;
 const getCustomerSchema = async () => {
   if (customerSchemaCache) return customerSchemaCache;
 
-  const rows = await q(
-    `
+  const rows = await q(`
     SELECT COLUMN_NAME
     FROM INFORMATION_SCHEMA.COLUMNS
     WHERE TABLE_SCHEMA = DATABASE()
       AND TABLE_NAME = 'customers'
-    `
-  );
+  `);
 
-  const set = new Set(rows.map((row) => row.COLUMN_NAME));
+  const columns = new Set(rows.map((row) => row.COLUMN_NAME));
 
   customerSchemaCache = {
-    hasGroupName: set.has("group_name"),
-    hasPaymentTerms: set.has("payment_terms"),
+    columns,
+    has(column) {
+      return columns.has(column);
+    },
   };
 
   return customerSchemaCache;
 };
+
+const selectCustomerColumn = (schema, column, fallback = `NULL AS ${column}`) =>
+  schema.has(column) ? `c.${column}` : fallback;
 
 const customerSelectSql = (schema) => `
   SELECT
@@ -57,24 +63,24 @@ const customerSelectSql = (schema) => `
     c.customer_code,
     c.customer_type,
     c.customer_name,
-    ${schema.hasGroupName ? "c.group_name" : "NULL AS group_name"},
-    c.contact_person,
-    c.phone,
-    c.whatsapp_number,
-    c.email,
-    c.address,
-    c.city,
-    c.delivery_window,
-    ${schema.hasPaymentTerms ? "c.payment_terms" : "NULL AS payment_terms"},
-    c.returns_policy,
-    c.driver_preference,
-    c.notes,
-    c.location_island,
-    c.airline_preference,
-    c.incoterm,
-    c.cold_chain_required,
-    c.status,
-    c.created_at,
+    ${selectCustomerColumn(schema, "group_name")},
+    ${selectCustomerColumn(schema, "contact_person")},
+    ${selectCustomerColumn(schema, "phone")},
+    ${selectCustomerColumn(schema, "whatsapp_number")},
+    ${selectCustomerColumn(schema, "email")},
+    ${selectCustomerColumn(schema, "address")},
+    ${selectCustomerColumn(schema, "city")},
+    ${selectCustomerColumn(schema, "delivery_window")},
+    ${selectCustomerColumn(schema, "payment_terms")},
+    ${selectCustomerColumn(schema, "returns_policy")},
+    ${selectCustomerColumn(schema, "driver_preference")},
+    ${selectCustomerColumn(schema, "notes")},
+    ${selectCustomerColumn(schema, "location_island")},
+    ${selectCustomerColumn(schema, "airline_preference")},
+    ${selectCustomerColumn(schema, "incoterm")},
+    ${schema.has("cold_chain_required") ? "c.cold_chain_required" : "0 AS cold_chain_required"},
+    ${schema.has("status") ? "c.status" : "'active' AS status"},
+    ${selectCustomerColumn(schema, "created_at")},
     CASE
       WHEN c.customer_type = 'global' THEN COALESCE(gs.shipment_count, 0)
       ELSE COALESCE(ls.dispatch_count, 0)
@@ -160,6 +166,8 @@ const getCustomerById = async (req, res) => {
         gd.dispatch_date,
         CASE
           WHEN UPPER(COALESCE(gd.airline, '')) = 'Q2' THEN 'Maldivian (Q2)'
+          WHEN UPPER(COALESCE(gd.airline, '')) = 'EK' THEN 'Emirates (EK)'
+          WHEN UPPER(COALESCE(gd.airline, '')) = 'QR' THEN 'Qatar Airways (QR)'
           ELSE 'SriLankan Airlines (UL)'
         END AS flight,
         CONCAT(COALESCE(it.total_weight, 0), ' kg') AS weight,
@@ -218,6 +226,12 @@ const getCustomerById = async (req, res) => {
   }
 };
 
+const pushInsertField = (schema, columns, values, column, value, transform = (v) => v) => {
+  if (!schema.has(column)) return;
+  columns.push(column);
+  values.push(transform(value));
+};
+
 const createCustomer = async (req, res) => {
   try {
     const userId = req.user?.id || null;
@@ -265,66 +279,47 @@ const createCustomer = async (req, res) => {
       finalCode = buildNextCustomerCode(customer_type, codeRows);
     }
 
-    const columns = [
-      "customer_code",
-      "customer_type",
-      "customer_name",
-      "contact_person",
-      "phone",
-      "whatsapp_number",
-      "email",
-      "address",
-      "city",
-      "delivery_window",
-      "returns_policy",
-      "driver_preference",
-      "notes",
-      "location_island",
+    const columns = [];
+    const values = [];
+
+    pushInsertField(schema, columns, values, "customer_code", finalCode);
+    pushInsertField(schema, columns, values, "customer_type", customer_type);
+    pushInsertField(schema, columns, values, "customer_name", customer_name);
+    pushInsertField(schema, columns, values, "group_name", group_name || null);
+    pushInsertField(schema, columns, values, "contact_person", contact_person || null);
+    pushInsertField(schema, columns, values, "phone", phone || null);
+    pushInsertField(schema, columns, values, "whatsapp_number", finalWhatsapp);
+    pushInsertField(schema, columns, values, "email", email || null);
+    pushInsertField(schema, columns, values, "address", address || null);
+    pushInsertField(schema, columns, values, "city", city || null);
+    pushInsertField(schema, columns, values, "delivery_window", delivery_window || null);
+    pushInsertField(schema, columns, values, "payment_terms", payment_terms || null);
+    pushInsertField(schema, columns, values, "returns_policy", returns_policy || null);
+    pushInsertField(schema, columns, values, "driver_preference", driver_preference || null);
+    pushInsertField(schema, columns, values, "notes", notes || null);
+    pushInsertField(schema, columns, values, "location_island", location_island || null);
+    pushInsertField(
+      schema,
+      columns,
+      values,
       "airline_preference",
+      customer_type === "global" ? airline_preference : null,
+      (value) => (value ? normalizeAirlinePreference(value) : null)
+    );
+    pushInsertField(
+      schema,
+      columns,
+      values,
       "incoterm",
-      "cold_chain_required",
-      "status",
-      "created_by",
-    ];
-
-    const values = [
-      finalCode,
-      customer_type,
-      customer_name,
-      contact_person || null,
-      phone || null,
-      finalWhatsapp,
-      email || null,
-      address || null,
-      city || null,
-      delivery_window || null,
-      returns_policy || null,
-      driver_preference || null,
-      notes || null,
-      location_island || null,
-      customer_type === "global" ? normalizeAirlinePreference(airline_preference) : null,
-      customer_type === "global" ? (incoterm || "CIF") : null,
-      cold_chain_required ? 1 : 0,
-      status || "active",
-      userId,
-    ];
-
-    if (schema.hasGroupName) {
-      columns.splice(3, 0, "group_name");
-      values.splice(3, 0, group_name || null);
-    }
-
-    if (schema.hasPaymentTerms) {
-      const insertAt = columns.indexOf("returns_policy");
-      columns.splice(insertAt, 0, "payment_terms");
-      values.splice(insertAt, 0, payment_terms || null);
-    }
-
-    const placeholders = columns.map(() => "?").join(", ");
+      customer_type === "global" ? incoterm || "CIF" : null
+    );
+    pushInsertField(schema, columns, values, "cold_chain_required", cold_chain_required ? 1 : 0);
+    pushInsertField(schema, columns, values, "status", status || "active");
+    pushInsertField(schema, columns, values, "created_by", userId);
 
     const sql = `
       INSERT INTO customers (${columns.join(", ")})
-      VALUES (${placeholders})
+      VALUES (${columns.map(() => "?").join(", ")})
     `;
 
     const result = await q(sql, values);
@@ -340,6 +335,12 @@ const createCustomer = async (req, res) => {
       error: err.message,
     });
   }
+};
+
+const pushUpdateField = (schema, sets, values, column, value, transform = (v) => v) => {
+  if (!schema.has(column)) return;
+  sets.push(`${column} = ?`);
+  values.push(transform(value));
 };
 
 const updateCustomer = async (req, res) => {
@@ -371,54 +372,34 @@ const updateCustomer = async (req, res) => {
 
     const finalWhatsapp = whatsapp_number || whatsapp || phone || null;
 
-    const sets = [
-      "customer_name = ?",
-      "contact_person = ?",
-      "phone = ?",
-      "whatsapp_number = ?",
-      "email = ?",
-      "address = ?",
-      "city = ?",
-      "delivery_window = ?",
-      "returns_policy = ?",
-      "driver_preference = ?",
-      "notes = ?",
-      "location_island = ?",
-      "airline_preference = ?",
-      "incoterm = ?",
-      "cold_chain_required = ?",
-      "status = ?",
-    ];
+    const sets = [];
+    const values = [];
 
-    const values = [
-      customer_name,
-      contact_person || null,
-      phone || null,
-      finalWhatsapp,
-      email || null,
-      address || null,
-      city || null,
-      delivery_window || null,
-      returns_policy || null,
-      driver_preference || null,
-      notes || null,
-      location_island || null,
-      airline_preference ? normalizeAirlinePreference(airline_preference) : null,
-      incoterm || null,
-      cold_chain_required ? 1 : 0,
-      status || "active",
-    ];
-
-    if (schema.hasGroupName) {
-      sets.splice(1, 0, "group_name = ?");
-      values.splice(1, 0, group_name || null);
-    }
-
-    if (schema.hasPaymentTerms) {
-      const insertAt = sets.indexOf("returns_policy = ?");
-      sets.splice(insertAt, 0, "payment_terms = ?");
-      values.splice(insertAt, 0, payment_terms || null);
-    }
+    pushUpdateField(schema, sets, values, "customer_name", customer_name);
+    pushUpdateField(schema, sets, values, "group_name", group_name || null);
+    pushUpdateField(schema, sets, values, "contact_person", contact_person || null);
+    pushUpdateField(schema, sets, values, "phone", phone || null);
+    pushUpdateField(schema, sets, values, "whatsapp_number", finalWhatsapp);
+    pushUpdateField(schema, sets, values, "email", email || null);
+    pushUpdateField(schema, sets, values, "address", address || null);
+    pushUpdateField(schema, sets, values, "city", city || null);
+    pushUpdateField(schema, sets, values, "delivery_window", delivery_window || null);
+    pushUpdateField(schema, sets, values, "payment_terms", payment_terms || null);
+    pushUpdateField(schema, sets, values, "returns_policy", returns_policy || null);
+    pushUpdateField(schema, sets, values, "driver_preference", driver_preference || null);
+    pushUpdateField(schema, sets, values, "notes", notes || null);
+    pushUpdateField(schema, sets, values, "location_island", location_island || null);
+    pushUpdateField(
+      schema,
+      sets,
+      values,
+      "airline_preference",
+      airline_preference,
+      (value) => (value ? normalizeAirlinePreference(value) : null)
+    );
+    pushUpdateField(schema, sets, values, "incoterm", incoterm || null);
+    pushUpdateField(schema, sets, values, "cold_chain_required", cold_chain_required ? 1 : 0);
+    pushUpdateField(schema, sets, values, "status", status || "active");
 
     values.push(id);
 

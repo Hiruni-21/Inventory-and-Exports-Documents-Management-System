@@ -37,6 +37,68 @@ const computeAllCleared = (statuses, incoterm) => {
   return requiredFields.every((field) => statuses[field] === "done") ? 1 : 0;
 };
 
+let exportSchemaCache = null;
+
+const getExportSchema = async () => {
+  if (exportSchemaCache) return exportSchemaCache;
+
+  const dispatchCols = await q(`
+    SELECT COLUMN_NAME
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'global_dispatch'
+  `);
+
+  const itemCols = await q(`
+    SELECT COLUMN_NAME
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'global_dispatch_items'
+  `);
+
+  const dispatchSet = new Set(dispatchCols.map((row) => row.COLUMN_NAME));
+  const itemSet = new Set(itemCols.map((row) => row.COLUMN_NAME));
+
+  exportSchemaCache = {
+    hasFlightNo: dispatchSet.has("flight_no"),
+    hasAwbNumber: dispatchSet.has("awb_number"),
+    hasTotalWeight: dispatchSet.has("total_weight"),
+    hasTotalBoxes: dispatchSet.has("total_boxes"),
+    hasItemBoxes: itemSet.has("boxes"),
+  };
+
+  return exportSchemaCache;
+};
+
+const parseDispatchMetaFromRemarks = (remarks) => {
+  const raw = String(remarks || "");
+  const flightMatch = raw.match(/Flight No:\s*(.+)/i);
+  const awbMatch = raw.match(/AWB No:\s*(.+)/i);
+
+  return {
+    flight_no: flightMatch ? flightMatch[1].trim() : "",
+    awb_number: awbMatch ? awbMatch[1].trim() : "",
+  };
+};
+
+const normalizeExportRow = (row) => {
+  const parsed = parseDispatchMetaFromRemarks(row.remarks);
+  const insuranceRequired = String(row.incoterm || "").toUpperCase() === "CIF";
+  const docsDoneCount = (
+    insuranceRequired
+      ? DOC_FIELDS
+      : DOC_FIELDS.filter((field) => field !== "insurance_certificate_status")
+  ).filter((field) => row[field] === "done").length;
+
+  return {
+    ...row,
+    flight_no: row.flight_no || parsed.flight_no || "",
+    awb_number: row.awb_number || parsed.awb_number || "",
+    docs_done_count: docsDoneCount,
+    insurance_required: insuranceRequired,
+  };
+};
+
 const ensureMissingExportDocumentRows = async () => {
   await q(`
     INSERT INTO export_documents
@@ -71,9 +133,21 @@ const ensureMissingExportDocumentRows = async () => {
   `);
 };
 
+const getTotalsJoinSql = (schema) => `
+  LEFT JOIN (
+    SELECT
+      global_dispatch_id,
+      COALESCE(SUM(qty), 0) AS total_weight
+      ${schema.hasItemBoxes ? `, COALESCE(SUM(boxes), 0) AS total_boxes` : ``}
+    FROM global_dispatch_items
+    GROUP BY global_dispatch_id
+  ) it ON it.global_dispatch_id = gd.id
+`;
+
 const getAllExportDocuments = async (req, res) => {
   try {
     await ensureMissingExportDocumentRows();
+    const schema = await getExportSchema();
 
     const rows = await q(`
       SELECT
@@ -94,30 +168,27 @@ const getAllExportDocuments = async (req, res) => {
         gd.departure_date,
         gd.status AS dispatch_status,
         gd.airline,
-        gd.flight_no,
-        gd.awb_number,
+        ${schema.hasFlightNo ? "gd.flight_no" : "NULL AS flight_no"},
+        ${schema.hasAwbNumber ? "gd.awb_number" : "NULL AS awb_number"},
         gd.incoterm,
-        gd.total_weight,
-        gd.total_boxes,
+        ${schema.hasTotalWeight ? "gd.total_weight" : "COALESCE(it.total_weight, 0) AS total_weight"},
+        ${
+          schema.hasTotalBoxes
+            ? "gd.total_boxes"
+            : schema.hasItemBoxes
+            ? "COALESCE(it.total_boxes, 0) AS total_boxes"
+            : "0 AS total_boxes"
+        },
+        gd.remarks,
         ${CUSTOMER_DISPLAY_SQL} AS customer_name
       FROM export_documents ed
       JOIN global_dispatch gd ON gd.id = ed.global_dispatch_id
       JOIN customers c ON c.id = gd.customer_id
+      ${getTotalsJoinSql(schema)}
       ORDER BY gd.id DESC
     `);
 
-    const normalized = rows.map((row) => {
-      const docsDoneCount = DOC_FIELDS.filter((field) => row[field] === "done").length;
-      const insuranceRequired = String(row.incoterm || "").toUpperCase() === "CIF";
-
-      return {
-        ...row,
-        docs_done_count: docsDoneCount,
-        insurance_required: insuranceRequired,
-      };
-    });
-
-    res.json(normalized);
+    res.json(rows.map(normalizeExportRow));
   } catch (err) {
     console.error("getAllExportDocuments error:", err);
     res.status(500).json({
@@ -130,6 +201,7 @@ const getAllExportDocuments = async (req, res) => {
 const getExportDocumentShipments = async (req, res) => {
   try {
     await ensureMissingExportDocumentRows();
+    const schema = await getExportSchema();
 
     const rows = await q(`
       SELECT
@@ -139,15 +211,16 @@ const getExportDocumentShipments = async (req, res) => {
         gd.status,
         gd.incoterm,
         gd.airline,
-        gd.flight_no,
-        gd.awb_number,
+        ${schema.hasFlightNo ? "gd.flight_no" : "NULL AS flight_no"},
+        ${schema.hasAwbNumber ? "gd.awb_number" : "NULL AS awb_number"},
+        gd.remarks,
         ${CUSTOMER_DISPLAY_SQL} AS customer_name
       FROM global_dispatch gd
       JOIN customers c ON c.id = gd.customer_id
       ORDER BY gd.id DESC
     `);
 
-    res.json(rows);
+    res.json(rows.map(normalizeExportRow));
   } catch (err) {
     console.error("getExportDocumentShipments error:", err);
     res.status(500).json({
@@ -161,6 +234,8 @@ const getExportDocumentById = async (req, res) => {
   const { id } = req.params;
 
   try {
+    const schema = await getExportSchema();
+
     const rows = await q(
       `
       SELECT
@@ -182,14 +257,22 @@ const getExportDocumentById = async (req, res) => {
         gd.status AS dispatch_status,
         gd.incoterm,
         gd.airline,
-        gd.flight_no,
-        gd.awb_number,
-        gd.total_weight,
-        gd.total_boxes,
+        ${schema.hasFlightNo ? "gd.flight_no" : "NULL AS flight_no"},
+        ${schema.hasAwbNumber ? "gd.awb_number" : "NULL AS awb_number"},
+        ${schema.hasTotalWeight ? "gd.total_weight" : "COALESCE(it.total_weight, 0) AS total_weight"},
+        ${
+          schema.hasTotalBoxes
+            ? "gd.total_boxes"
+            : schema.hasItemBoxes
+            ? "COALESCE(it.total_boxes, 0) AS total_boxes"
+            : "0 AS total_boxes"
+        },
+        gd.remarks,
         ${CUSTOMER_DISPLAY_SQL} AS customer_name
       FROM export_documents ed
       JOIN global_dispatch gd ON gd.id = ed.global_dispatch_id
       JOIN customers c ON c.id = gd.customer_id
+      ${getTotalsJoinSql(schema)}
       WHERE ed.id = ?
       LIMIT 1
       `,
@@ -200,7 +283,7 @@ const getExportDocumentById = async (req, res) => {
       return res.status(404).json({ message: "Export document set not found" });
     }
 
-    res.json(rows[0]);
+    res.json(normalizeExportRow(rows[0]));
   } catch (err) {
     console.error("getExportDocumentById error:", err);
     res.status(500).json({
@@ -241,10 +324,7 @@ const updateExportDocuments = async (req, res) => {
       airway_bill_status: req.body.airway_bill_status || "pending",
       certificate_of_origin_status: req.body.certificate_of_origin_status || "pending",
       health_certificate_status: req.body.health_certificate_status || "pending",
-      insurance_certificate_status:
-        String(incoterm || "").toUpperCase() === "CIF"
-          ? req.body.insurance_certificate_status || "pending"
-          : req.body.insurance_certificate_status || "pending",
+      insurance_certificate_status: req.body.insurance_certificate_status || "pending",
     };
 
     const allCleared = computeAllCleared(statuses, incoterm);
@@ -323,10 +403,7 @@ const updateExportDocumentsByDispatchId = async (req, res) => {
       airway_bill_status: req.body.airway_bill_status || "pending",
       certificate_of_origin_status: req.body.certificate_of_origin_status || "pending",
       health_certificate_status: req.body.health_certificate_status || "pending",
-      insurance_certificate_status:
-        String(incoterm || "").toUpperCase() === "CIF"
-          ? req.body.insurance_certificate_status || "pending"
-          : req.body.insurance_certificate_status || "pending",
+      insurance_certificate_status: req.body.insurance_certificate_status || "pending",
     };
 
     const allCleared = computeAllCleared(statuses, incoterm);
