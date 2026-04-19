@@ -604,26 +604,39 @@ useEffect(() => {
         </div>
       </div>
 
-      <div className="fb" style={{ marginTop: 16 }}>
-        <button className={`ft ${tab === "All" ? "on" : ""}`} onClick={() => setTab("All")}>
-          All
-        </button>
-        <button className={`ft ${tab === "Today" ? "on" : ""}`} onClick={() => setTab("Today")}>
-          Today ({todayCount})
-        </button>
-        <button className={`ft ${tab === "Scheduled" ? "on" : ""}`} onClick={() => setTab("Scheduled")}>
-          Scheduled ({scheduledCount})
-        </button>
-        <button className={`ft ${tab === "Delivered" ? "on" : ""}`} onClick={() => setTab("Delivered")}>
-          Delivered ({deliveredCount})
-        </button>
+      <div
+        className="fb"
+        style={{ marginTop: 16, justifyContent: "space-between", alignItems: "center", gap: 12 }}
+      >
+        <div className="fb" style={{ marginBottom: 0 }}>
+          <button className={`ft ${tab === "All" ? "on" : ""}`} onClick={() => setTab("All")}>
+            All
+          </button>
+          <button className={`ft ${tab === "Today" ? "on" : ""}`} onClick={() => setTab("Today")}>
+            Today ({todayCount})
+          </button>
+          <button className={`ft ${tab === "Scheduled" ? "on" : ""}`} onClick={() => setTab("Scheduled")}>
+            Scheduled ({scheduledCount})
+          </button>
+          <button className={`ft ${tab === "Delivered" ? "on" : ""}`} onClick={() => setTab("Delivered")}>
+            Delivered ({deliveredCount})
+          </button>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span className="count-pill">{filteredRows.length} dispatches</span>
+
+          <button
+            type="button"
+            className="btn btn-p btn-sm"
+            onClick={() => window.dispatchEvent(new Event("fw-open-local-dispatch-modal"))}
+          >
+            + New Dispatch
+          </button>
+        </div>
       </div>
 
       <div className="tw dispatch-local-tw">
-        <div className="tw-h">
-          <h3>Local Dispatch Records</h3>
-        </div>
-
         <table>
           <thead>
             <tr>

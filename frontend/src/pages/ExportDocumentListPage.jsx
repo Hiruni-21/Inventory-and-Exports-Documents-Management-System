@@ -376,12 +376,25 @@ const ExportDocumentListPage = () => {
         <span>📄</span>
         <div>
           All 7 documents must be verified before a shipment can be <strong>Cleared</strong> and
-          stock deducted. Use <strong>+ Create Document Set</strong> above to upload and confirm
+          stock deducted. Use <strong>+ Create Document Set</strong> on this page to upload and confirm
           documents per shipment.
         </div>
       </div>
 
-      <div className="content-card" style={{ marginTop: 16 }}>
+      <div className="page-toolbar" style={{ marginTop: 16 }}>
+        <div></div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            className="btn btn-p btn-sm"
+            onClick={() => window.dispatchEvent(new Event("fw-open-export-docs-modal"))}
+          >
+            + Create Document Set
+          </button>
+        </div>
+      </div>
+
+      <div className="content-card">
         <div className="card-header-row">
           <h3>Document Status by Shipment</h3>
         </div>
@@ -470,7 +483,7 @@ const ExportDocumentListPage = () => {
         </div>
       </div>
 
-      <div className="content-card" style={{ marginTop: 16 }}>
+      <div className="content-card">
         <div className="card-header-row" style={{ display: "block" }}>
           <h3>Export Document Reference</h3>
           <p style={{ color: "var(--text2)", marginTop: 4, fontSize: 13 }}>

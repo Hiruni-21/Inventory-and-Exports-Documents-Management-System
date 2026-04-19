@@ -452,14 +452,29 @@ export default function GlobalCustomersPage() {
             ))}
           </select>
         </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span className="count-pill">{filteredCustomers.length} customers</span>
+
+          <button
+            type="button"
+            className="btn btn-p btn-sm"
+            onClick={() => window.dispatchEvent(new Event("fw-open-global-customer-modal"))}
+          >
+            + Add Customer
+          </button>
+
+          <button
+            type="button"
+            className="btn btn-s btn-sm"
+            onClick={() => window.dispatchEvent(new Event("fw-export-global-customers"))}
+          >
+            Export CSV
+          </button>
+        </div>
       </div>
 
       <div className="content-card">
-        <div className="card-header-row">
-          <h3>✈️ Global Customers — Export</h3>
-          <span className="count-pill">{filteredCustomers.length} customers</span>
-        </div>
-
         <div className="table-wrap">
           <table className="data-table global-customers-table">
             <thead>

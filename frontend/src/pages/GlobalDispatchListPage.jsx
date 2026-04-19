@@ -548,25 +548,32 @@ export default function GlobalDispatchListPage() {
           </button>
         </div>
 
-        <div className="dispatch-search-wrap">
-          <div className="dispatch-search-box">
-            <Search size={16} className="dispatch-search-icon" />
-            <input
-              className="dispatch-search-input"
-              placeholder="Search by dispatch no, customer, airline or status"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <span className="count-pill">{filteredRows.length} shipments</span>
+
+          <button
+            type="button"
+            className="btn btn-p btn-sm"
+            onClick={() => window.dispatchEvent(new Event("fw-open-global-shipment-modal"))}
+          >
+            + New Shipment
+          </button>
+
+          <div className="dispatch-search-wrap">
+            <div className="dispatch-search-box">
+              <Search size={16} className="dispatch-search-icon" />
+              <input
+                className="dispatch-search-input"
+                placeholder="Search by dispatch no, customer, airline or status"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
           </div>
         </div>
       </div>
 
       <div className="content-card global-dispatch-card">
-        <div className="card-header-row">
-          <h3>✈️ Global Dispatch — Export Shipments</h3>
-          <span className="count-pill">{filteredRows.length} shipments</span>
-        </div>
-
         <div className="table-wrap">
           <table className="data-table global-dispatch-table">
             <thead>

@@ -289,18 +289,12 @@ const actionButtons = {
     { label: "Record Wastage", to: "/wastage/add", className: "btn btn-p btn-sm" },
   ],
   "/wastage": [{ label: "Record Wastage", to: "/wastage/add", className: "btn btn-p btn-sm" }],
-  "/dispatch/local": [{ label: "+ New Dispatch", eventName: "fw-open-local-dispatch-modal", className: "btn btn-p btn-sm" }],
-  "/dispatch/global": [{ label: "+ New Shipment", eventName: "fw-open-global-shipment-modal", className: "btn btn-p btn-sm" }],
-  "/export-documents": [{ label: "+ Create Document Set", eventName: "fw-open-export-docs-modal", className: "btn btn-p btn-sm" }],
+  "/dispatch/local": [],
+  "/dispatch/global": [],
+  "/export-documents": [],
   "/users": [{ label: "+ Add User", to: "/users/add", className: "btn btn-p btn-sm", disabled: true }],
-  "/customers/local": [
-    { label: "+ Add Customer", eventName: "fw-open-local-customer-modal", className: "btn btn-p btn-sm" },
-    { label: "Export CSV", eventName: "fw-export-local-customers", className: "btn btn-s btn-sm" },
-  ],
-  "/customers/global": [
-    { label: "+ Add Customer", eventName: "fw-open-global-customer-modal", className: "btn btn-p btn-sm" },
-    { label: "Export CSV", eventName: "fw-export-global-customers", className: "btn btn-s btn-sm" },
-  ],
+  "/customers/local": [],
+  "/customers/global": [],
 };
 
 const normalizeRole = (role) => {
