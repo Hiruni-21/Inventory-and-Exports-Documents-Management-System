@@ -2330,3 +2330,22 @@ textarea.fc{height:78px;padding:10px 12px;resize:vertical}
   background:var(--g100) !important;
   border-color:var(--g400) !important;
 }
+.supplier-green-btn{
+  background: var(--g700) !important;
+  border: 1px solid var(--g700) !important;
+  color: var(--white) !important;
+  box-shadow: none !important;
+}
+
+.supplier-green-btn:hover{
+  background: var(--g800) !important;
+  border-color: var(--g800) !important;
+  color: var(--white) !important;
+}
+
+.supplier-green-btn:focus,
+.supplier-green-btn:focus-visible,
+.supplier-green-btn:active{
+  outline: none !important;
+  box-shadow: none !important;
+}

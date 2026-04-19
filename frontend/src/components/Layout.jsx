@@ -1,5 +1,6 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import api from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import companyLogo from "../assets/company-logo.png";
 
@@ -57,28 +58,34 @@ const IconPlane = () => (
 const IconUsers = () => (
   <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" /><circle cx="9.5" cy="7" r="4" /><path d="M20 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
 );
+const IconShieldCheck = () => (
+  <svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.5 8.5 8 9 4.5-.5 8-4 8-9V6l-8-3Z" /><path d="m9.5 12 1.8 1.8 3.7-3.8" /></svg>
+);
+const IconMessage = () => (
+  <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+);
 
 const notificationsByRole = {
   manager: [
-    { type: "⏱ Expiry Alert", message: "Batch BT-089 Dragon Fruit expires in 2 days.", time: "Just now", unread: true },
-    { type: "📦 Low Stock", message: "Cardboard Box (Large) is below reorder level.", time: "10 min", unread: true },
-    { type: "📄 Export Docs", message: "Shipment SHP-2024-042 has 2 missing documents.", time: "2 hours", unread: false },
+    { type: "Expiry Alert", message: "Batch BT-089 Dragon Fruit expires in 2 days.", time: "Just now", unread: true },
+    { type: "Low Stock", message: "Cardboard Box (Large) is below reorder level.", time: "10 min", unread: true },
+    { type: "Export Docs", message: "Shipment SHP-2024-042 has 2 missing documents.", time: "2 hours", unread: false },
   ],
   ops: [
-    { type: "⚠️ Low Stock", message: "5 items need purchase orders.", time: "Just now", unread: true },
-    { type: "📥 GRN", message: "One GRN needs verification.", time: "1 hour", unread: true },
+    { type: "Low Stock", message: "5 items need purchase orders.", time: "Just now", unread: true },
+    { type: "GRN", message: "One GRN needs verification.", time: "1 hour", unread: true },
   ],
   supervisor: [
-    { type: "⏱ Expiry", message: "Dragon Fruit BT-089 should dispatch first today.", time: "Just now", unread: true },
-    { type: "📢 Notify Ops", message: "Low stock items need to be escalated to Kamal.", time: "45 min", unread: true },
+    { type: "Expiry", message: "Dragon Fruit BT-089 should dispatch first today.", time: "Just now", unread: true },
+    { type: "Notify Ops", message: "Low stock items need to be escalated.", time: "45 min", unread: true },
   ],
   logistics: [
-    { type: "🚚 Dispatch", message: "3 local dispatches are scheduled for today.", time: "Just now", unread: true },
-    { type: "✈️ Export", message: "One export shipment is waiting for document completion.", time: "1 hour", unread: true },
+    { type: "Dispatch", message: "3 local dispatches are scheduled for today.", time: "Just now", unread: true },
+    { type: "Export", message: "One export shipment is waiting for document completion.", time: "1 hour", unread: true },
   ],
   supplier: [
-    { type: "📋 Order", message: "PO-2024-115 is awaiting delivery.", time: "2 hours", unread: true },
-    { type: "↩️ Return", message: "RN-2024-014 deduction is pending.", time: "Yesterday", unread: false },
+    { type: "Purchase Order", message: "Fresh World sent a purchase order for your review.", time: "Just now", unread: true },
+    { type: "Return Note", message: "A return note is awaiting your feedback.", time: "1 hour", unread: true },
   ],
 };
 
@@ -129,14 +136,21 @@ const navByRole = {
     },
     {
       label: "ANALYTICS",
-      items: [
-        { to: "/reports", text: "Reports & Analytics", icon: <IconActivity /> },
-        { to: "/users", text: "Users & Roles", icon: <IconUsers /> },
-      ],
+      items: [{ to: "/reports", text: "Reports & Analytics", icon: <IconActivity /> }],
+    },
+    {
+      label: "SYSTEM",
+      items: [{ to: "/users", text: "Users & Roles", icon: <IconUsers /> }],
     },
   ],
   ops: [
-    { label: "OVERVIEW", items: [{ to: "/dashboard", text: "Dashboard", icon: <IconDashboard /> }] },
+    {
+      label: "OVERVIEW",
+      items: [
+        { to: "/dashboard", text: "Dashboard", icon: <IconDashboard /> },
+        { to: "/approvals", text: "Approval Notes", icon: <IconShieldCheck /> },
+      ],
+    },
     {
       label: "INVENTORY",
       items: [
@@ -169,15 +183,24 @@ const navByRole = {
     { label: "ANALYTICS", items: [{ to: "/reports", text: "Reports", icon: <IconActivity /> }] },
   ],
   supervisor: [
-    { label: "OVERVIEW", items: [{ to: "/dashboard", text: "Dashboard", icon: <IconDashboard /> }] },
+    {
+      label: "OVERVIEW",
+      items: [
+        { to: "/dashboard", text: "Dashboard", icon: <IconDashboard /> },
+        { to: "/approvals", text: "Approval Notes", icon: <IconShieldCheck /> },
+      ],
+    },
     {
       label: "INVENTORY",
       items: [
         { to: "/inventory", text: "Inventory", icon: <IconInventory /> },
+        { to: "/items", text: "Item Master", icon: <IconTag /> },
+        { to: "/categories", text: "Item Categories", icon: <IconLayers /> },
         { to: "/inventory/expiry", text: "Expiry Items", icon: <IconClock />, badge: { text: "3", cls: "nb-r" } },
         { to: "/inventory/low-stock", text: "Low Stock", icon: <IconAlert />, badge: { text: "5", cls: "nb-r" } },
         { to: "/stock-adjustments", text: "Stock Adjustments", icon: <IconAdjust /> },
         { to: "/stock-count", text: "Physical Stock Count", icon: <IconClipboard /> },
+        { to: "/inventory/valuation", text: "Stock Valuation", icon: <IconDollar /> },
       ],
     },
     {
@@ -188,7 +211,10 @@ const navByRole = {
         { to: "/returns", text: "Returns & Wastage", icon: <IconReturn /> },
       ],
     },
-    { label: "PACKAGING", items: [{ to: "/packaging", text: "Packaging Stock", icon: <IconBox />, badge: { text: "!", cls: "nb-r" } }] },
+    {
+      label: "PACKAGING",
+      items: [{ to: "/packaging", text: "Packaging Stock", icon: <IconBox />, badge: { text: "!", cls: "nb-r" } }],
+    },
   ],
   logistics: [
     { label: "OVERVIEW", items: [{ to: "/dashboard", text: "Dashboard", icon: <IconDashboard /> }] },
@@ -208,8 +234,9 @@ const navByRole = {
       label: "MY PORTAL",
       items: [
         { to: "/dashboard", text: "My Dashboard", icon: <IconDashboard /> },
-        { to: "/supplier/orders", text: "My Orders", icon: <IconFile /> },
+        { to: "/supplier/orders", text: "My Purchase Orders", icon: <IconFile /> },
         { to: "/supplier/returns", text: "My Return Notes", icon: <IconReturn /> },
+        { to: "/supplier/messages", text: "Messages", icon: <IconMessage /> },
       ],
     },
   ],
@@ -225,7 +252,7 @@ const pageMeta = {
   "/items/add": { title: "Item Master", subtitle: "Create item" },
   "/inventory": { title: "Inventory", subtitle: "Current stock levels" },
   "/inventory/low-stock": { title: "Low Stock Alerts", subtitle: "Items below reorder level" },
-  "/inventory/expiry": { title: "Expiry Items", subtitle: "Batches expiring within 14 days" },
+  "/inventory/expiry": { title: "Expiry Items", subtitle: "Items with batches expiring within 14 days" },
   "/inventory/valuation": { title: "Stock Valuation", subtitle: "Current inventory value" },
   "/stock-adjustments": { title: "Stock Adjustments", subtitle: "Adjustment history" },
   "/stock-adjustments/add": { title: "Stock Adjustments", subtitle: "Create adjustment" },
@@ -239,13 +266,11 @@ const pageMeta = {
   "/returns/add": { title: "Returns & Wastage", subtitle: "Record return" },
   "/wastage": { title: "Returns & Wastage", subtitle: "Wastage records" },
   "/wastage/add": { title: "Returns & Wastage", subtitle: "Record wastage" },
-  "/customers/local": { title: "Local Customers", subtitle: "Sri Lanka — 4 customers" },
-  "/customers/global": { title: "Global Customers", subtitle: "Export customers" },  
+  "/customers/local": { title: "Local Customers", subtitle: "Sri Lanka customers" },
+  "/customers/global": { title: "Global Customers", subtitle: "Export customers" },
   "/dispatch/local": { title: "Local Dispatch", subtitle: "Lorry deliveries · Sri Lanka" },
   "/dispatch/global": { title: "Global Dispatch", subtitle: "Export shipments · Maldives & international" },
   "/dispatch/global/add": { title: "Dispatch", subtitle: "Create dispatch" },
-  "/export-documents": { title: "Export Documents", subtitle: "Shipment document sets" },  
-  "/dispatch/global/add": { title: "Dispatch", subtitle: "Create dispatch" },  
   "/export-documents": { title: "Export Documents", subtitle: "Shipment document sets" },
   "/export-documents/add": { title: "Export Documents", subtitle: "Create export document" },
   "/reports": { title: "Reports & Analytics", subtitle: "Operational reporting" },
@@ -253,56 +278,42 @@ const pageMeta = {
   "/activity": { title: "Activity Log", subtitle: "Immutable audit trail" },
   "/supplier/orders": { title: "My Purchase Orders", subtitle: "Supplier portal" },
   "/supplier/returns": { title: "My Return Notes", subtitle: "Supplier portal" },
+  "/supplier/messages": { title: "Messages", subtitle: "Supplier portal" },
+  "/approvals": { title: "Approvals", subtitle: "Approval decisions and notes" },
 };
 
 const actionButtons = {
   "/suppliers": [{ label: "+ Add Supplier", to: "/suppliers/add", className: "btn btn-p btn-sm" }],
-  "/categories": [{ label: "+ Add Category", to: "/categories/add", className: "btn btn-p btn-sm" }],
-  "/items": [{ label: "+ New Item", to: "/items/add", className: "btn btn-p btn-sm" }],
-  "/stock-adjustments": [{ label: "+ New Adjustment", to: "/stock-adjustments/add", className: "btn btn-p btn-sm" }],
   "/purchase-orders": [{ label: "+ Create PO", to: "/purchase-orders/add", className: "btn btn-p btn-sm" }],
   "/grn": [{ label: "+ New GRN", to: "/grn/add", className: "btn btn-p btn-sm" }],
   "/returns": [
-    { label: "↩️ Record Return", to: "/returns/add", className: "btn btn-s btn-sm" },
-    { label: "🗑 Record Wastage", to: "/wastage/add", className: "btn btn-p btn-sm" },
+    { label: "Record Return", to: "/returns/add", className: "btn btn-s btn-sm" },
+    { label: "Record Wastage", to: "/wastage/add", className: "btn btn-p btn-sm" },
   ],
-  "/wastage": [{ label: "🗑 Record Wastage", to: "/wastage/add", className: "btn btn-p btn-sm" }],
-  "/dispatch/local": [{label: "+ New Dispatch",eventName: "fw-open-local-dispatch-modal",className: "btn btn-p btn-sm",},],  
+  "/wastage": [{ label: "Record Wastage", to: "/wastage/add", className: "btn btn-p btn-sm" }],
+  "/dispatch/local": [{ label: "+ New Dispatch", eventName: "fw-open-local-dispatch-modal", className: "btn btn-p btn-sm" }],
   "/dispatch/global": [{ label: "+ New Shipment", eventName: "fw-open-global-shipment-modal", className: "btn btn-p btn-sm" }],
-  "/export-documents": [{ label: "+ Create Export Document", to: "/export-documents/add", className: "btn btn-p btn-sm" }],  
+  "/export-documents": [{ label: "+ Create Document Set", eventName: "fw-open-export-docs-modal", className: "btn btn-p btn-sm" }],
   "/users": [{ label: "+ Add User", to: "/users/add", className: "btn btn-p btn-sm", disabled: true }],
-
-"/customers/local": [
-  {
-    label: "+ Add Customer",
-    eventName: "fw-open-local-customer-modal",
-    className: "btn btn-p btn-sm",
-  },
-  {
-    label: "Export CSV",
-    eventName: "fw-export-local-customers",
-    className: "btn btn-s btn-sm",
-  },
-],
-"/customers/global": [
-  {
-    label: "+ Add Customer",
-    eventName: "fw-open-global-customer-modal",
-    className: "btn btn-p btn-sm",
-  },
-  {
-    label: "Export CSV",
-    eventName: "fw-export-global-customers",
-    className: "btn btn-s btn-sm",
-  },
-],};
+  "/customers/local": [
+    { label: "+ Add Customer", eventName: "fw-open-local-customer-modal", className: "btn btn-p btn-sm" },
+    { label: "Export CSV", eventName: "fw-export-local-customers", className: "btn btn-s btn-sm" },
+  ],
+  "/customers/global": [
+    { label: "+ Add Customer", eventName: "fw-open-global-customer-modal", className: "btn btn-p btn-sm" },
+    { label: "Export CSV", eventName: "fw-export-global-customers", className: "btn btn-s btn-sm" },
+  ],
+};
 
 const normalizeRole = (role) => {
   const value = String(role || "manager").toLowerCase();
+
+  if (value.includes("ops")) return "ops";
   if (value.includes("operation")) return "ops";
   if (value.includes("supervisor")) return "supervisor";
   if (value.includes("logistics")) return "logistics";
   if (value.includes("supplier")) return "supplier";
+
   return "manager";
 };
 
@@ -314,6 +325,8 @@ const getMeta = (pathname) => {
   if (/^\/dispatch\/print\//.test(pathname)) return { title: "Dispatch", subtitle: "Printable dispatch sheet" };
   if (/^\/export-documents\/\d+$/.test(pathname)) return { title: "Export Documents", subtitle: "Document details" };
   if (/^\/export-documents\/print\//.test(pathname)) return { title: "Export Documents", subtitle: "Printable export document" };
+  if (/^\/supplier\/orders\/\d+$/.test(pathname)) return { title: "Purchase Order Note", subtitle: "Supplier portal" };
+  if (/^\/supplier\/returns\/\d+$/.test(pathname)) return { title: "Return Note", subtitle: "Supplier portal" };
   return { title: "Dashboard", subtitle: "Fresh World Exporters ERP" };
 };
 
@@ -321,13 +334,101 @@ const Layout = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [notifOpen, setNotifOpen] = useState(false);
+  const [approvalCount, setApprovalCount] = useState(0);
+  const [expiryCount, setExpiryCount] = useState(0);
+  const [lowStockCount, setLowStockCount] = useState(0);
 
   const roleKey = normalizeRole(user?.role);
-  const sections = useMemo(() => navByRole[roleKey] || navByRole.manager, [roleKey]);
+
+  useEffect(() => {
+    const loadSidebarCounts = async () => {
+      try {
+        const requests = [
+          roleKey === "manager" ? api.get("/approvals/counts") : Promise.resolve({ data: { total: 0 } }),
+          api.get("/inventory/expiry", { params: { days: 14 } }),
+          api.get("/inventory/low-stock"),
+        ];
+
+        const [approvalsRes, expiryRes, lowStockRes] = await Promise.allSettled(requests);
+
+        if (approvalsRes.status === "fulfilled") {
+          setApprovalCount(Number(approvalsRes.value?.data?.total || 0));
+        } else {
+          setApprovalCount(0);
+        }
+
+        if (expiryRes.status === "fulfilled") {
+          setExpiryCount(Array.isArray(expiryRes.value?.data) ? expiryRes.value.data.length : 0);
+        } else {
+          setExpiryCount(0);
+        }
+
+        if (lowStockRes.status === "fulfilled") {
+          setLowStockCount(Array.isArray(lowStockRes.value?.data) ? lowStockRes.value.data.length : 0);
+        } else {
+          setLowStockCount(0);
+        }
+      } catch (err) {
+        console.error(err);
+        setApprovalCount(0);
+        setExpiryCount(0);
+        setLowStockCount(0);
+      }
+    };
+
+    loadSidebarCounts();
+  }, [roleKey, location.pathname]);
+  const sections = useMemo(() => {
+    const base = navByRole[roleKey] || navByRole.manager;
+
+    const withDynamicCounts = base.map((section) => ({
+      ...section,
+      items: section.items.map((item) => {
+        if (item.to === "/inventory/expiry") {
+          return {
+            ...item,
+            badge: expiryCount > 0 ? { text: String(expiryCount), cls: "nb-r" } : null,
+          };
+        }
+
+        if (item.to === "/inventory/low-stock") {
+          return {
+            ...item,
+            badge: lowStockCount > 0 ? { text: String(lowStockCount), cls: "nb-r" } : null,
+          };
+        }
+
+        return item;
+      }),
+    }));
+
+    if (roleKey !== "manager") {
+      return withDynamicCounts;
+    }
+
+    return withDynamicCounts.map((section) => {
+      if (section.label !== "OVERVIEW") {
+        return section;
+      }
+
+      return {
+        ...section,
+        items: [
+          ...section.items,
+          {
+            to: "/approvals",
+            text: "Pending Approvals",
+            icon: <IconShieldCheck />,
+            badge: approvalCount > 0 ? { text: String(approvalCount), cls: "nb-r" } : null,
+          },
+        ],
+      };
+    });
+  }, [roleKey, approvalCount, expiryCount, lowStockCount]);
+
   const meta = getMeta(location.pathname);
   const notifications = notificationsByRole[roleKey] || notificationsByRole.manager;
   const pageActions = actionButtons[location.pathname] || [];
-
   const initials = (user?.name || "FW")
     .split(" ")
     .map((x) => x[0])
@@ -398,26 +499,26 @@ const Layout = () => {
             </div>
 
             <div className="tb-a">
-    {pageActions.map((action) =>
-  action.disabled ? (
-    <button key={action.label} className={action.className} disabled title="Not wired yet">
-      {action.label}
-    </button>
-  ) : action.eventName ? (
-    <button
-      key={action.label}
-      type="button"
-      className={action.className}
-      onClick={() => window.dispatchEvent(new CustomEvent(action.eventName))}
-    >
-      {action.label}
-    </button>
-  ) : (
-    <Link key={action.label} to={action.to} className={action.className}>
-      {action.label}
-    </Link>
-  )
-)}
+              {pageActions.map((action) =>
+                action.disabled ? (
+                  <button key={action.label} className={action.className} disabled title="Not wired yet">
+                    {action.label}
+                  </button>
+                ) : action.eventName ? (
+                  <button
+                    key={action.label}
+                    type="button"
+                    className={action.className}
+                    onClick={() => window.dispatchEvent(new CustomEvent(action.eventName))}
+                  >
+                    {action.label}
+                  </button>
+                ) : (
+                  <Link key={action.label} to={action.to} className={action.className}>
+                    {action.label}
+                  </Link>
+                )
+              )}
 
               <button className="nb-btn" onClick={() => setNotifOpen((p) => !p)}>
                 <svg viewBox="0 0 24 24">
