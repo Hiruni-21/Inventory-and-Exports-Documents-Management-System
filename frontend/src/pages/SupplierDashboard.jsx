@@ -7,54 +7,34 @@ const SupplierDashboard = () => {
         style={{
           background: "linear-gradient(135deg,var(--g900),var(--g700))",
           borderRadius: "var(--r-lg)",
-          padding: "20px 24px",
+          padding: "22px 26px",
           marginBottom: 18,
-          display: "flex",
-          alignItems: "center",
-          gap: 14,
+          border: "1px solid rgba(255,255,255,.06)",
         }}
       >
-        <div
-          style={{
-            width: 48,
-            height: 48,
-            background: "var(--a500)",
-            borderRadius: 12,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 20,
-            boxShadow: "0 4px 12px rgba(232,168,56,.4)",
-          }}
-        >
-          🌿
+        <div style={{ fontSize: 13, color: "rgba(255,255,255,.55)", marginBottom: 6 }}>
+          Supplier Portal
         </div>
-
-        <div>
-          <div style={{ fontSize: 19, fontWeight: 800, color: "white", letterSpacing: "-.3px" }}>
-            Mahinda Organic Farm
-          </div>
-          <div style={{ fontSize: 11, color: "rgba(255,255,255,.5)", marginTop: 2 }}>
-            Supplier Portal · Kurunegala · Organic Certified
-          </div>
+        <div style={{ fontSize: 32, fontWeight: 800, color: "white", letterSpacing: "-.4px", lineHeight: 1.1 }}>
+          Mahinda Organic Farm
+        </div>
+        <div style={{ fontSize: 12, color: "rgba(255,255,255,.6)", marginTop: 6 }}>
+          Kurunegala · Organic Certified
         </div>
       </div>
 
       <div className="krow k3">
         <div className="kc a">
-          <span className="ki">📋</span>
           <div className="kv">3</div>
           <div className="kl">Open Orders from Fresh World</div>
         </div>
 
         <div className="kc r">
-          <span className="ki">↩️</span>
           <div className="kv">1</div>
           <div className="kl">Pending Return Note</div>
         </div>
 
         <div className="kc g">
-          <span className="ki">💰</span>
           <div className="kv">LKR 48,250</div>
           <div className="kl">Latest Order Value</div>
         </div>
@@ -65,46 +45,54 @@ const SupplierDashboard = () => {
           <h3>My Latest Orders</h3>
           <p>View delivery requirements from Fresh World</p>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <div
               style={{
-                padding: 12,
-                background: "var(--w100)",
-                borderRadius: 10,
-                border: "1px solid rgba(212,135,42,.2)",
+                padding: 18,
+                background: "var(--ivory)",
+                borderRadius: 14,
+                border: "1px solid var(--border)",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontWeight: 700, color: "var(--g800)" }}>PO-2024-115</span>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 19, fontWeight: 800, color: "var(--g900)" }}>PO-2024-115</div>
+                  <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 6 }}>
+                    Dragon Fruit 25 kg · Snake Gourd 30 kg
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--a600)", marginTop: 4, fontWeight: 700 }}>
+                    Required by 2024-03-17
+                  </div>
+                </div>
+
                 <span className="badge bg-a">Awaiting Your Delivery</span>
               </div>
-              <div style={{ fontSize: 11, color: "var(--text2)", marginTop: 4 }}>
-                Dragon Fruit 25 kg · Snake Gourd 30 kg
-              </div>
-              <div style={{ fontSize: 10, color: "var(--d)", marginTop: 3 }}>
-                Required by 2024-03-17
-              </div>
-              <Link to="/supplier/orders" className="btn btn-s btn-xs" style={{ marginTop: 8 }}>
+
+              <Link to="/supplier/orders" className="btn btn-s btn-xs" style={{ marginTop: 14 }}>
                 View Full Details →
               </Link>
             </div>
 
             <div
               style={{
-                padding: 12,
-                background: "var(--ivory)",
-                borderRadius: 10,
+                padding: 18,
+                background: "white",
+                borderRadius: 14,
                 border: "1px solid var(--border)",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontWeight: 700, color: "var(--g800)" }}>PO-2024-112</span>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 19, fontWeight: 800, color: "var(--g900)" }}>PO-2024-112</div>
+                  <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 6 }}>
+                    8 items · LKR 64,400
+                  </div>
+                </div>
+
                 <span className="badge bg-g">Delivered & Closed</span>
               </div>
-              <div style={{ fontSize: 11, color: "var(--text2)", marginTop: 4 }}>
-                8 items · LKR 64,400
-              </div>
-              <Link to="/supplier/orders" className="btn btn-s btn-xs" style={{ marginTop: 8 }}>
+
+              <Link to="/supplier/orders" className="btn btn-s btn-xs" style={{ marginTop: 14 }}>
                 View Details →
               </Link>
             </div>
@@ -115,48 +103,57 @@ const SupplierDashboard = () => {
           <h3>My Return Notes</h3>
           <p>Deductions applied to the next payment</p>
 
-          <div
-            style={{
-              padding: 12,
-              background: "var(--d100)",
-              borderRadius: 10,
-              border: "1px solid rgba(200,75,47,.2)",
-              marginBottom: 8,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontWeight: 700, color: "var(--d)" }}>RN-2024-014</span>
-              <span className="badge bg-a">Pending</span>
-            </div>
-            <div style={{ fontSize: 11, color: "var(--text2)", marginTop: 4 }}>
-              Dragon Fruit 1.2 kg — overripe
-            </div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--d)", marginTop: 4 }}>
-              −LKR 1,020 from next payment
-            </div>
-            <Link to="/supplier/returns" className="btn btn-s btn-xs" style={{ marginTop: 8 }}>
-              View Details →
-            </Link>
-          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div
+              style={{
+                padding: 18,
+                background: "var(--ivory)",
+                borderRadius: 14,
+                border: "1px solid rgba(200,75,47,.18)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 19, fontWeight: 800, color: "var(--d)" }}>RN-2024-014</div>
+                  <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 6 }}>
+                    Dragon Fruit 1.2 kg — overripe
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: "var(--d)", marginTop: 6 }}>
+                    −LKR 1,020 from next payment
+                  </div>
+                </div>
 
-          <div
-            style={{
-              padding: 12,
-              background: "var(--ivory)",
-              borderRadius: 10,
-              border: "1px solid var(--border)",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontWeight: 700, color: "var(--text2)" }}>RN-2024-009</span>
-              <span className="badge bg-g">Deducted ✓</span>
+                <span className="badge bg-a">Pending</span>
+              </div>
+
+              <Link to="/supplier/returns" className="btn btn-s btn-xs" style={{ marginTop: 14 }}>
+                View Details →
+              </Link>
             </div>
-            <div style={{ fontSize: 11, color: "var(--text2)", marginTop: 4 }}>
-              Rambutan 2.5 kg — −LKR 1,875 applied
+
+            <div
+              style={{
+                padding: 18,
+                background: "white",
+                borderRadius: 14,
+                border: "1px solid var(--border)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 19, fontWeight: 800, color: "var(--g900)" }}>RN-2024-009</div>
+                  <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 6 }}>
+                    Rambutan 2.5 kg — −LKR 1,875 applied
+                  </div>
+                </div>
+
+                <span className="badge bg-g">Deducted ✓</span>
+              </div>
+
+              <Link to="/supplier/returns" className="btn btn-s btn-xs" style={{ marginTop: 14 }}>
+                View Details →
+              </Link>
             </div>
-            <Link to="/supplier/returns" className="btn btn-s btn-xs" style={{ marginTop: 8 }}>
-              View Details →
-            </Link>
           </div>
         </div>
       </div>

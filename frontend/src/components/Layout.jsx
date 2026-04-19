@@ -64,25 +64,25 @@ const IconShieldCheck = () => (
 
 const notificationsByRole = {
   manager: [
-    { type: "⏱ Expiry Alert", message: "Batch BT-089 Dragon Fruit expires in 2 days.", time: "Just now", unread: true },
-    { type: "📦 Low Stock", message: "Cardboard Box (Large) is below reorder level.", time: "10 min", unread: true },
-    { type: "📄 Export Docs", message: "Shipment SHP-2024-042 has 2 missing documents.", time: "2 hours", unread: false },
+    { type: "Expiry Alert", message: "Batch BT-089 Dragon Fruit expires in 2 days.", time: "Just now", unread: true },
+    { type: "Low Stock", message: "Cardboard Box (Large) is below reorder level.", time: "10 min", unread: true },
+    { type: "Export Docs", message: "Shipment SHP-2024-042 has 2 missing documents.", time: "2 hours", unread: false },
   ],
   ops: [
-    { type: "⚠️ Low Stock", message: "5 items need purchase orders.", time: "Just now", unread: true },
-    { type: "📥 GRN", message: "One GRN needs verification.", time: "1 hour", unread: true },
+    { type: "Low Stock", message: "5 items need purchase orders.", time: "Just now", unread: true },
+    { type: "GRN", message: "One GRN needs verification.", time: "1 hour", unread: true },
   ],
   supervisor: [
-    { type: "⏱ Expiry", message: "Dragon Fruit BT-089 should dispatch first today.", time: "Just now", unread: true },
-    { type: "📢 Notify Ops", message: "Low stock items need to be escalated to Kamal.", time: "45 min", unread: true },
+    { type: "Expiry", message: "Dragon Fruit BT-089 should dispatch first today.", time: "Just now", unread: true },
+    { type: "Notify Ops", message: "Low stock items need to be escalated to Kamal.", time: "45 min", unread: true },
   ],
   logistics: [
-    { type: "🚚 Dispatch", message: "3 local dispatches are scheduled for today.", time: "Just now", unread: true },
-    { type: "✈️ Export", message: "One export shipment is waiting for document completion.", time: "1 hour", unread: true },
+    { type: "Dispatch", message: "3 local dispatches are scheduled for today.", time: "Just now", unread: true },
+    { type: "Export", message: "One export shipment is waiting for document completion.", time: "1 hour", unread: true },
   ],
   supplier: [
-    { type: "📋 Order", message: "PO-2024-115 is awaiting delivery.", time: "2 hours", unread: true },
-    { type: "↩️ Return", message: "RN-2024-014 deduction is pending.", time: "Yesterday", unread: false },
+    { type: "Order", message: "PO-2024-115 is awaiting delivery.", time: "2 hours", unread: true },
+    { type: "Return", message: "RN-2024-014 deduction is pending.", time: "Yesterday", unread: false },
   ],
 };
 
@@ -133,14 +133,15 @@ const navByRole = {
     },
     {
       label: "ANALYTICS",
-      items: [
-        { to: "/reports", text: "Reports & Analytics", icon: <IconActivity /> },
-        { to: "/users", text: "Users & Roles", icon: <IconUsers /> },
-      ],
+      items: [{ to: "/reports", text: "Reports & Analytics", icon: <IconActivity /> }],
+    },
+    {
+      label: "SYSTEM",
+      items: [{ to: "/users", text: "Users & Roles", icon: <IconUsers /> }],
     },
   ],
-      ops: [
-        {
+  ops: [
+    {
       label: "OVERVIEW",
       items: [
         { to: "/dashboard", text: "Dashboard", icon: <IconDashboard /> },
@@ -180,20 +181,23 @@ const navByRole = {
   ],
   supervisor: [
     {
-  label: "OVERVIEW",
-  items: [
-    { to: "/dashboard", text: "Dashboard", icon: <IconDashboard /> },
-    { to: "/approvals", text: "Approval Notes", icon: <IconShieldCheck /> },
-  ],
-},
+      label: "OVERVIEW",
+      items: [
+        { to: "/dashboard", text: "Dashboard", icon: <IconDashboard /> },
+        { to: "/approvals", text: "Approval Notes", icon: <IconShieldCheck /> },
+      ],
+    },
     {
       label: "INVENTORY",
       items: [
         { to: "/inventory", text: "Inventory", icon: <IconInventory /> },
+        { to: "/items", text: "Item Master", icon: <IconTag /> },
+        { to: "/categories", text: "Item Categories", icon: <IconLayers /> },
         { to: "/inventory/expiry", text: "Expiry Items", icon: <IconClock />, badge: { text: "3", cls: "nb-r" } },
         { to: "/inventory/low-stock", text: "Low Stock", icon: <IconAlert />, badge: { text: "5", cls: "nb-r" } },
         { to: "/stock-adjustments", text: "Stock Adjustments", icon: <IconAdjust /> },
         { to: "/stock-count", text: "Physical Stock Count", icon: <IconClipboard /> },
+        { to: "/inventory/valuation", text: "Stock Valuation", icon: <IconDollar /> },
       ],
     },
     {
@@ -204,7 +208,10 @@ const navByRole = {
         { to: "/returns", text: "Returns & Wastage", icon: <IconReturn /> },
       ],
     },
-    { label: "PACKAGING", items: [{ to: "/packaging", text: "Packaging Stock", icon: <IconBox />, badge: { text: "!", cls: "nb-r" } }] },
+    {
+      label: "PACKAGING",
+      items: [{ to: "/packaging", text: "Packaging Stock", icon: <IconBox />, badge: { text: "!", cls: "nb-r" } }],
+    },
   ],
   logistics: [
     { label: "OVERVIEW", items: [{ to: "/dashboard", text: "Dashboard", icon: <IconDashboard /> }] },
@@ -241,7 +248,8 @@ const pageMeta = {
   "/items/add": { title: "Item Master", subtitle: "Create item" },
   "/inventory": { title: "Inventory", subtitle: "Current stock levels" },
   "/inventory/low-stock": { title: "Low Stock Alerts", subtitle: "Items below reorder level" },
-  "/inventory/expiry": { title: "Expiry Items", subtitle: "Items with batches expiring within 14 days" },  "/inventory/valuation": { title: "Stock Valuation", subtitle: "Current inventory value" },
+  "/inventory/expiry": { title: "Expiry Items", subtitle: "Items with batches expiring within 14 days" },
+  "/inventory/valuation": { title: "Stock Valuation", subtitle: "Current inventory value" },
   "/stock-adjustments": { title: "Stock Adjustments", subtitle: "Adjustment history" },
   "/stock-adjustments/add": { title: "Stock Adjustments", subtitle: "Create adjustment" },
   "/stock-count": { title: "Physical Stock Count", subtitle: "Count and reconcile warehouse stock" },
@@ -255,7 +263,7 @@ const pageMeta = {
   "/wastage": { title: "Returns & Wastage", subtitle: "Wastage records" },
   "/wastage/add": { title: "Returns & Wastage", subtitle: "Record wastage" },
   "/customers/local": { title: "Local Customers", subtitle: "Sri Lanka — 4 customers" },
-  "/customers/global": { title: "Global Customers", subtitle: "Export customers" },  
+  "/customers/global": { title: "Global Customers", subtitle: "Export customers" },
   "/dispatch/local": { title: "Local Dispatch", subtitle: "Lorry deliveries · Sri Lanka" },
   "/dispatch/global": { title: "Global Dispatch", subtitle: "Export shipments · Maldives & international" },
   "/dispatch/global/add": { title: "Dispatch", subtitle: "Create dispatch" },
@@ -274,38 +282,45 @@ const actionButtons = {
   "/purchase-orders": [{ label: "+ Create PO", to: "/purchase-orders/add", className: "btn btn-p btn-sm" }],
   "/grn": [{ label: "+ New GRN", to: "/grn/add", className: "btn btn-p btn-sm" }],
   "/returns": [
-    { label: "↩️ Record Return", to: "/returns/add", className: "btn btn-s btn-sm" },
-    { label: "🗑 Record Wastage", to: "/wastage/add", className: "btn btn-p btn-sm" },
+    { label: "Record Return", to: "/returns/add", className: "btn btn-s btn-sm" },
+    { label: "Record Wastage", to: "/wastage/add", className: "btn btn-p btn-sm" },
   ],
-  "/wastage": [{ label: "🗑 Record Wastage", to: "/wastage/add", className: "btn btn-p btn-sm" }],
-  "/dispatch/local": [{label: "+ New Dispatch",eventName: "fw-open-local-dispatch-modal",className: "btn btn-p btn-sm",},],  
+  "/wastage": [{ label: "Record Wastage", to: "/wastage/add", className: "btn btn-p btn-sm" }],
+  "/dispatch/local": [
+    {
+      label: "+ New Dispatch",
+      eventName: "fw-open-local-dispatch-modal",
+      className: "btn btn-p btn-sm",
+    },
+  ],
   "/dispatch/global": [{ label: "+ New Shipment", eventName: "fw-open-global-shipment-modal", className: "btn btn-p btn-sm" }],
-  "/export-documents": [{ label: "+ Create Document Set", eventName: "fw-open-export-docs-modal", className: "btn btn-p btn-sm" }],  "/users": [{ label: "+ Add User", to: "/users/add", className: "btn btn-p btn-sm", disabled: true }],
-
-"/customers/local": [
-  {
-    label: "+ Add Customer",
-    eventName: "fw-open-local-customer-modal",
-    className: "btn btn-p btn-sm",
-  },
-  {
-    label: "Export CSV",
-    eventName: "fw-export-local-customers",
-    className: "btn btn-s btn-sm",
-  },
-],
-"/customers/global": [
-  {
-    label: "+ Add Customer",
-    eventName: "fw-open-global-customer-modal",
-    className: "btn btn-p btn-sm",
-  },
-  {
-    label: "Export CSV",
-    eventName: "fw-export-global-customers",
-    className: "btn btn-s btn-sm",
-  },
-],};
+  "/export-documents": [{ label: "+ Create Document Set", eventName: "fw-open-export-docs-modal", className: "btn btn-p btn-sm" }],
+  "/users": [{ label: "+ Add User", to: "/users/add", className: "btn btn-p btn-sm", disabled: true }],
+  "/customers/local": [
+    {
+      label: "+ Add Customer",
+      eventName: "fw-open-local-customer-modal",
+      className: "btn btn-p btn-sm",
+    },
+    {
+      label: "Export CSV",
+      eventName: "fw-export-local-customers",
+      className: "btn btn-s btn-sm",
+    },
+  ],
+  "/customers/global": [
+    {
+      label: "+ Add Customer",
+      eventName: "fw-open-global-customer-modal",
+      className: "btn btn-p btn-sm",
+    },
+    {
+      label: "Export CSV",
+      eventName: "fw-export-global-customers",
+      className: "btn btn-s btn-sm",
+    },
+  ],
+};
 
 const normalizeRole = (role) => {
   const value = String(role || "manager").toLowerCase();
@@ -327,7 +342,7 @@ const getMeta = (pathname) => {
   if (/^\/dispatch\/print\//.test(pathname)) return { title: "Dispatch", subtitle: "Printable dispatch sheet" };
   if (/^\/export-documents\/\d+$/.test(pathname)) return { title: "Export Documents", subtitle: "Document details" };
   if (/^\/export-documents\/print\//.test(pathname)) return { title: "Export Documents", subtitle: "Printable export document" };
-  if (/^\/items\/edit\/\d+$/.test(pathname)) {return { title: "Item Master", subtitle: "Edit item" };}
+  if (/^\/items\/edit\/\d+$/.test(pathname)) return { title: "Item Master", subtitle: "Edit item" };
   return { title: "Dashboard", subtitle: "Fresh World Exporters ERP" };
 };
 
@@ -358,7 +373,6 @@ const Layout = () => {
     loadApprovalCount();
   }, [roleKey, location.pathname]);
 
-
   const sections = useMemo(() => {
     const base = navByRole[roleKey] || navByRole.manager;
 
@@ -379,15 +393,13 @@ const Layout = () => {
             to: "/approvals",
             text: "Pending Approvals",
             icon: <IconShieldCheck />,
-            badge:
-              approvalCount > 0
-                ? { text: String(approvalCount), cls: "nb-r" }
-                : null,
+            badge: approvalCount > 0 ? { text: String(approvalCount), cls: "nb-r" } : null,
           },
         ],
       };
     });
   }, [roleKey, approvalCount]);
+
   const meta = getMeta(location.pathname);
   const notifications = notificationsByRole[roleKey] || notificationsByRole.manager;
   const pageActions = actionButtons[location.pathname] || [];
@@ -398,89 +410,89 @@ const Layout = () => {
     .slice(0, 2)
     .toUpperCase();
 
-    return (
-      <>
-        <div id="app">
-          <div className="sb">
-            <div className="sb-top">
-              <div className="sb-head">
-                <div className="sb-brand">
-                  <div className="sb-brand-box">
-                    <img src={companyLogo} alt="Fresh World logo" className="sidebar-logo-img" />
-                  </div>
-                  <div className="sb-brand-text">
-                    <h2>Fresh World</h2>
-                    <p>Exporters · ERP v5</p>
-                  </div>
+  return (
+    <>
+      <div id="app">
+        <div className="sb">
+          <div className="sb-top">
+            <div className="sb-head">
+              <div className="sb-brand">
+                <div className="sb-brand-box">
+                  <img src={companyLogo} alt="Fresh World logo" className="sidebar-logo-img" />
                 </div>
-              </div>
-
-              <div className="sb-nav">
-                {sections.map((section) => (
-                  <div key={section.label}>
-                    <div className="sbl">{section.label}</div>
-                    {section.items.map((item) => (
-                      <Link
-                        key={item.to}
-                        to={item.to}
-                        className={`ni ${location.pathname === item.to ? "active" : ""}`}
-                      >
-                        <div className="ni-icon">{item.icon}</div>
-                        <div className="ni-txt">{item.text}</div>
-                        {item.badge ? <span className={`nb ${item.badge.cls}`}>{item.badge.text}</span> : null}
-                      </Link>
-                    ))}
-                  </div>
-                ))}
+                <div className="sb-brand-text">
+                  <h2>Fresh World</h2>
+                  <p>Exporters · ERP v5</p>
+                </div>
               </div>
             </div>
 
-            <div className="sb-user">
-              <div className="sb-user-row">
-                <div className="sb-av">{initials}</div>
-                <div>
-                  <div className="sb-u-name">{user?.name || "Fresh World User"}</div>
-                  <div className="sb-u-role">{user?.role || "Manager"}</div>
+            <div className="sb-nav">
+              {sections.map((section) => (
+                <div key={section.label}>
+                  <div className="sbl">{section.label}</div>
+                  {section.items.map((item) => (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      className={`ni ${location.pathname === item.to ? "active" : ""}`}
+                    >
+                      <div className="ni-icon">{item.icon}</div>
+                      <div className="ni-txt">{item.text}</div>
+                      {item.badge ? <span className={`nb ${item.badge.cls}`}>{item.badge.text}</span> : null}
+                    </Link>
+                  ))}
                 </div>
-              </div>
-
-              <button className="sb-signout" onClick={logout}>
-                <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth="2" strokeLinecap="round">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
-                </svg>
-                Sign out
-              </button>
+              ))}
             </div>
           </div>
 
-          <div className="main">
-            <div className="topbar">
-              <div className="tb-t">
-                <h1>{meta.title}</h1>
-                <p>{meta.subtitle}</p>
+          <div className="sb-user">
+            <div className="sb-user-row">
+              <div className="sb-av">{initials}</div>
+              <div>
+                <div className="sb-u-name">{user?.name || "Fresh World User"}</div>
+                <div className="sb-u-role">{user?.role || "Manager"}</div>
               </div>
+            </div>
 
-              <div className="tb-a">
-      {pageActions.map((action) =>
-    action.disabled ? (
-      <button key={action.label} className={action.className} disabled title="Not wired yet">
-        {action.label}
-      </button>
-    ) : action.eventName ? (
-      <button
-        key={action.label}
-        type="button"
-        className={action.className}
-        onClick={() => window.dispatchEvent(new CustomEvent(action.eventName))}
-      >
-        {action.label}
-      </button>
-    ) : (
-      <Link key={action.label} to={action.to} className={action.className}>
-        {action.label}
-      </Link>
-    )
-  )}
+            <button className="sb-signout" onClick={logout}>
+              <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth="2" strokeLinecap="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+              </svg>
+              Sign out
+            </button>
+          </div>
+        </div>
+
+        <div className="main">
+          <div className="topbar">
+            <div className="tb-t">
+              <h1>{meta.title}</h1>
+              <p>{meta.subtitle}</p>
+            </div>
+
+            <div className="tb-a">
+              {pageActions.map((action) =>
+                action.disabled ? (
+                  <button key={action.label} className={action.className} disabled title="Not wired yet">
+                    {action.label}
+                  </button>
+                ) : action.eventName ? (
+                  <button
+                    key={action.label}
+                    type="button"
+                    className={action.className}
+                    onClick={() => window.dispatchEvent(new CustomEvent(action.eventName))}
+                  >
+                    {action.label}
+                  </button>
+                ) : (
+                  <Link key={action.label} to={action.to} className={action.className}>
+                    {action.label}
+                  </Link>
+                )
+              )}
 
               <button className="nb-btn" onClick={() => setNotifOpen((p) => !p)}>
                 <svg viewBox="0 0 24 24">

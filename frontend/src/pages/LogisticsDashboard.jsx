@@ -32,14 +32,13 @@ const LogisticsDashboard = () => {
     const loadDashboard = async () => {
       setLoading(true);
 
-      const [localData, globalData, docsData, localCustomersData, globalCustomersData] =
-        await Promise.all([
-          getArray("/dispatch"),
-          getArray("/dispatch/global"),
-          getArray("/export-docs"),
-          getArray("/customers", { params: { type: "local" } }),
-          getArray("/customers", { params: { type: "global" } }),
-        ]);
+      const [localData, globalData, docsData, localCustomersData, globalCustomersData] = await Promise.all([
+        getArray("/dispatch"),
+        getArray("/dispatch/global"),
+        getArray("/export-docs"),
+        getArray("/customers", { params: { type: "local" } }),
+        getArray("/customers", { params: { type: "global" } }),
+      ]);
 
       setLocalDispatch(localData);
       setGlobalDispatch(globalData);
@@ -71,32 +70,27 @@ const LogisticsDashboard = () => {
     <>
       {loading ? (
         <div className="ib ib-i">
-          <span>⏳</span>
           <div>Loading logistics dashboard...</div>
         </div>
       ) : (
         <>
           <div className="krow k4">
             <div className="kc b">
-              <span className="ki">🚚</span>
               <div className="kv">{localDispatch.length}</div>
               <div className="kl">Local Dispatches</div>
             </div>
 
             <div className="kc a">
-              <span className="ki">✈️</span>
               <div className="kv">{activeGlobalShipments}</div>
               <div className="kl">Active Export Shipments</div>
             </div>
 
             <div className="kc r">
-              <span className="ki">📄</span>
               <div className="kv">{pendingDocs.length}</div>
               <div className="kl">Pending Document Sets</div>
             </div>
 
             <div className="kc g">
-              <span className="ki">✅</span>
               <div className="kv">{clearedShipments}</div>
               <div className="kl">Cleared Shipments</div>
             </div>
@@ -104,19 +98,16 @@ const LogisticsDashboard = () => {
 
           <div className="krow k4">
             <div className="kc p">
-              <span className="ki">🏨</span>
               <div className="kv">{localCustomers.length}</div>
               <div className="kl">Local Customers</div>
             </div>
 
             <div className="kc p">
-              <span className="ki">🌍</span>
               <div className="kv">{globalCustomers.length}</div>
               <div className="kl">Global Customers</div>
             </div>
 
             <div className="kc a">
-              <span className="ki">📦</span>
               <div className="kv">
                 {pendingDocs.filter((row) => String(row.packing_list_status || "").toLowerCase() !== "done").length}
               </div>
@@ -124,7 +115,6 @@ const LogisticsDashboard = () => {
             </div>
 
             <div className="kc r">
-              <span className="ki">🧾</span>
               <div className="kv">
                 {pendingDocs.filter((row) => String(row.commercial_invoice_status || "").toLowerCase() !== "done").length}
               </div>
@@ -144,10 +134,10 @@ const LogisticsDashboard = () => {
               <table>
                 <thead>
                   <tr>
-                    <th>Dispatch</th>
-                    <th>Customer</th>
-                    <th>Date</th>
-                    <th>Status</th>
+                    <th>DISPATCH</th>
+                    <th>CUSTOMER</th>
+                    <th>DATE</th>
+                    <th>STATUS</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -160,11 +150,7 @@ const LogisticsDashboard = () => {
                         <td>{row.client_name || "—"}</td>
                         <td>{formatDate(row.dispatch_date)}</td>
                         <td>
-                          <span
-                            className={`badge ${
-                              normalizeStatus(row.status) === "delivered" ? "bg-g" : "bg-a"
-                            }`}
-                          >
+                          <span className={`badge ${normalizeStatus(row.status) === "delivered" ? "bg-g" : "bg-a"}`}>
                             {row.status || "scheduled"}
                           </span>
                         </td>
@@ -190,10 +176,10 @@ const LogisticsDashboard = () => {
               <table>
                 <thead>
                   <tr>
-                    <th>Shipment</th>
-                    <th>Customer</th>
-                    <th>Date</th>
-                    <th>Docs</th>
+                    <th>SHIPMENT</th>
+                    <th>CUSTOMER</th>
+                    <th>DATE</th>
+                    <th>DOCS</th>
                   </tr>
                 </thead>
                 <tbody>

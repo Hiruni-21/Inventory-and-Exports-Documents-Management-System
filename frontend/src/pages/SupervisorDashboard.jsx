@@ -42,14 +42,13 @@ const SupervisorDashboard = () => {
     const loadDashboard = async () => {
       setLoading(true);
 
-      const [grnData, wastageData, lowStockData, expiryData, adjustmentsData] =
-        await Promise.all([
-          getArray("/grn"),
-          getArray("/wastage"),
-          getArray("/inventory/low-stock"),
-          getArray("/inventory/expiry", { params: { days: 14 } }),
-          getArray("/stock-adjustments"),
-        ]);
+      const [grnData, wastageData, lowStockData, expiryData, adjustmentsData] = await Promise.all([
+        getArray("/grn"),
+        getArray("/wastage"),
+        getArray("/inventory/low-stock"),
+        getArray("/inventory/expiry", { params: { days: 14 } }),
+        getArray("/stock-adjustments"),
+      ]);
 
       setGrnList(grnData);
       setWastage(wastageData);
@@ -96,36 +95,48 @@ const SupervisorDashboard = () => {
     [expiry]
   );
 
+  const recentCountAdjustments = useMemo(
+    () =>
+      adjustments
+        .filter((row) => {
+          const reason = String(row.reason || "").toLowerCase();
+          const notes = String(row.notes || "").toLowerCase();
+          const type = String(row.adjustment_type || "").toLowerCase();
+          return (
+            reason.includes("physical stock count") ||
+            notes.includes("physical stock count") ||
+            type === "stock_count"
+          );
+        })
+        .slice(0, 4),
+    [adjustments]
+  );
+
   return (
     <>
       {loading ? (
         <div className="ib ib-i">
-          <span>⏳</span>
           <div>Loading supervisor dashboard...</div>
         </div>
       ) : (
         <>
           <div className="krow k4">
             <div className="kc g">
-              <span className="ki">📥</span>
               <div className="kv">{todaysGoodsReceived}</div>
               <div className="kl">Today&apos;s Goods Received</div>
             </div>
 
             <div className="kc r">
-              <span className="ki">🗑</span>
               <div className="kv">{wastageRecords}</div>
               <div className="kl">Wastage Records</div>
             </div>
 
             <div className="kc a">
-              <span className="ki">⚠️</span>
               <div className="kv">{lowStockAlerts}</div>
               <div className="kl">Low Stock Alerts</div>
             </div>
 
             <div className="kc b">
-              <span className="ki">📋</span>
               <div className="kv">{stockCountVariances}</div>
               <div className="kl">Physical Count Variances</div>
             </div>
@@ -143,9 +154,9 @@ const SupervisorDashboard = () => {
               <table>
                 <thead>
                   <tr>
-                    <th>Item</th>
-                    <th>Batch</th>
-                    <th>Days Left</th>
+                    <th>ITEM</th>
+                    <th>BATCH</th>
+                    <th>DAYS LEFT</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -181,10 +192,10 @@ const SupervisorDashboard = () => {
               <table>
                 <thead>
                   <tr>
-                    <th>Item</th>
-                    <th>Batch</th>
-                    <th>Qty</th>
-                    <th>Date</th>
+                    <th>ITEM</th>
+                    <th>BATCH</th>
+                    <th>QTY</th>
+                    <th>DATE</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -241,49 +252,26 @@ const SupervisorDashboard = () => {
               <h3>Recent Count Adjustments</h3>
               <p>Physical stock count corrections</p>
 
-              {adjustments
-                .filter((row) => {
-                  const reason = String(row.reason || "").toLowerCase();
-                  const notes = String(row.notes || "").toLowerCase();
-                  const type = String(row.adjustment_type || "").toLowerCase();
-                  return (
-                    reason.includes("physical stock count") ||
-                    notes.includes("physical stock count") ||
-                    type === "stock_count"
-                  );
-                })
-                .slice(0, 4).length ? (
-                adjustments
-                  .filter((row) => {
-                    const reason = String(row.reason || "").toLowerCase();
-                    const notes = String(row.notes || "").toLowerCase();
-                    const type = String(row.adjustment_type || "").toLowerCase();
-                    return (
-                      reason.includes("physical stock count") ||
-                      notes.includes("physical stock count") ||
-                      type === "stock_count"
-                    );
-                  })
-                  .slice(0, 4)
-                  .map((row, index) => (
-                    <Link
-                      key={row.id}
-                      to="/stock-adjustments"
-                      style={{
-                        display: "block",
-                        textDecoration: "none",
-                        padding: "8px 0",
-                        borderBottom: index === 3 ? "none" : "1px solid var(--border)",
-                      }}
-                    >
-                      <div style={{ fontSize: 11, fontWeight: 600, color: "var(--g900)" }}>
-                        {row.item_name || "Adjustment"}
-                      </div>
-                      <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 2 }}>
-                        {String(row.adjustment_type || "").toLowerCase() === "increase" ? "Increase" : "Decrease"} · {Number(row.quantity || row.adjustment_qty || 0)} · {row.reason || "Physical stock count"}
-                      </div>
-                    </Link>
-                  ))
+              {recentCountAdjustments.length ? (
+                recentCountAdjustments.map((row, index) => (
+                  <Link
+                    key={row.id}
+                    to="/stock-adjustments"
+                    style={{
+                      display: "block",
+                      textDecoration: "none",
+                      padding: "8px 0",
+                      borderBottom: index === recentCountAdjustments.length - 1 ? "none" : "1px solid var(--border)",
+                    }}
+                  >
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--g900)" }}>
+                      {row.item_name || "Adjustment"}
+                    </div>
+                    <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 2 }}>
+                      {String(row.adjustment_type || "").toLowerCase() === "increase" ? "Increase" : "Decrease"} · {Number(row.quantity || row.adjustment_qty || 0)} · {row.reason || "Physical stock count"}
+                    </div>
+                  </Link>
+                ))
               ) : (
                 <div style={{ fontSize: 12, color: "var(--text3)" }}>No recent count adjustments</div>
               )}
