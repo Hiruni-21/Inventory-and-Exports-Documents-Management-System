@@ -4,7 +4,7 @@ const db = require("../config/db");
   If your system uses the old batch table, change this to "batches".
   Leave it as "inventory_batches" if your current inventory pages already work with that.
 */
-const BATCH_TABLE = "inventory_batches";
+const BATCH_TABLE = "batches";
 const BATCH_CODE_COL = BATCH_TABLE === "batches" ? "batch_number" : "batch_code";
 const BATCH_QTY_COL =
   BATCH_TABLE === "batches" ? "qty_remaining" : "available_quantity";
