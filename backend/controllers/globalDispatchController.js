@@ -1,8 +1,7 @@
 const db = require("../config/db");
 const { refreshInventorySnapshot } = require("./inventoryController");
 
-const BATCH_TABLE =
-  process.env.BATCH_TABLE === "batches" ? "batches" : "inventory_batches";
+const BATCH_TABLE = "batches";
 
 const BATCH_CODE_COL = BATCH_TABLE === "batches" ? "batch_number" : "batch_code";
 const BATCH_QTY_COL = BATCH_TABLE === "batches" ? "qty_remaining" : "available_quantity";

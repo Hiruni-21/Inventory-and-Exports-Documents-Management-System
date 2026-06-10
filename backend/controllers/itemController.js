@@ -42,14 +42,14 @@ const normalizeSupplierIds = (value) => {
 };
 
 const syncItemSuppliers = async (itemId, supplierIds) => {
-  await query("DELETE FROM item_suppliers WHERE item_id = ?", [itemId]);
+  await query("DELETE FROM supplier_items WHERE item_id = ?", [itemId]);
 
   const cleaned = [...new Set(normalizeSupplierIds(supplierIds))];
   if (!cleaned.length) return;
 
   const values = cleaned.map((supplierId) => [itemId, supplierId]);
   await query(
-    "INSERT INTO item_suppliers (item_id, supplier_id) VALUES ?",
+    "INSERT INTO supplier_items (item_id, supplier_id) VALUES ?",
     [values]
   );
 };
@@ -67,7 +67,7 @@ const getAllItems = async (req, res) => {
               ORDER BY s.supplier_name
               SEPARATOR ', '
             )
-            FROM item_suppliers isp
+            FROM supplier_items isp
             LEFT JOIN suppliers s ON s.id = isp.supplier_id
             WHERE isp.item_id = i.id
           ),
@@ -80,7 +80,7 @@ const getAllItems = async (req, res) => {
               ORDER BY isp.supplier_id
               SEPARATOR ','
             )
-            FROM item_suppliers isp
+            FROM supplier_items isp
             WHERE isp.item_id = i.id
           ),
           ''
@@ -125,7 +125,7 @@ const getItemById = async (req, res) => {
               ORDER BY s.supplier_name
               SEPARATOR ', '
             )
-            FROM item_suppliers isp
+            FROM supplier_items isp
             LEFT JOIN suppliers s ON s.id = isp.supplier_id
             WHERE isp.item_id = i.id
           ),
@@ -138,7 +138,7 @@ const getItemById = async (req, res) => {
               ORDER BY isp.supplier_id
               SEPARATOR ','
             )
-            FROM item_suppliers isp
+            FROM supplier_items isp
             WHERE isp.item_id = i.id
           ),
           ''
