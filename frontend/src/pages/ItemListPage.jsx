@@ -793,8 +793,20 @@ const ItemListPage = () => {
         </div>
       </div>
 
-      <div className="tw" style={{ borderRadius: 24, overflow: "hidden" }}>
-        <table>
+      <div
+        className="tw item-master-table-wrap"
+        style={{
+          borderRadius: 24,
+          overflowX: "auto",
+          overflowY: "hidden",
+        }}
+      >
+        <table
+          style={{
+            minWidth: 1120,
+            tableLayout: "fixed",
+          }}
+        >
           <thead>
             <tr>
               <th style={{ width: "11%", ...tableHeaderCellStyle }}>CODE</th>

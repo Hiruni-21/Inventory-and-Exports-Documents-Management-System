@@ -667,8 +667,14 @@ const InventoryListPage = () => {
         </div>
       </div>
 
-      <div className="tw">
-        <table>
+      <div
+        className="tw inventory-table-wrap"
+        style={{
+          overflowX: "auto",
+          overflowY: "hidden",
+        }}
+      >
+        <table style={{ minWidth: 1120 }}>
           <thead>
             <tr>
               <th style={{ width: "11%" }}>ITEM CODE</th>
@@ -849,8 +855,19 @@ const InventoryListPage = () => {
                 </div>
               ) : null}
 
-              <div className="tw" style={{ marginBottom: 18 }}>
-                <table>
+              <div
+                  className="tw inventory-table-wrap"
+                  style={{
+                    overflowX: "auto",
+                    overflowY: "hidden",
+                  }}
+                >
+                  <table
+                    style={{
+                      minWidth: 1120,
+                      tableLayout: "fixed",
+                    }}
+                  >
                   <thead>
                     <tr>
                       <th>BATCH NO.</th>
