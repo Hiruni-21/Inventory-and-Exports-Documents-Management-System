@@ -121,3 +121,45 @@ CALL add_column_if_missing(
 );
 
 DROP PROCEDURE add_column_if_missing;
+
+USE fresh_world_system;
+
+DROP PROCEDURE IF EXISTS add_column_if_missing;
+
+DELIMITER $$
+
+CREATE PROCEDURE add_column_if_missing(
+  IN table_name_param VARCHAR(64),
+  IN column_name_param VARCHAR(64),
+  IN alter_sql_param TEXT
+)
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE()
+      AND table_name = table_name_param
+      AND column_name = column_name_param
+  ) THEN
+    SET @sql = alter_sql_param;
+    PREPARE stmt FROM @sql;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+  END IF;
+END $$
+
+DELIMITER ;
+
+CALL add_column_if_missing(
+  'global_dispatch',
+  'total_weight',
+  'ALTER TABLE global_dispatch ADD COLUMN total_weight DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER incoterm'
+);
+
+CALL add_column_if_missing(
+  'global_dispatch',
+  'total_boxes',
+  'ALTER TABLE global_dispatch ADD COLUMN total_boxes INT NOT NULL DEFAULT 0 AFTER total_weight'
+);
+
+DROP PROCEDURE IF EXISTS add_column_if_missing;
