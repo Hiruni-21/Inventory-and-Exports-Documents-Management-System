@@ -66,6 +66,11 @@ const AddPurchaseOrderPage = () => {
     return map;
   }, [items]);
 
+  const supplierItems = useMemo(() => {
+  if (!form.supplier_id) return [];
+  return items.filter((item) => String(item.supplier_id) === String(form.supplier_id));
+}, [items, form.supplier_id]);
+
   const enrichedLines = useMemo(() => {
     return lines.map((line) => {
       const item = itemLookup[String(line.item_id)];
@@ -90,10 +95,29 @@ const AddPurchaseOrderPage = () => {
     return enrichedLines.reduce((sum, line) => sum + Number(line.amount || 0), 0);
   }, [enrichedLines]);
 
-  const handleFormChange = (e) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-  };
+  const handleFormChange = async (e) => {
+    const { name, value } = e.target;
 
+    setForm((prev) => ({ ...prev, [name]: value }));
+
+    if (name === "supplier_id") {
+      setLines([{ ...emptyLine }]);
+      setError("");
+
+      if (!value) {
+        setItems([]);
+        return;
+      }
+
+      try {
+        const res = await api.get(`/purchase-orders/supplier/${value}/items`);
+        setItems(Array.isArray(res.data) ? res.data : []);
+      } catch (err) {
+        setItems([]);
+        setError(err.response?.data?.message || "Failed to load supplier items");
+      }
+    }
+  };
   const handleLineChange = (index, field, value) => {
     setLines((prev) => {
       const next = [...prev];
@@ -105,6 +129,7 @@ const AddPurchaseOrderPage = () => {
         current.unit = item?.unit || "";
         current.price =
           item?.unit_price ||
+          item?.unit_cost ||
           item?.purchase_price ||
           item?.cost_price ||
           item?.buying_price ||

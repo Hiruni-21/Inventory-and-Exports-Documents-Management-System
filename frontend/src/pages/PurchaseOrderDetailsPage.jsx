@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import api from "../utils/api";
 
 const fmtDate = (value) => {
@@ -99,7 +99,6 @@ const PurchaseOrderDetailsPage = () => {
       <div className="tw">
         <div className="tw-h">
           <h3>PO Items</h3>
-          <Link to="/grn/add" className="btn btn-p btn-xs">Create GRN</Link>
         </div>
         <table>
           <thead>
@@ -108,6 +107,8 @@ const PurchaseOrderDetailsPage = () => {
               <th>Item Name</th>
               <th>Unit</th>
               <th>Quantity</th>
+              <th>Unit Price</th>
+              <th>Line Total</th>
             </tr>
           </thead>
           <tbody>
@@ -117,12 +118,16 @@ const PurchaseOrderDetailsPage = () => {
                   <td style={{ fontFamily: "monospace", fontSize: 11, color: "var(--text3)" }}>{item.item_code}</td>
                   <td style={{ fontWeight: 600 }}>{item.item_name}</td>
                   <td>{item.unit}</td>
-                  <td>{item.quantity}</td>
+                  <td>{Number(item.quantity || 0).toFixed(2)}</td>
+                  <td>LKR {Number(item.unit_price || 0).toLocaleString()}</td>
+                  <td style={{ fontWeight: 700 }}>
+                    LKR {Number(item.line_total || Number(item.quantity || 0) * Number(item.unit_price || 0)).toLocaleString()}
+                  </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="4" style={{ textAlign: "center", color: "var(--text3)" }}>No items found</td>
+                <td colSpan="6" style={{ textAlign: "center", color: "var(--text3)" }}>No items found</td>
               </tr>
             )}
           </tbody>

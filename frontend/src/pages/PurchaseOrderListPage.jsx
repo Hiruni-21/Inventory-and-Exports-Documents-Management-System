@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
 
 const statusClassMap = {
@@ -20,18 +20,22 @@ const getBadgeClass = (status) => {
 
 const getStatusLabel = (status) => {
   const value = String(status || "pending").toLowerCase();
+
   if (value.includes("await") || value.includes("pending")) return "Awaiting Approval";
   if (value.includes("approved")) return "Approved";
   if (value.includes("sent")) return "Sent";
   if (value.includes("closed") || value.includes("received")) return "Closed";
   if (value.includes("draft")) return "Draft";
+
   return status || "Pending";
 };
 
 const fmtDate = (value) => {
   if (!value) return "—";
+
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
+
   return date.toLocaleDateString("en-CA");
 };
 
@@ -48,6 +52,7 @@ const PurchaseOrderListPage = () => {
     const fetchPurchaseOrders = async () => {
       setLoading(true);
       setError("");
+
       try {
         const res = await api.get("/purchase-orders");
         setPurchaseOrders(Array.isArray(res.data) ? res.data : []);
@@ -65,14 +70,23 @@ const PurchaseOrderListPage = () => {
     return purchaseOrders.reduce(
       (acc, po) => {
         const value = String(po.status || "pending").toLowerCase();
+
         acc.all += 1;
+
         if (value.includes("await") || value.includes("pending")) acc.awaiting += 1;
         if (value.includes("approved")) acc.approved += 1;
         if (value.includes("sent")) acc.sent += 1;
         if (value.includes("closed") || value.includes("received")) acc.closed += 1;
+
         return acc;
       },
-      { all: 0, awaiting: 0, approved: 0, sent: 0, closed: 0 }
+      {
+        all: 0,
+        awaiting: 0,
+        approved: 0,
+        sent: 0,
+        closed: 0,
+      }
     );
   }, [purchaseOrders]);
 
@@ -141,7 +155,7 @@ const PurchaseOrderListPage = () => {
           Closed ({counts.closed})
         </button>
 
-        <div className="sw" style={{ marginLeft: "auto" }}>
+        <div className="sw po-search-box">
           <input
             className="si"
             placeholder="Search purchase orders..."
@@ -153,77 +167,72 @@ const PurchaseOrderListPage = () => {
 
       {loading ? (
         <div className="ib ib-i">
-          <span>⏳</span>
+          <span>Loading</span>
           <div>Loading purchase orders...</div>
         </div>
       ) : null}
 
       {error ? (
         <div className="ib ib-d">
-          <span>⚠️</span>
+          <span>Warning</span>
           <div>{error}</div>
         </div>
       ) : null}
 
-      <div className="tw">
+      <div className="tw po-list-card">
         <div className="tw-h">
           <h3>Purchase Orders</h3>
+          <span className="po-scroll-note">Scroll left/right to see all columns</span>
         </div>
 
-        <table>
-          <thead>
-            <tr>
-              <th>PO Number</th>
-              <th>Supplier</th>
-              <th>Date Placed</th>
-              <th>Required By</th>
-              <th>Status</th>
-              <th>Created By</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredOrders.length > 0 ? (
-              filteredOrders.map((po) => (
-                <tr key={po.id}>
-                  <td style={{ fontFamily: "monospace", fontWeight: 700, color: "var(--g800)" }}>
-                    {po.po_number}
-                  </td>
-                  <td style={{ fontWeight: 600 }}>{po.supplier_name || "—"}</td>
-                  <td>{fmtDate(po.order_date || po.created_at)}</td>
-                  <td>{fmtDate(po.expected_delivery_date)}</td>
-                  <td>
-                    <span className={`badge ${getBadgeClass(po.status)}`}>
-                      {getStatusLabel(po.status)}
-                    </span>
-                  </td>
-                  <td>{po.created_by_name || "—"}</td>
-                  <td>
-                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-                      <Link to={`/purchase-orders/${po.id}`} className="ab" title="View PO">
-                        👁
-                      </Link>
-                      <button
-                        type="button"
-                        className="ab"
-                        title="Create GRN from this PO"
-                        onClick={() => navigate(`/grn/add?po=${po.id}`)}
-                      >
-                        📥
-                      </button>
-                    </div>
+        <div className="po-table-scroll">
+          <table className="po-list-table">
+            <thead>
+              <tr>
+                <th>PO Number</th>
+                <th>Supplier</th>
+                <th>Date Placed</th>
+                <th>Required By</th>
+                <th>Status</th>
+                <th>Created By</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {filteredOrders.length > 0 ? (
+                filteredOrders.map((po) => (
+                  <tr
+                    key={po.id}
+                    onClick={() => navigate(`/purchase-orders/${po.id}`)}
+                    className="po-click-row"
+                  >
+                    <td className="po-number-cell">{po.po_number || "—"}</td>
+
+                    <td className="po-supplier-cell">{po.supplier_name || "—"}</td>
+
+                    <td>{fmtDate(po.order_date || po.created_at)}</td>
+
+                    <td>{fmtDate(po.expected_delivery_date)}</td>
+
+                    <td>
+                      <span className={`badge ${getBadgeClass(po.status)}`}>
+                        {getStatusLabel(po.status)}
+                      </span>
+                    </td>
+
+                    <td>{po.created_by_name || "—"}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="6" className="po-empty-cell">
+                    No purchase orders found
                   </td>
                 </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="7" style={{ textAlign: "center", color: "var(--text3)" }}>
-                  No purchase orders found
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

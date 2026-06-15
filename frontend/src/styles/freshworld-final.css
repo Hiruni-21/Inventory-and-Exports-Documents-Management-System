@@ -2565,3 +2565,180 @@ textarea.fc{height:78px;padding:10px 12px;resize:vertical}
   width: 110px;
   text-align: center;
 }
+/* Purchase order table horizontal scroll fix */
+.po-list-card {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.po-table-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto !important;
+  overflow-y: hidden;
+  display: block;
+  -webkit-overflow-scrolling: touch;
+}
+
+.po-list-table {
+  width: 1150px !important;
+  min-width: 1150px !important;
+  max-width: none !important;
+  table-layout: auto !important;
+  border-collapse: collapse;
+}
+
+.po-list-table th,
+.po-list-table td {
+  white-space: nowrap !important;
+}
+
+.po-list-table th:nth-child(1),
+.po-list-table td:nth-child(1) {
+  min-width: 170px;
+}
+
+.po-list-table th:nth-child(2),
+.po-list-table td:nth-child(2) {
+  min-width: 220px;
+}
+
+.po-list-table th:nth-child(3),
+.po-list-table td:nth-child(3),
+.po-list-table th:nth-child(4),
+.po-list-table td:nth-child(4) {
+  min-width: 140px;
+}
+
+.po-list-table th:nth-child(5),
+.po-list-table td:nth-child(5) {
+  min-width: 180px;
+}
+
+.po-list-table th:nth-child(6),
+.po-list-table td:nth-child(6) {
+  min-width: 180px;
+}
+/* Purchase Order List horizontal scroll fix */
+.po-list-card {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+.po-table-scroll {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  display: block !important;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 8px;
+}
+
+.po-table-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+
+.po-table-scroll::-webkit-scrollbar-thumb {
+  background: #bfd8cb;
+  border-radius: 999px;
+}
+
+.po-table-scroll::-webkit-scrollbar-track {
+  background: #f4f7f3;
+}
+
+.po-list-table {
+  width: 1200px !important;
+  min-width: 1200px !important;
+  max-width: none !important;
+  table-layout: fixed !important;
+  border-collapse: collapse !important;
+}
+
+.po-list-table th,
+.po-list-table td {
+  white-space: nowrap !important;
+  vertical-align: middle !important;
+}
+
+.po-list-table th:nth-child(1),
+.po-list-table td:nth-child(1) {
+  width: 190px !important;
+}
+
+.po-list-table th:nth-child(2),
+.po-list-table td:nth-child(2) {
+  width: 230px !important;
+}
+
+.po-list-table th:nth-child(3),
+.po-list-table td:nth-child(3) {
+  width: 150px !important;
+}
+
+.po-list-table th:nth-child(4),
+.po-list-table td:nth-child(4) {
+  width: 150px !important;
+}
+
+.po-list-table th:nth-child(5),
+.po-list-table td:nth-child(5) {
+  width: 190px !important;
+}
+
+.po-list-table th:nth-child(6),
+.po-list-table td:nth-child(6) {
+  width: 190px !important;
+}
+
+.po-click-row {
+  cursor: pointer;
+}
+
+.po-click-row:hover td {
+  background: rgba(224, 245, 234, 0.45) !important;
+}
+
+.po-number-cell {
+  font-family: monospace;
+  font-weight: 700;
+  color: var(--g800);
+}
+
+.po-supplier-cell {
+  font-weight: 600;
+}
+
+.po-empty-cell {
+  text-align: center;
+  color: var(--text3);
+  padding: 24px 16px !important;
+}
+
+.po-search-box {
+  margin-left: auto;
+}
+
+.po-scroll-note {
+  font-size: 11px;
+  color: var(--text3);
+  font-weight: 500;
+}
+
+@media (max-width: 900px) {
+  .po-search-box {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .po-search-box .si {
+    width: 100% !important;
+  }
+
+  .po-scroll-note {
+    display: none;
+  }
+}
