@@ -403,7 +403,6 @@ export default function ManagerApprovalsPage() {
               <th>MANAGER NOTE</th>
               <th>DECIDED BY</th>
               <th>CREATED</th>
-              <th>ACTIONS</th>
             </tr>
           </thead>
 

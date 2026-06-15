@@ -654,7 +654,7 @@ const InventoryListPage = () => {
         </select>
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          {["All", "Low Stock", "Out of Stock", "Expiring"].map((tabName) => (
+          {["All", "Low Stock", "Out of Stock"].map((tabName) => (
             <button
               key={tabName}
               type="button"

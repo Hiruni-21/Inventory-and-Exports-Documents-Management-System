@@ -97,7 +97,7 @@ const getDispatchReport = (req, res) => {
       d.client_name,
       d.dispatch_date,
       d.remarks,
-      u.name AS created_by_name
+      COALESCE(NULLIF(u.full_name, ''), u.email, 'System User') AS created_by_name
     FROM dispatch_records d
     LEFT JOIN users u ON d.created_by = u.id
   `;
@@ -129,7 +129,7 @@ const getWastageReport = (req, res) => {
       w.wastage_date,
       w.reason,
       w.remarks,
-      u.name AS created_by_name
+      COALESCE(NULLIF(u.full_name, ''), u.email, 'System User') AS created_by_name
     FROM wastage_records w
     LEFT JOIN users u ON w.created_by = u.id
   `;
@@ -162,7 +162,7 @@ const getReturnReport = (req, res) => {
       r.return_type,
       r.reference_number,
       r.remarks,
-      u.name AS created_by_name
+      COALESCE(NULLIF(u.full_name, ''), u.email, 'System User') AS created_by_name
     FROM return_records r
     LEFT JOIN users u ON r.created_by = u.id
   `;
@@ -197,7 +197,7 @@ const getExportDocumentReport = (req, res) => {
       ed.destination_country,
       dr.dispatch_number,
       dr.client_name,
-      u.name AS created_by_name
+      COALESCE(NULLIF(u.full_name, ''), u.email, 'System User') AS created_by_name
     FROM export_documents ed
     JOIN dispatch_records dr ON ed.dispatch_id = dr.id
     LEFT JOIN users u ON ed.created_by = u.id

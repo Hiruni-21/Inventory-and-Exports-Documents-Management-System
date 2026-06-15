@@ -11,6 +11,7 @@ const emptyLine = {
 
 const AddPurchaseOrderPage = () => {
   const navigate = useNavigate();
+  const today = new Date().toISOString().split("T")[0];
 
   const [suppliers, setSuppliers] = useState([]);
   const [items, setItems] = useState([]);
@@ -65,6 +66,11 @@ const AddPurchaseOrderPage = () => {
     return map;
   }, [items]);
 
+  const supplierItems = useMemo(() => {
+  if (!form.supplier_id) return [];
+  return items.filter((item) => String(item.supplier_id) === String(form.supplier_id));
+}, [items, form.supplier_id]);
+
   const enrichedLines = useMemo(() => {
     return lines.map((line) => {
       const item = itemLookup[String(line.item_id)];
@@ -89,10 +95,29 @@ const AddPurchaseOrderPage = () => {
     return enrichedLines.reduce((sum, line) => sum + Number(line.amount || 0), 0);
   }, [enrichedLines]);
 
-  const handleFormChange = (e) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-  };
+  const handleFormChange = async (e) => {
+    const { name, value } = e.target;
 
+    setForm((prev) => ({ ...prev, [name]: value }));
+
+    if (name === "supplier_id") {
+      setLines([{ ...emptyLine }]);
+      setError("");
+
+      if (!value) {
+        setItems([]);
+        return;
+      }
+
+      try {
+        const res = await api.get(`/purchase-orders/supplier/${value}/items`);
+        setItems(Array.isArray(res.data) ? res.data : []);
+      } catch (err) {
+        setItems([]);
+        setError(err.response?.data?.message || "Failed to load supplier items");
+      }
+    }
+  };
   const handleLineChange = (index, field, value) => {
     setLines((prev) => {
       const next = [...prev];
@@ -100,7 +125,16 @@ const AddPurchaseOrderPage = () => {
 
       if (field === "item_id") {
         const item = itemLookup[String(value)];
+
         current.unit = item?.unit || "";
+        current.price =
+          item?.unit_price ||
+          item?.unit_cost ||
+          item?.purchase_price ||
+          item?.cost_price ||
+          item?.buying_price ||
+          item?.price ||
+          "";
       }
 
       next[index] = current;
@@ -120,11 +154,14 @@ const AddPurchaseOrderPage = () => {
   };
 
   const nextStep = () => {
-    if (step === 1) {
-      if (!form.supplier_id || !form.expected_delivery_date) {
-        setError("Supplier and required-by date are required");
-        return;
-      }
+    if (!form.supplier_id || !form.expected_delivery_date) {
+      setError("Supplier and required-by date are required");
+      return;
+    }
+
+    if (form.expected_delivery_date < today) {
+      setError("Required-by date cannot be in the past");
+      return;
     }
 
     if (step === 2) {
@@ -152,6 +189,7 @@ const AddPurchaseOrderPage = () => {
       .map((line) => ({
         item_id: Number(line.item_id),
         quantity: Number(line.quantity),
+        unit_price: Number(line.price || 0),
       }));
 
     if (!form.supplier_id || !form.expected_delivery_date || cleanItems.length === 0) {
@@ -165,6 +203,8 @@ const AddPurchaseOrderPage = () => {
       await api.post("/purchase-orders", {
         supplier_id: Number(form.supplier_id),
         expected_delivery_date: form.expected_delivery_date,
+        status: mode === "draft" ? "draft" : "pending_approval",
+        priority: priority.toLowerCase(),
         remarks: [
           form.remarks,
           instructions,
@@ -274,6 +314,7 @@ const AddPurchaseOrderPage = () => {
                   className="fc"
                   type="date"
                   name="expected_delivery_date"
+                  min={today}
                   value={form.expected_delivery_date}
                   onChange={handleFormChange}
                 />
