@@ -341,9 +341,178 @@ const getPurchaseItemsBySupplier = (req, res) => {
   });
 };
 
+const sendPurchaseOrder = (req, res) => {
+  const { id } = req.params;
+
+  const userId = req.user?.id || null;
+  const userName =
+    req.user?.full_name ||
+    req.user?.email ||
+    req.user?.name ||
+    "Fresh World ERP";
+
+  const findSql = `
+    SELECT
+      po.id,
+      po.po_number,
+      po.status,
+      po.order_date,
+      po.expected_delivery_date,
+      po.required_by,
+      po.expected_date,
+      po.notes,
+      po.remarks,
+      s.id AS supplier_id,
+      s.supplier_name,
+      s.email,
+      s.contact_number,
+      s.whatsapp_number
+    FROM purchase_orders po
+    LEFT JOIN suppliers s ON s.id = po.supplier_id
+    WHERE po.id = ?
+    LIMIT 1
+  `;
+
+  db.query(findSql, [id], (findErr, rows) => {
+    if (findErr) {
+      console.error("sendPurchaseOrder find error:", findErr);
+      return res.status(500).json({
+        message: "Database error while finding purchase order",
+        error: findErr.message,
+      });
+    }
+
+    if (!rows.length) {
+      return res.status(404).json({ message: "Purchase order not found" });
+    }
+
+    const po = rows[0];
+    const currentStatus = String(po.status || "").toLowerCase();
+
+    if (currentStatus !== "approved") {
+      return res.status(400).json({
+        message: "Only approved purchase orders can be sent",
+      });
+    }
+
+    const requiredBy =
+      po.expected_delivery_date || po.required_by || po.expected_date || "—";
+
+    const messageBody = [
+      `Purchase Order: ${po.po_number}`,
+      `Supplier: ${po.supplier_name || "—"}`,
+      `Order Date: ${po.order_date || "—"}`,
+      `Required By: ${requiredBy}`,
+      po.notes || po.remarks ? `Notes: ${po.notes || po.remarks}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    db.beginTransaction((txErr) => {
+      if (txErr) {
+        console.error("sendPurchaseOrder transaction error:", txErr);
+        return res.status(500).json({
+          message: "Failed to start transaction",
+          error: txErr.message,
+        });
+      }
+
+      const updateSql = `
+        UPDATE purchase_orders
+        SET status = 'sent',
+            sent_by = ?,
+            updated_at = NOW()
+        WHERE id = ?
+      `;
+
+      db.query(updateSql, [userId, id], (updateErr) => {
+        if (updateErr) {
+          return db.rollback(() => {
+            console.error("sendPurchaseOrder update error:", updateErr);
+            res.status(500).json({
+              message: "Failed to update purchase order status",
+              error: updateErr.message,
+            });
+          });
+        }
+
+        const messageSql = `
+          INSERT INTO supplier_messages
+            (
+              supplier_id,
+              message_type,
+              subject,
+              message_body,
+              linked_kind,
+              linked_record_id,
+              sent_by,
+              status
+            )
+          VALUES (?, 'purchase_order', ?, ?, 'order', ?, ?, 'Sent')
+        `;
+
+        db.query(
+          messageSql,
+          [
+            po.supplier_id,
+            `Purchase Order ${po.po_number}`,
+            messageBody,
+            po.id,
+            userName,
+          ],
+          (messageErr) => {
+            if (messageErr) {
+              return db.rollback(() => {
+                console.error("sendPurchaseOrder message error:", messageErr);
+                res.status(500).json({
+                  message: "Failed to log supplier message",
+                  error: messageErr.message,
+                });
+              });
+            }
+
+            db.commit((commitErr) => {
+              if (commitErr) {
+                return db.rollback(() => {
+                  console.error("sendPurchaseOrder commit error:", commitErr);
+                  res.status(500).json({
+                    message: "Failed to complete send action",
+                    error: commitErr.message,
+                  });
+                });
+              }
+
+              const emailSubject = encodeURIComponent(
+                `Fresh World Purchase Order ${po.po_number}`
+              );
+              const emailBody = encodeURIComponent(messageBody);
+
+              const cleanPhone = String(
+                po.whatsapp_number || po.contact_number || ""
+              ).replace(/\D/g, "");
+
+              res.json({
+                message: "Purchase order sent successfully",
+                status: "sent",
+                email_link: po.email
+                  ? `mailto:${po.email}?subject=${emailSubject}&body=${emailBody}`
+                  : null,
+                whatsapp_link: cleanPhone
+                  ? `https://wa.me/${cleanPhone}?text=${emailBody}`
+                  : null,
+              });
+            });
+          }
+        );
+      });
+    });
+  });
+};
+
 module.exports = {
    getAllPurchaseOrders,
    getPurchaseOrderById,
    getPurchaseItemsBySupplier,
    createPurchaseOrder,
+   sendPurchaseOrder,
 };
