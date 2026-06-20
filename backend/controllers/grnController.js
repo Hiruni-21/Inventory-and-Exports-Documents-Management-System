@@ -1,13 +1,15 @@
 const db = require("../config/db");
 const { refreshInventorySnapshot } = require("./inventoryController");
 
+/* =========================
+   GET ALL GRN
+========================= */
 const getAllGrn = (req, res) => {
   const sql = `
     SELECT
       g.id,
       g.grn_number,
       g.received_date,
-      NULL AS received_time,
       g.created_at,
       po.po_number,
       s.supplier_name,
@@ -29,13 +31,15 @@ const getAllGrn = (req, res) => {
   });
 };
 
+/* =========================
+   GET GRN BY ID
+========================= */
 const getGrnById = (req, res) => {
   const { id } = req.params;
 
   const grnSql = `
     SELECT
       g.*,
-      NULL AS received_time,
       po.po_number,
       s.supplier_name,
       s.contact_number,
@@ -52,8 +56,8 @@ const getGrnById = (req, res) => {
     SELECT
       gi.id,
       gi.item_id,
-      gi.ordered_qty,
-      gi.received_qty,
+      gi.ordered_qty AS ordered_quantity,
+      gi.received_qty AS delivered_quantity,
       gi.variance_qty,
       gi.variance_percent,
       gi.batch_number,
@@ -76,7 +80,7 @@ const getGrnById = (req, res) => {
       return res.status(500).json({ message: "Database error", error: err.message });
     }
 
-    if (grnResults.length === 0) {
+    if (!grnResults.length) {
       return res.status(404).json({ message: "GRN not found" });
     }
 
@@ -94,6 +98,9 @@ const getGrnById = (req, res) => {
   });
 };
 
+/* =========================
+   GET PO ITEMS FOR GRN
+========================= */
 const getPurchaseOrderItemsForGrn = (req, res) => {
   const { purchaseOrderId } = req.params;
 
@@ -123,6 +130,9 @@ const getPurchaseOrderItemsForGrn = (req, res) => {
   });
 };
 
+/* =========================
+   CREATE GRN
+========================= */
 const createGrn = (req, res) => {
   const {
     purchase_order_id,
@@ -134,8 +144,26 @@ const createGrn = (req, res) => {
 
   const created_by = req.user.id;
 
-  if (!purchase_order_id || !supplier_id || !received_date || !Array.isArray(items) || items.length === 0) {
+  if (
+    !purchase_order_id ||
+    !supplier_id ||
+    !received_date ||
+    !Array.isArray(items) ||
+    items.length === 0
+  ) {
     return res.status(400).json({ message: "Required fields are missing" });
+  }
+
+  /* ✅ DATE VALIDATION (FIXED POSITION) */
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const received = new Date(received_date);
+
+  if (received < today) {
+    return res.status(400).json({
+      message: "Received date cannot be before today.",
+    });
   }
 
   const validItems = items
@@ -146,21 +174,23 @@ const createGrn = (req, res) => {
     }))
     .filter((item) => item.item_id && item.delivered_quantity > 0);
 
-  if (validItems.length === 0) {
-    return res.status(400).json({ message: "At least one delivered quantity must be greater than 0" });
+  if (!validItems.length) {
+    return res.status(400).json({
+      message: "At least one delivered quantity must be greater than 0",
+    });
   }
 
   const grnNumber = `GRN-${Date.now()}`;
 
   const grnSql = `
     INSERT INTO grn
-      (grn_number, purchase_order_id, supplier_id, received_date, created_by)
-    VALUES (?, ?, ?, ?, ?)
+    (grn_number, purchase_order_id, supplier_id, received_date, remarks, created_by)
+    VALUES (?, ?, ?, ?, ?, ?)
   `;
 
   db.query(
     grnSql,
-    [grnNumber, purchase_order_id, supplier_id, received_date, created_by],
+    [grnNumber, purchase_order_id, supplier_id, received_date, remarks, created_by],
     (err, result) => {
       if (err) {
         console.error("createGrn error:", err);
@@ -169,155 +199,109 @@ const createGrn = (req, res) => {
 
       const grnId = result.insertId;
 
-      const itemIds = [...new Set(validItems.map((item) => item.item_id))];
+      const itemIds = validItems.map((i) => i.item_id);
 
       db.query(
         `SELECT id, unit, COALESCE(unit_cost, 0) AS unit_cost FROM items WHERE id IN (?)`,
         [itemIds],
-        (itemLookupErr, itemRows) => {
-          if (itemLookupErr) {
-            console.error("createGrn item lookup error:", itemLookupErr);
-            return res.status(500).json({ message: "Database error", error: itemLookupErr.message });
+        (itemErr, itemRows) => {
+          if (itemErr) {
+            return res.status(500).json({ message: "DB error", error: itemErr.message });
           }
 
           const itemMap = {};
-          (itemRows || []).forEach((row) => {
-            itemMap[row.id] = {
-              unit: row.unit || "",
-              unit_cost: Number(row.unit_cost || 0),
-            };
+          itemRows.forEach((r) => {
+            itemMap[r.id] = r;
           });
 
           const grnItemValues = validItems.map((item, index) => {
-            const unitInfo = itemMap[item.item_id] || { unit: "", unit_cost: 0 };
+            const info = itemMap[item.item_id] || {};
+
             const varianceQty = item.delivered_quantity - item.ordered_quantity;
             const variancePercent =
               item.ordered_quantity > 0
                 ? (varianceQty / item.ordered_quantity) * 100
                 : 0;
+
             const batchNumber = `BATCH-${grnId}-${index + 1}`;
-            const lineTotal = item.delivered_quantity * unitInfo.unit_cost;
+            const lineTotal = item.delivered_quantity * (info.unit_cost || 0);
 
             return [
               grnId,
-              null, // purchase_order_item_id kept NULL for now because current FK points to po_items, not purchase_order_items
+              null,
               item.item_id,
               item.ordered_quantity,
               item.delivered_quantity,
               varianceQty,
               variancePercent,
               batchNumber,
-              null, // expiry_date
-              unitInfo.unit_cost,
+              null,
+              info.unit_cost || 0,
               lineTotal,
               remarks || null,
             ];
           });
 
           const grnItemSql = `
-            INSERT INTO grn_items
-              (
-                grn_id,
-                purchase_order_item_id,
-                item_id,
-                ordered_qty,
-                received_qty,
-                variance_qty,
-                variance_percent,
-                batch_number,
-                expiry_date,
-                unit_cost,
-                line_total,
-                notes
-              )
-            VALUES ?
+            INSERT INTO grn_items (
+              grn_id,
+              purchase_order_item_id,
+              item_id,
+              ordered_qty,
+              received_qty,
+              variance_qty,
+              variance_percent,
+              batch_number,
+              expiry_date,
+              unit_cost,
+              line_total,
+              notes
+            ) VALUES ?
           `;
 
           db.query(grnItemSql, [grnItemValues], (itemErr) => {
             if (itemErr) {
-              console.error("createGrn items error:", itemErr);
-              return res.status(500).json({ message: "Database error", error: itemErr.message });
+              return res.status(500).json({ message: "DB error", error: itemErr.message });
             }
 
             let processed = 0;
-            let failed = false;
 
             validItems.forEach((item, index) => {
-              const unitInfo = itemMap[item.item_id] || { unit: "", unit_cost: 0 };
               const batchCode = `BATCH-${grnId}-${index + 1}`;
 
-              const inventorySql = `
-                INSERT INTO inventory_batches
-                  (item_id, grn_id, batch_code, received_quantity, available_quantity, unit, received_date, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'Available')
-              `;
-
               db.query(
-                inventorySql,
+                `INSERT INTO inventory_batches
+                 (item_id, grn_id, batch_code, received_quantity, available_quantity, unit, received_date, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, 'Available')`,
                 [
                   item.item_id,
                   grnId,
                   batchCode,
                   item.delivered_quantity,
                   item.delivered_quantity,
-                  unitInfo.unit,
+                  itemMap[item.item_id]?.unit || "",
                   received_date,
                 ],
-                (inventoryErr) => {
-                  if (failed) return;
-
-                  if (inventoryErr) {
-                    failed = true;
-                    console.error("createGrn inventory error:", inventoryErr);
-                    return res.status(500).json({
-                      message: "Database error",
-                      error: inventoryErr.message,
-                    });
-                  }
-
-                  const movementSql = `
-                    INSERT INTO stock_movements
-                      (item_id, movement_type, reference_type, reference_id, quantity, notes)
-                    VALUES (?, 'IN', 'GRN', ?, ?, ?)
-                  `;
+                (err) => {
+                  if (err) return;
 
                   db.query(
-                    movementSql,
+                    `INSERT INTO stock_movements
+                     (item_id, movement_type, reference_type, reference_id, quantity, notes)
+                     VALUES (?, 'IN', 'GRN', ?, ?, ?)`,
                     [
                       item.item_id,
                       grnId,
                       item.delivered_quantity,
                       `Stock added from GRN ${grnNumber}`,
                     ],
-                    (movementErr) => {
-                      if (failed) return;
-
-                      if (movementErr) {
-                        failed = true;
-                        console.error("createGrn movement error:", movementErr);
-                        return res.status(500).json({
-                          message: "Database error",
-                          error: movementErr.message,
-                        });
-                      }
-
-                      refreshInventorySnapshot(item.item_id, (refreshErr) => {
-                        if (failed) return;
-
-                        if (refreshErr) {
-                          failed = true;
-                          console.error("createGrn refreshInventorySnapshot error:", refreshErr);
-                          return res.status(500).json({
-                            message: "Database error",
-                            error: refreshErr.message,
-                          });
-                        }
-
-                        processed += 1;
+                    () => {
+                      refreshInventorySnapshot(item.item_id, () => {
+                        processed++;
 
                         if (processed === validItems.length) {
                           return res.status(201).json({
-                            message: "GRN created successfully and inventory updated",
+                            message: "GRN created successfully",
                             grnId,
                             grnNumber,
                           });

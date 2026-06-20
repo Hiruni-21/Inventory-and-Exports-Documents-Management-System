@@ -12,11 +12,9 @@ const AddGrnPage = () => {
   const [items, setItems] = useState([]);
   const [form, setForm] = useState({
     purchase_order_id: "",
-    received_date: "",
-    received_time: "",
+    received_date: new Date().toISOString().split("T")[0],
     remarks: "",
   });
-
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [loadingItems, setLoadingItems] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -29,8 +27,14 @@ const AddGrnPage = () => {
       setError("");
       try {
         const res = await api.get("/purchase-orders");
+
         const rows = Array.isArray(res.data) ? res.data : [];
-        setPurchaseOrders(rows);
+
+        const sentPurchaseOrders = rows.filter(
+          (po) => String(po.status || "").toLowerCase() === "sent"
+        );
+
+        setPurchaseOrders(sentPurchaseOrders);
 
         const preselectedPo = searchParams.get("po");
         if (preselectedPo) {
@@ -143,13 +147,12 @@ const AddGrnPage = () => {
 
     try {
       await api.post("/grn", {
-        purchase_order_id: Number(form.purchase_order_id),
-        supplier_id: Number(supplierId),
-        received_date: form.received_date,
-        received_time: form.received_time || "",
-        remarks: form.remarks,
-        items: cleanItems,
-      });
+      purchase_order_id: Number(form.purchase_order_id),
+      supplier_id: Number(supplierId),
+      received_date: form.received_date,
+      remarks: form.remarks,
+      items: cleanItems,
+  });
 
       setSuccess("GRN created successfully");
       setTimeout(() => navigate("/grn"), 800);
@@ -235,20 +238,11 @@ const AddGrnPage = () => {
                   type="date"
                   name="received_date"
                   value={form.received_date}
+                  min={new Date().toISOString().split("T")[0]}
                   onChange={handleHeaderChange}
                 />
               </div>
 
-              <div className="ff">
-                <label className="fl">Received Time</label>
-                <input
-                  className="fc"
-                  type="time"
-                  name="received_time"
-                  value={form.received_time}
-                  onChange={handleHeaderChange}
-                />
-              </div>
             </div>
 
             <div className="fr">
