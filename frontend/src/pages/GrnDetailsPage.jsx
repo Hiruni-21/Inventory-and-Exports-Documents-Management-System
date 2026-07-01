@@ -199,6 +199,33 @@ const GrnDetailsPage = () => {
           </table>
         </div>
       </div>
+
+      <div className="tw" style={{ marginTop: 20 }}>
+        <div className="tw-h">
+          <h3>Inventory Summary</h3>
+        </div>
+        <div className="md-b" style={{ padding: 22 }}>
+          <div className="krow k3" style={{ marginBottom: 0 }}>
+            <div className="kc a">
+              <div className="ki">📦</div>
+              <div className="kv">{totalItems}</div>
+              <div className="kl">Total Items Updated</div>
+            </div>
+
+            <div className="kc b">
+              <div className="ki">⚖️</div>
+              <div className="kv">{totalReceived}</div>
+              <div className="kl">Total Quantity Received</div>
+            </div>
+
+            <div className="kc g">
+              <div className="ki">✅</div>
+              <div className="kv" style={{ fontSize: 18 }}>Inventory Updated Successfully</div>
+              <div className="kl">Inventory Status</div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
