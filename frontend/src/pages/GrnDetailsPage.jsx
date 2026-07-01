@@ -147,37 +147,50 @@ const GrnDetailsPage = () => {
           <h3>Received Items</h3>
         </div>
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", minWidth: 680, borderCollapse: "collapse" }}>
+          <table style={{ width: "100%", minWidth: 980, borderCollapse: "collapse" }}>
             <thead>
               <tr>
-                <th>Item Code</th>
-                <th>Item Name</th>
-                <th>Unit</th>
-                <th>Ordered Qty</th>
-                <th>Delivered Qty</th>
-                <th>Variance</th>
+                <th style={{ textAlign: "left", padding: "12px 10px", whiteSpace: "nowrap" }}>Item Code</th>
+                <th style={{ textAlign: "left", padding: "12px 10px", whiteSpace: "nowrap" }}>Item Name</th>
+                <th style={{ textAlign: "left", padding: "12px 10px", whiteSpace: "nowrap" }}>Unit</th>
+                <th style={{ textAlign: "right", padding: "12px 10px", whiteSpace: "nowrap" }}>Ordered Quantity</th>
+                <th style={{ textAlign: "right", padding: "12px 10px", whiteSpace: "nowrap" }}>Received Quantity</th>
+                <th style={{ textAlign: "right", padding: "12px 10px", whiteSpace: "nowrap" }}>Variance</th>
+                <th style={{ textAlign: "right", padding: "12px 10px", whiteSpace: "nowrap" }}>Unit Cost</th>
+                <th style={{ textAlign: "right", padding: "12px 10px", whiteSpace: "nowrap" }}>Line Total</th>
+                <th style={{ textAlign: "left", padding: "12px 10px", whiteSpace: "nowrap" }}>Batch Number</th>
               </tr>
             </thead>
             <tbody>
               {grn.items?.length ? (
                 grn.items.map((item) => {
                   const variance = Number(item.delivered_quantity || 0) - Number(item.ordered_quantity || 0);
+                  const varianceColor = variance > 0 ? "var(--s)" : variance < 0 ? "var(--d)" : "var(--text3)";
+                  const varianceLabel = variance > 0 ? `+${variance}` : `${variance}`;
+
                   return (
                     <tr key={item.id}>
-                      <td style={{ fontFamily: "monospace", fontSize: 12, color: "var(--text3)", padding: "12px 8px" }}>{item.item_code}</td>
-                      <td style={{ fontWeight: 600, padding: "12px 8px" }}>{item.item_name}</td>
-                      <td style={{ padding: "12px 8px" }}>{item.unit}</td>
-                      <td style={{ padding: "12px 8px" }}>{item.ordered_quantity}</td>
-                      <td style={{ padding: "12px 8px" }}>{item.delivered_quantity}</td>
-                      <td style={{ padding: "12px 8px", fontWeight: 700, color: variance < 0 ? "var(--d)" : variance > 0 ? "var(--s)" : "var(--text3)" }}>
-                        {variance > 0 ? "+" : ""}{variance}
+                      <td style={{ fontFamily: "monospace", fontSize: 12, color: "var(--text3)", padding: "12px 10px" }}>{item.item_code || "—"}</td>
+                      <td style={{ fontWeight: 600, padding: "12px 10px" }}>{item.item_name || "—"}</td>
+                      <td style={{ padding: "12px 10px" }}>{item.unit || "—"}</td>
+                      <td style={{ padding: "12px 10px", textAlign: "right" }}>{item.ordered_quantity ?? 0}</td>
+                      <td style={{ padding: "12px 10px", textAlign: "right" }}>{item.delivered_quantity ?? 0}</td>
+                      <td style={{ padding: "12px 10px", textAlign: "right", fontWeight: 700, color: varianceColor }}>
+                        {varianceLabel}
                       </td>
+                      <td style={{ padding: "12px 10px", textAlign: "right" }}>
+                        {item.unit_cost != null ? Number(item.unit_cost).toLocaleString("en-LK") : "—"}
+                      </td>
+                      <td style={{ padding: "12px 10px", textAlign: "right" }}>
+                        {item.line_total != null ? Number(item.line_total).toLocaleString("en-LK") : "—"}
+                      </td>
+                      <td style={{ padding: "12px 10px" }}>{item.batch_number || "—"}</td>
                     </tr>
                   );
                 })
               ) : (
                 <tr>
-                  <td colSpan="6" style={{ textAlign: "center", color: "var(--text3)", padding: 16 }}>
+                  <td colSpan="9" style={{ textAlign: "center", color: "var(--text3)", padding: 16 }}>
                     No items found
                   </td>
                 </tr>
