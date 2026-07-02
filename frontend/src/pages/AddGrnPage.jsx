@@ -108,6 +108,17 @@ const AddGrnPage = () => {
       setSuccess("");
     }
 
+    if (name === "received_date") {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const selected = new Date(value);
+      if (!Number.isNaN(selected.getTime()) && selected < today) {
+        setError("Received date cannot be before today.");
+        return;
+      }
+      setError("");
+    }
+
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -143,21 +154,31 @@ const AddGrnPage = () => {
       return;
     }
 
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const receivedDate = new Date(form.received_date);
+
+    if (!Number.isNaN(receivedDate.getTime()) && receivedDate < today) {
+      setError("Received date cannot be before today.");
+      return;
+    }
+
     setSaving(true);
 
     try {
       await api.post("/grn", {
-      purchase_order_id: Number(form.purchase_order_id),
-      supplier_id: Number(supplierId),
-      received_date: form.received_date,
-      remarks: form.remarks,
-      items: cleanItems,
-  });
+        purchase_order_id: Number(form.purchase_order_id),
+        supplier_id: Number(supplierId),
+        received_date: form.received_date,
+        remarks: form.remarks,
+        items: cleanItems,
+      });
 
       setSuccess("GRN created successfully");
       setTimeout(() => navigate("/grn"), 800);
     } catch (err) {
-      setError(err.response?.data?.error || err.response?.data?.message || "Failed to create GRN");
+      const backendMessage = err.response?.data?.message || err.response?.data?.error;
+      setError(backendMessage || "Failed to create GRN");
     } finally {
       setSaving(false);
     }

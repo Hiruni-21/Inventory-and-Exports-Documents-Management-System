@@ -90,9 +90,17 @@ const getGrnById = (req, res) => {
         return res.status(500).json({ message: "Database error", error: itemErr.message });
       }
 
+      const normalizedItems = itemResults.map((item) => ({
+        ...item,
+        ordered_quantity: Number(item.ordered_quantity ?? item.ordered_qty ?? 0),
+        delivered_quantity: Number(
+          item.delivered_quantity ?? item.received_quantity ?? item.received_qty ?? 0
+        ),
+      }));
+
       res.json({
         ...grnResults[0],
-        items: itemResults,
+        items: normalizedItems,
       });
     });
   });
