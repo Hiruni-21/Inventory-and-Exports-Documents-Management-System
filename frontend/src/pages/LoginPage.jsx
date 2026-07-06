@@ -1,66 +1,18 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import companyLogo from "../assets/company-logo.png";
-
-const roleConfig = {
-  manager: {
-    label: "Manager",
-    email: "manager@freshworld.lk",
-    password: "manager123",
-  },
-  ops: {
-    label: "Operations Executive",
-    email: "ops@freshworld.lk",
-    password: "ops123",
-  },
-  supervisor: {
-    label: "Supervisor",
-    email: "nishantha@freshworld.lk",
-    password: "supervisor123",
-  },
-  logistics: {
-    label: "Logistics Executive",
-    email: "dilani@freshworld.lk",
-    password: "logistics123",
-  },
-  supplier: {
-    label: "Supplier Portal",
-    email: "mahinda@organicfarm.lk",
-    password: "supplier123",
-  },
-};
-
-const roles = ["manager", "ops", "supervisor", "logistics", "supplier"];
 
 const LoginPage = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const [selectedRole, setSelectedRole] = useState("manager");
   const [showPassword, setShowPassword] = useState(false);
-  const [modalMode, setModalMode] = useState("add"); // "add" | "edit"
-const [editingCustomerId, setEditingCustomerId] = useState(null);
   const [form, setForm] = useState({
-    email: roleConfig.manager.email,
-    password: roleConfig.manager.password,
+    email: "",
+    password: "",
   });
   const [error, setError] = useState("");
-
-  const currentRole = useMemo(() => roleConfig[selectedRole], [selectedRole]);
-
-  const pickRole = (roleKey) => {
-    setSelectedRole(roleKey);
-    setForm({
-      email: roleConfig[roleKey].email,
-      password: roleConfig[roleKey].password,
-    });
-    setError("");
-  };
-
-  const onRoleSelect = (roleKey) => {
-    pickRole(roleKey);
-  };
 
   const handleChange = (e) => {
     setForm((prev) => ({
@@ -96,33 +48,15 @@ const [editingCustomerId, setEditingCustomerId] = useState(null);
           </div>
 
           <div className="ll-sub">
-            Inventory &amp; Export Documents Management System 
+            Inventory &amp; Export Documents Management System
           </div>
 
           <div className="ll-div"></div>
-
-          <div className="ll-roles-lbl">Select your role to demo</div>
-
-          <div className="ll-pills">
-            {roles.map((roleKey) => (
-              <div
-                key={roleKey}
-                className={`lp ${selectedRole === roleKey ? "active" : ""}`}
-                data-r={roleKey}
-                onClick={() => pickRole(roleKey)}
-              >
-                <span className="dot"></span>
-                {roleConfig[roleKey].label}
-              </div>
-            ))}
-          </div>
         </div>
 
         <div className="lr">
           <h2>Welcome back</h2>
-          <p className="lr-sub">
-            Sign in to your <strong>{currentRole.label}</strong> account
-          </p>
+          <p className="lr-sub">Sign in to your account</p>
 
           {error && (
             <div
@@ -147,7 +81,7 @@ const [editingCustomerId, setEditingCustomerId] = useState(null);
               <div className="li-wrap">
                 <span className="li-ico">✉</span>
                 <input
-                  type="text"
+                  type="email"
                   className="li"
                   name="email"
                   value={form.email}
@@ -178,36 +112,10 @@ const [editingCustomerId, setEditingCustomerId] = useState(null);
               </div>
             </div>
 
-            <div className="lf">
-              <label>Role</label>
-              <div className="li-wrap">
-                <span className="li-ico">👤</span>
-                <select
-                  className="li"
-                  value={selectedRole}
-                  onChange={(e) => onRoleSelect(e.target.value)}
-                >
-                  <option value="manager">Manager</option>
-                  <option value="ops">Operations Executive</option>
-                  <option value="supervisor">Supervisor</option>
-                  <option value="logistics">Logistics Executive</option>
-                  <option value="supplier">Supplier Portal</option>
-                </select>
-                <span className="li-arr">▾</span>
-              </div>
-            </div>
-
             <button className="sign-btn" type="submit">
               Sign In
             </button>
           </form>
-
-          <div className="demo-box">
-            <strong>Demo:</strong> Use role name + 123 &nbsp;
-            <code>manager123</code> <code>ops123</code> <code>supervisor123</code>{" "}
-            <code>logistics123</code> <code>supplier123</code>
-            &nbsp; or just <code>demo123</code> for any role
-          </div>
         </div>
       </div>
     </div>
