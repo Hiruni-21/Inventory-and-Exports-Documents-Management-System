@@ -26,8 +26,8 @@ const LoginPage = () => {
     setError("");
 
     try {
-      await login(form.email, form.password);
-      navigate("/dashboard");
+      const redirectPath = await login(form.email, form.password);
+      navigate(redirectPath);
     } catch (err) {
       setError(err.response?.data?.message || "Invalid email or password");
     }

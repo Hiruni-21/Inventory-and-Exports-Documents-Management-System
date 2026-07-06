@@ -9,6 +9,7 @@ import OperationsDashboard from "./pages/OperationsDashboard";
 import LogisticsDashboard from "./pages/LogisticsDashboard";
 import SupervisorDashboard from "./pages/SupervisorDashboard";
 import SupplierDashboard from "./pages/SupplierDashboard";
+import AdminDashboard from "./pages/AdminDashboard";
 
 import SupplierListPage from "./pages/SupplierListPage";
 import AddSupplierPage from "./pages/AddSupplierPage";
@@ -68,6 +69,7 @@ const DashboardRouter = () => {
   if (role.includes("logistics")) return <LogisticsDashboard />;
   if (role.includes("supervisor")) return <SupervisorDashboard />;
   if (role.includes("supplier")) return <SupplierDashboard />;
+  if (role.includes("admin")) return <AdminDashboard />;
   return <ManagerDashboard />;
 };
 
@@ -84,6 +86,7 @@ function App() {
         }
       >
         <Route path="/dashboard" element={<DashboardRouter />} />
+        <Route path="/admin/dashboard" element={<AdminDashboard />} />
 
         <Route path="/suppliers" element={<SupplierListPage />} />
         <Route path="/suppliers/add" element={<AddSupplierPage />} />
