@@ -11,13 +11,13 @@ const {
 
 const { verifyToken, allowRoles } = require("../middleware/authMiddleware");
 
-router.get("/", verifyToken, allowRoles("manager", "ops"), listApprovals);
-router.get("/counts", verifyToken, allowRoles("manager", "ops"), getApprovalCounts);
+router.get("/", verifyToken, allowRoles("manager", "operations"), listApprovals);
+router.get("/counts", verifyToken, allowRoles("manager", "operations"), getApprovalCounts);
 
 router.post(
   "/",
   verifyToken,
-  allowRoles("manager", "ops", "logistics", "supervisor"),
+  allowRoles("manager", "operations", "logistics", "supervisor"),
   createApproval
 );
 

@@ -6,9 +6,9 @@ const {
   createStockAdjustment,
 } = require("../controllers/stockAdjustmentController");
 
-const { verifyToken } = require("../middleware/authMiddleware");
+const { verifyToken, allowRoles } = require("../middleware/authMiddleware");
 
-router.get("/", verifyToken, getAllStockAdjustments);
-router.post("/", verifyToken, createStockAdjustment);
+router.get("/", verifyToken, allowRoles("manager", "operations", "supervisor"), getAllStockAdjustments);
+router.post("/", verifyToken, allowRoles("manager", "operations", "supervisor"), createStockAdjustment);
 
 module.exports = router;

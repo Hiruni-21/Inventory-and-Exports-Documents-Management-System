@@ -9,12 +9,22 @@ const {
   updateExportDocumentsByDispatchId,
 } = require("../controllers/exportDocumentController");
 
-const { verifyToken } = require("../middleware/authMiddleware");
+const { verifyToken, allowRoles } = require("../middleware/authMiddleware");
 
-router.get("/", verifyToken, getAllExportDocuments);
-router.get("/shipments", verifyToken, getExportDocumentShipments);
-router.put("/by-dispatch/:globalDispatchId", verifyToken, updateExportDocumentsByDispatchId);
-router.get("/:id", verifyToken, getExportDocumentById);
-router.put("/:id", verifyToken, updateExportDocuments);
+router.get("/", verifyToken, allowRoles("manager", "supervisor", "logistics"), getAllExportDocuments);
+router.get(
+  "/shipments",
+  verifyToken,
+  allowRoles("manager", "supervisor", "logistics"),
+  getExportDocumentShipments
+);
+router.put(
+  "/by-dispatch/:globalDispatchId",
+  verifyToken,
+  allowRoles("manager", "supervisor", "logistics"),
+  updateExportDocumentsByDispatchId
+);
+router.get("/:id", verifyToken, allowRoles("manager", "supervisor", "logistics"), getExportDocumentById);
+router.put("/:id", verifyToken, allowRoles("manager", "supervisor", "logistics"), updateExportDocuments);
 
 module.exports = router;

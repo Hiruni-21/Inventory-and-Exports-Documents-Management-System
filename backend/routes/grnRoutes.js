@@ -8,11 +8,16 @@ const {
   createGrn,
 } = require("../controllers/grnController");
 
-const { verifyToken } = require("../middleware/authMiddleware");
+const { verifyToken, allowRoles } = require("../middleware/authMiddleware");
 
-router.get("/", verifyToken, getAllGrn);
-router.get("/po-items/:purchaseOrderId", verifyToken, getPurchaseOrderItemsForGrn);
-router.get("/:id", verifyToken, getGrnById);
-router.post("/", verifyToken, createGrn);
+router.get("/", verifyToken, allowRoles("manager", "operations"), getAllGrn);
+router.get(
+  "/po-items/:purchaseOrderId",
+  verifyToken,
+  allowRoles("manager", "operations"),
+  getPurchaseOrderItemsForGrn
+);
+router.get("/:id", verifyToken, allowRoles("manager", "operations"), getGrnById);
+router.post("/", verifyToken, allowRoles("manager", "operations"), createGrn);
 
 module.exports = router;

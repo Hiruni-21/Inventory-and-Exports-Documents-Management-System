@@ -11,11 +11,11 @@ const {
 
 const { verifyToken, allowRoles } = require("../middleware/authMiddleware");
 
-router.get("/", verifyToken, getAllItems);
-router.get("/:id", verifyToken, getItemById);
+router.get("/", verifyToken, allowRoles("manager", "operations"), getAllItems);
+router.get("/:id", verifyToken, allowRoles("manager", "operations"), getItemById);
 
-router.post("/", verifyToken, allowRoles("manager", "ops"), createItem);
-router.put("/:id", verifyToken, allowRoles("manager", "ops"), updateItem);
+router.post("/", verifyToken, allowRoles("manager", "operations"), createItem);
+router.put("/:id", verifyToken, allowRoles("manager", "operations"), updateItem);
 router.delete("/:id", verifyToken, allowRoles("manager"), deleteItem);
 
 module.exports = router;

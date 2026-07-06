@@ -6,9 +6,9 @@ const {
   createReturn,
 } = require("../controllers/returnController");
 
-const { verifyToken } = require("../middleware/authMiddleware");
+const { verifyToken, allowRoles } = require("../middleware/authMiddleware");
 
-router.get("/", verifyToken, getAllReturns);
-router.post("/", verifyToken, createReturn);
+router.get("/", verifyToken, allowRoles("manager", "operations", "supervisor"), getAllReturns);
+router.post("/", verifyToken, allowRoles("manager", "operations", "supervisor"), createReturn);
 
 module.exports = router;
