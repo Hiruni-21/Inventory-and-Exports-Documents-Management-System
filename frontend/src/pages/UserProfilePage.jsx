@@ -9,6 +9,11 @@ const UserProfilePage = () => {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
   const loadProfile = async () => {
     try {
       const res = await api.get("/users/profile");
@@ -17,6 +22,46 @@ const UserProfilePage = () => {
     } catch (err) {
       console.error("Failed to load profile:", err);
       setError(err.response?.data?.message || "Unable to load profile");
+    }
+  };
+
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setMessage("");
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setError("All password fields are required");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setError("New password must be at least 6 characters long");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setError("New passwords do not match");
+      return;
+    }
+
+    setIsChangingPassword(true);
+
+    try {
+      const res = await api.put("/users/profile/password", {
+        currentPassword,
+        newPassword,
+        confirmPassword,
+      });
+      setMessage(res.data.message || "Password changed successfully");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err) {
+      console.error("Failed to change password:", err);
+      setError(err.response?.data?.message || "Unable to change password");
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -170,6 +215,56 @@ const UserProfilePage = () => {
             />
             <button type="submit" disabled={isSaving} style={{ padding: "10px 16px", borderRadius: 10, border: 0, background: "#2563eb", color: "#fff", fontWeight: 700, cursor: "pointer" }}>
               {isSaving ? "Saving…" : "Save Phone"}
+            </button>
+          </form>
+
+          <form onSubmit={handlePasswordSubmit} style={{ marginTop: 32, borderTop: "1px solid #e5e7eb", paddingTop: 24 }}>
+            <h4 style={{ marginTop: 0, marginBottom: 16, color: "#111827" }}>Change Password</h4>
+            
+            <div style={{ marginBottom: 16 }}>
+              <label htmlFor="currentPassword" style={{ display: "block", marginBottom: 8, fontWeight: 600, color: "#111827" }}>
+                Current Password
+              </label>
+              <input
+                id="currentPassword"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Enter current password"
+                style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: "1px solid #d1d5db" }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label htmlFor="newPassword" style={{ display: "block", marginBottom: 8, fontWeight: 600, color: "#111827" }}>
+                New Password
+              </label>
+              <input
+                id="newPassword"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Enter new password"
+                style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: "1px solid #d1d5db" }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label htmlFor="confirmPassword" style={{ display: "block", marginBottom: 8, fontWeight: 600, color: "#111827" }}>
+                Confirm Password
+              </label>
+              <input
+                id="confirmPassword"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirm new password"
+                style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: "1px solid #d1d5db" }}
+              />
+            </div>
+
+            <button type="submit" disabled={isChangingPassword} style={{ padding: "10px 16px", borderRadius: 10, border: 0, background: "#2563eb", color: "#fff", fontWeight: 700, cursor: "pointer" }}>
+              {isChangingPassword ? "Updating Password…" : "Update Password"}
             </button>
           </form>
         </div>

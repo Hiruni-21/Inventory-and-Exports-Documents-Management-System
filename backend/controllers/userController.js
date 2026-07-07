@@ -142,10 +142,80 @@ const createUser = async (req, res) => {
   );
 };
 
+const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+
+    if (!currentPassword) {
+      return res.status(400).json({ message: "Current password is required" });
+    }
+    if (!newPassword) {
+      return res.status(400).json({ message: "New password is required" });
+    }
+    if (!confirmPassword) {
+      return res.status(400).json({ message: "Confirm password is required" });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "New password must be at least 6 characters long" });
+    }
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ message: "New passwords do not match" });
+    }
+
+    db.query(
+      "SELECT password FROM users WHERE id = ?",
+      [req.user.id],
+      async (err, results) => {
+        if (err) {
+          return res.status(500).json({ message: "Database error", error: err.message });
+        }
+
+        if (results.length === 0) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        const user = results[0];
+        const isMatch = await bcrypt.compare(currentPassword, user.password);
+
+        if (!isMatch) {
+          return res.status(400).json({ message: "Incorrect current password" });
+        }
+
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+        db.query(
+          "UPDATE users SET password = ? WHERE id = ?",
+          [hashedPassword, req.user.id],
+          (updateErr) => {
+            if (updateErr) {
+              return res.status(500).json({ message: "Database error", error: updateErr.message });
+            }
+
+            logActivity({
+              user_id: req.user.id,
+              user_name: req.user.name,
+              module: "Users",
+              action: "Changed password",
+              reference_type: "user",
+              reference_id: req.user.id,
+              ip_address: req.ip,
+            });
+
+            return res.json({ message: "Password changed successfully" });
+          }
+        );
+      }
+    );
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 module.exports = {
   getAllUsers,
   getCurrentUserProfile,
   updateCurrentUserProfile,
   updateCurrentUserProfilePhoto,
   createUser,
+  changePassword,
 };
