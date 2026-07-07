@@ -60,6 +60,7 @@ import SupplierMessagesPage from "./pages/SupplierMessagesPage";
 
 import StockValuationPage from "./pages/StockValuationPage";
 import PhysicalStockCountPage from "./pages/PhysicalStockCountPage";
+import UserProfilePage from "./pages/UserProfilePage";
 
 const DashboardRouter = () => {
   const { user } = useAuth();
@@ -149,6 +150,7 @@ function App() {
         <Route path="/supplier/returns" element={<SupplierReturnsPage />} />
         <Route path="/supplier/returns/:id" element={<SupplierReturnDetailsPage />} />
         <Route path="/supplier/messages" element={<SupplierMessagesPage />} />
+        <Route path="/profile" element={<UserProfilePage />} />
       </Route>
     </Routes>
   );

@@ -58,6 +58,9 @@ const IconPlane = () => (
 const IconUsers = () => (
   <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" /><circle cx="9.5" cy="7" r="4" /><path d="M20 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
 );
+const IconUserCircle = () => (
+  <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="10" r="3" /><path d="M7 19a5 5 0 0 1 10 0" /></svg>
+);
 const IconShieldCheck = () => (
   <svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.5 8.5 8 9 4.5-.5 8-4 8-9V6l-8-3Z" /><path d="m9.5 12 1.8 1.8 3.7-3.8" /></svg>
 );
@@ -95,6 +98,7 @@ const navByRole = {
       label: "OVERVIEW",
       items: [
         { to: "/dashboard", text: "Dashboard", icon: <IconDashboard /> },
+        { to: "/profile", text: "My Profile", icon: <IconUserCircle /> },
         { to: "/activity", text: "Activity Log", icon: <IconActivity /> },
       ],
     },
@@ -147,6 +151,7 @@ const navByRole = {
       label: "OVERVIEW",
       items: [
         { to: "/dashboard", text: "Dashboard", icon: <IconDashboard /> },
+        { to: "/profile", text: "My Profile", icon: <IconUserCircle /> },
         { to: "/approvals", text: "Approval Notes", icon: <IconShieldCheck /> },
       ],
     },
@@ -185,6 +190,7 @@ const navByRole = {
       label: "OVERVIEW",
       items: [
         { to: "/dashboard", text: "Dashboard", icon: <IconDashboard /> },
+        { to: "/profile", text: "My Profile", icon: <IconUserCircle /> },
         { to: "/approvals", text: "Approval Notes", icon: <IconShieldCheck /> },
       ],
     },
@@ -214,7 +220,7 @@ const navByRole = {
     },
   ],
   logistics: [
-    { label: "OVERVIEW", items: [{ to: "/dashboard", text: "Dashboard", icon: <IconDashboard /> }] },
+    { label: "OVERVIEW", items: [{ to: "/dashboard", text: "Dashboard", icon: <IconDashboard /> }, { to: "/profile", text: "My Profile", icon: <IconUserCircle /> }] },
     {
       label: "CLIENTS & DISPATCH",
       items: [
@@ -231,6 +237,7 @@ const navByRole = {
       label: "MY PORTAL",
       items: [
         { to: "/dashboard", text: "My Dashboard", icon: <IconDashboard /> },
+        { to: "/profile", text: "My Profile", icon: <IconUserCircle /> },
         { to: "/supplier/orders", text: "My Purchase Orders", icon: <IconFile /> },
         { to: "/supplier/returns", text: "My Return Notes", icon: <IconReturn /> },
         { to: "/supplier/messages", text: "Messages", icon: <IconMessage /> },
@@ -272,6 +279,7 @@ const pageMeta = {
   "/export-documents/add": { title: "Export Documents", subtitle: "Create export document" },
   "/reports": { title: "Reports & Analytics", subtitle: "Operational reporting" },
   "/users": { title: "Users & Roles", subtitle: "System access management" },
+  "/profile": { title: "My Profile", subtitle: "Manage your account details" },
   "/activity": { title: "Activity Log", subtitle: "Immutable audit trail" },
   "/supplier/orders": { title: "My Purchase Orders", subtitle: "Supplier portal" },
   "/supplier/returns": { title: "My Return Notes", subtitle: "Supplier portal" },

@@ -47,6 +47,8 @@ CREATE TABLE users (
   password VARCHAR(255) NOT NULL,
   role ENUM('manager','ops','supervisor','logistics','supplier') NOT NULL,
   phone VARCHAR(30),
+  department VARCHAR(100),
+  profile_photo VARCHAR(255),
   status ENUM('active','inactive') NOT NULL DEFAULT 'active',
   supplier_id INT NULL,
   last_login_at DATETIME NULL,
