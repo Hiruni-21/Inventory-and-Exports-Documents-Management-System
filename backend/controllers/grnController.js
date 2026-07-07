@@ -308,6 +308,27 @@ const createGrn = (req, res) => {
                         processed++;
 
                         if (processed === validItems.length) {
+                          const { sendNotification } = require("../utils/notificationHelper");
+                          
+                          // Notify Operations
+                          sendNotification({
+                            role: "ops",
+                            title: "GRN Created",
+                            message: `A new GRN (${grnNumber}) has been created.`,
+                            type: "grn_created"
+                          }).catch(err => console.error("GRN notification error:", err.message));
+
+                          // Notify Manager of discrepancies if any variance exists
+                          const hasDiscrepancy = validItems.some(it => (Number(it.delivered_quantity || 0) - Number(it.ordered_quantity || 0)) !== 0);
+                          if (hasDiscrepancy) {
+                            sendNotification({
+                              role: "manager",
+                              title: "GRN Discrepancy Alert",
+                              message: `Discrepancy detected in GRN ${grnNumber}.`,
+                              type: "grn_discrepancy"
+                            }).catch(err => console.error("GRN discrepancy notification error:", err.message));
+                          }
+
                           return res.status(201).json({
                             message: "GRN created successfully",
                             grnId,

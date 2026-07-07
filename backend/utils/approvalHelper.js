@@ -119,6 +119,14 @@ const createApprovalRequest = async (payload, conn = db) => {
     ]
   );
 
+  const { sendNotification } = require("./notificationHelper");
+  sendNotification({
+    role: "manager",
+    title: "Pending Approval Request",
+    message: `A new approval request "${title}" is pending review.`,
+    type: "pending_approval"
+  }).catch(err => console.error("Approval notification error:", err.message));
+
   return result.insertId;
 };
 

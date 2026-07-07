@@ -43,7 +43,13 @@ const refreshInventorySnapshot = (itemId, callback = () => {}) => {
       db.query(
         upsertSql,
         [itemId, qtyOnHand, qtyAvailable, unitCost, totalValue],
-        (upsertErr) => callback(upsertErr)
+        (upsertErr) => {
+          if (!upsertErr) {
+            const { triggerLowStockCheck } = require("../utils/notificationHelper");
+            triggerLowStockCheck(itemId);
+          }
+          callback(upsertErr);
+        }
       );
     });
   });

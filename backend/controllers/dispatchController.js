@@ -78,7 +78,13 @@ const refreshInventorySnapshot = (itemId, callback = () => {}) => {
       db.query(
         upsertSql,
         [itemId, qtyOnHand, qtyAvailable, unitCost, totalValue],
-        (upsertErr) => callback(upsertErr)
+        (upsertErr) => {
+          if (!upsertErr) {
+            const { triggerLowStockCheck } = require("../utils/notificationHelper");
+            triggerLowStockCheck(itemId);
+          }
+          callback(upsertErr);
+        }
       );
     });
   });
@@ -386,6 +392,24 @@ const createDispatch = (req, res) => {
                   );
                 }
 
+                const { sendNotification } = require("../utils/notificationHelper");
+                
+                // Notify Supervisor
+                sendNotification({
+                  role: "supervisor",
+                  title: "Dispatch Ready for Review",
+                  message: `Local dispatch ${dispatchNumber} is ready for review.`,
+                  type: "dispatch_ready"
+                }).catch(err => console.error("Local dispatch ready notification error:", err.message));
+
+                // Notify Logistics
+                sendNotification({
+                  role: "logistics",
+                  title: "New Dispatch Assigned",
+                  message: `Local dispatch ${dispatchNumber} has been assigned.`,
+                  type: "dispatch_assigned"
+                }).catch(err => console.error("Local dispatch assigned notification error:", err.message));
+
                 return res.status(201).json({
                   message: "Dispatch created successfully",
                   dispatchId,
@@ -603,6 +627,14 @@ const markDispatchDelivered = (req, res) => {
                     rollbackWithError(res, commitErr, "Failed to commit delivered dispatch")
                   );
                 }
+
+                const { sendNotification } = require("../utils/notificationHelper");
+                sendNotification({
+                  role: "logistics",
+                  title: "Dispatch Status Changed",
+                  message: `Local dispatch ${dispatchRow.dispatch_number} status has been updated to delivered.`,
+                  type: "dispatch_status"
+                }).catch(err => console.error("Local dispatch delivery notification error:", err.message));
 
                 return res.json({
                   message: "Dispatch marked delivered and stock deducted successfully",

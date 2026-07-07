@@ -150,6 +150,14 @@ const createUser = async (req, res) => {
           ip_address: req.ip,
         });
 
+        const { sendNotification } = require("../utils/notificationHelper");
+        sendNotification({
+          role: "manager",
+          title: "New User Registered",
+          message: `User ${full_name} has been registered with role ${role}.`,
+          type: "user_registered"
+        }).catch(err => console.error("Notification error:", err.message));
+
         res.status(201).json({ message: "User created successfully", userId: result.insertId });
       }
     );
