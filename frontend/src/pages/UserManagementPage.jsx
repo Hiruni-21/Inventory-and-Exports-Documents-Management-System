@@ -163,6 +163,7 @@ const UserManagementPage = () => {
     setEditUserForm({
       role: userToEdit.role,
       status: userToEdit.status,
+      phone: userToEdit.phone_number || userToEdit.phone || "",
     });
     setShowEditModal(true);
   };
@@ -438,10 +439,21 @@ const UserManagementPage = () => {
                   </div>
                 </div>
                 <div style={formGroupStyle}>
-                  <span style={labelStyle}>Phone</span>
-                  <div style={{ padding: "10px 12px", background: "#f8fafc", borderRadius: "8px", border: "1.5px solid var(--border)", color: "#64748b", fontSize: "14px", fontWeight: 500 }}>
-                    {editingUser.phone_number || editingUser.phone || "—"}
-                  </div>
+                  <label style={labelStyle} htmlFor="edit-phone">Phone</label>
+                  {editingUser.phone_number || editingUser.phone ? (
+                    <div style={{ padding: "10px 12px", background: "#f8fafc", borderRadius: "8px", border: "1.5px solid var(--border)", color: "#64748b", fontSize: "14px", fontWeight: 500 }}>
+                      {editingUser.phone_number || editingUser.phone}
+                    </div>
+                  ) : (
+                    <input
+                      style={inputStyle}
+                      id="edit-phone"
+                      name="phone"
+                      value={editUserForm.phone || ""}
+                      onChange={handleEditChange}
+                      placeholder="Enter phone number"
+                    />
+                  )}
                 </div>
                 <div style={formGroupStyle}>
                   <label style={labelStyle} htmlFor="edit-role">Role</label>

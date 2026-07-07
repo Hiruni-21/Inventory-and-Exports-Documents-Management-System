@@ -227,7 +227,7 @@ const changePassword = async (req, res) => {
 
 const updateUser = (req, res) => {
   const userId = req.params.id;
-  const { role, status } = req.body;
+  const { role, status, phone } = req.body;
 
   if (Number(userId) === Number(req.user.id)) {
     if (status === "inactive") {
@@ -239,27 +239,45 @@ const updateUser = (req, res) => {
     return res.status(400).json({ message: "Role and status are required" });
   }
 
-  const sql = "UPDATE users SET role = ?, status = ? WHERE id = ?";
-  db.query(sql, [role, status, userId], (err, result) => {
-    if (err) {
-      return res.status(500).json({ message: "Database error", error: err.message });
+  db.query("SELECT phone FROM users WHERE id = ? LIMIT 1", [userId], (selectErr, results) => {
+    if (selectErr) {
+      return res.status(500).json({ message: "Database error", error: selectErr.message });
     }
 
-    if (result.affectedRows === 0) {
+    if (results.length === 0) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    logActivity({
-      user_id: req.user.id,
-      user_name: req.user.name,
-      module: "Users",
-      action: "Updated user details",
-      reference_type: "user",
-      reference_id: userId,
-      ip_address: req.ip,
-    });
+    const existingPhone = results[0].phone;
 
-    res.json({ message: "User updated successfully" });
+    if (existingPhone && phone !== undefined && phone !== existingPhone) {
+      return res.status(400).json({ message: "Phone number already set by user" });
+    }
+
+    const finalPhone = existingPhone || phone || null;
+
+    const sql = "UPDATE users SET role = ?, status = ?, phone = ? WHERE id = ?";
+    db.query(sql, [role, status, finalPhone, userId], (err, result) => {
+      if (err) {
+        return res.status(500).json({ message: "Database error", error: err.message });
+      }
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      logActivity({
+        user_id: req.user.id,
+        user_name: req.user.name,
+        module: "Users",
+        action: "Updated user details",
+        reference_type: "user",
+        reference_id: userId,
+        ip_address: req.ip,
+      });
+
+      res.json({ message: "User updated successfully" });
+    });
   });
 };
 
