@@ -112,6 +112,15 @@ const LoginPage = () => {
               </div>
             </div>
 
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 20 }}>
+              <span
+                style={{ color: "#2563eb", cursor: "pointer", fontSize: 13, fontWeight: 500 }}
+                onClick={() => navigate("/forgot-password")}
+              >
+                Forgot Password?
+              </span>
+            </div>
+
             <button className="sign-btn" type="submit">
               Sign In
             </button>

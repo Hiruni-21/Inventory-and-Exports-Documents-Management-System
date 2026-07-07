@@ -61,6 +61,8 @@ import SupplierMessagesPage from "./pages/SupplierMessagesPage";
 import StockValuationPage from "./pages/StockValuationPage";
 import PhysicalStockCountPage from "./pages/PhysicalStockCountPage";
 import UserProfilePage from "./pages/UserProfilePage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 
 const DashboardRouter = () => {
   const { user } = useAuth();
@@ -78,6 +80,8 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<LoginPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
 
       <Route
         element={
