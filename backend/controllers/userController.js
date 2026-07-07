@@ -7,7 +7,7 @@ const logActivity = require("../utils/logActivity");
 
 const getAllUsers = (req, res) => {
   db.query(
-    "SELECT id, full_name, email, role, phone, status, supplier_id, created_at FROM users ORDER BY id DESC",
+    "SELECT id, full_name, email, role, phone, phone AS phone_number, status, department, supplier_id, created_at FROM users ORDER BY id DESC",
     (err, results) => {
       if (err) {
         return res.status(500).json({ message: "Database error", error: err.message });
@@ -106,40 +106,54 @@ const updateCurrentUserProfilePhoto = async (req, res) => {
 };
 
 const createUser = async (req, res) => {
-  const { full_name, email, password, role, phone, status, supplier_id } = req.body;
+  const { full_name, email, password, role } = req.body;
 
   if (!full_name || !email || !password || !role) {
     return res.status(400).json({ message: "Full name, email, password, and role are required" });
   }
 
-  const hashedPassword = await bcrypt.hash(password, 10);
+  if (password.length < 6) {
+    return res.status(400).json({ message: "Password must be at least 6 characters long" });
+  }
 
-  const sql = `
-    INSERT INTO users (full_name, email, password, role, phone, status, supplier_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `;
-
-  db.query(
-    sql,
-    [full_name, email, hashedPassword, role, phone || null, status || "active", supplier_id || null],
-    (err, result) => {
-      if (err) {
-        return res.status(500).json({ message: "Database error", error: err.message });
-      }
-
-      logActivity({
-        user_id: req.user.id,
-        user_name: req.user.name,
-        module: "Users",
-        action: "Created user",
-        reference_type: "user",
-        reference_id: result.insertId,
-        ip_address: req.ip,
-      });
-
-      res.status(201).json({ message: "User created successfully", userId: result.insertId });
+  db.query("SELECT id FROM users WHERE email = ? LIMIT 1", [email], async (emailErr, emailResults) => {
+    if (emailErr) {
+      return res.status(500).json({ message: "Database error", error: emailErr.message });
     }
-  );
+
+    if (emailResults.length > 0) {
+      return res.status(400).json({ message: "Email address is already registered" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const sql = `
+      INSERT INTO users (full_name, email, password, role, status)
+      VALUES (?, ?, ?, ?, 'active')
+    `;
+
+    db.query(
+      sql,
+      [full_name, email, hashedPassword, role],
+      (err, result) => {
+        if (err) {
+          return res.status(500).json({ message: "Database error", error: err.message });
+        }
+
+        logActivity({
+          user_id: req.user.id,
+          user_name: req.user.name,
+          module: "Users",
+          action: "Created user",
+          reference_type: "user",
+          reference_id: result.insertId,
+          ip_address: req.ip,
+        });
+
+        res.status(201).json({ message: "User created successfully", userId: result.insertId });
+      }
+    );
+  });
 };
 
 const changePassword = async (req, res) => {
@@ -211,6 +225,93 @@ const changePassword = async (req, res) => {
   }
 };
 
+const updateUser = (req, res) => {
+  const userId = req.params.id;
+  const { role, status, phone } = req.body;
+
+  if (Number(userId) === Number(req.user.id)) {
+    if (status === "inactive") {
+      return res.status(400).json({ message: "You cannot deactivate your own admin account" });
+    }
+  }
+
+  if (!role || !status) {
+    return res.status(400).json({ message: "Role and status are required" });
+  }
+
+  db.query("SELECT phone FROM users WHERE id = ? LIMIT 1", [userId], (selectErr, results) => {
+    if (selectErr) {
+      return res.status(500).json({ message: "Database error", error: selectErr.message });
+    }
+
+    if (results.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const existingPhone = results[0].phone;
+
+    if (existingPhone && phone !== undefined && phone !== existingPhone) {
+      return res.status(400).json({ message: "Phone number already set by user" });
+    }
+
+    const finalPhone = existingPhone || phone || null;
+
+    const sql = "UPDATE users SET role = ?, status = ?, phone = ? WHERE id = ?";
+    db.query(sql, [role, status, finalPhone, userId], (err, result) => {
+      if (err) {
+        return res.status(500).json({ message: "Database error", error: err.message });
+      }
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      logActivity({
+        user_id: req.user.id,
+        user_name: req.user.name,
+        module: "Users",
+        action: "Updated user details",
+        reference_type: "user",
+        reference_id: userId,
+        ip_address: req.ip,
+      });
+
+      res.json({ message: "User updated successfully" });
+    });
+  });
+};
+
+const deleteUser = (req, res) => {
+  const userId = req.params.id;
+
+  if (Number(userId) === Number(req.user.id)) {
+    return res.status(400).json({ message: "You cannot delete your own admin account" });
+  }
+
+  const sql = "UPDATE users SET status = 'inactive' WHERE id = ?";
+  db.query(sql, [userId], (err, result) => {
+    if (err) {
+      return res.status(500).json({ message: "Database error", error: err.message });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    logActivity({
+      user_id: req.user.id,
+      user_name: req.user.name,
+      module: "Users",
+      action: "Soft deleted user",
+      reference_type: "user",
+      reference_id: userId,
+      ip_address: req.ip,
+    });
+
+    res.json({ message: "User deleted successfully" });
+  });
+};
+
 module.exports = {
   getAllUsers,
   getCurrentUserProfile,
@@ -218,4 +319,6 @@ module.exports = {
   updateCurrentUserProfilePhoto,
   createUser,
   changePassword,
+  updateUser,
+  deleteUser,
 };
