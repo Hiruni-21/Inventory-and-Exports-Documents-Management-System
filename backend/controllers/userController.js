@@ -106,10 +106,10 @@ const updateCurrentUserProfilePhoto = async (req, res) => {
 };
 
 const createUser = async (req, res) => {
-  const { full_name, email, password, role, department } = req.body;
+  const { full_name, email, password, role } = req.body;
 
-  if (!full_name || !email || !password || !role || !department) {
-    return res.status(400).json({ message: "Full name, email, password, role, and department are required" });
+  if (!full_name || !email || !password || !role) {
+    return res.status(400).json({ message: "Full name, email, password, and role are required" });
   }
 
   if (password.length < 6) {
@@ -128,13 +128,13 @@ const createUser = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const sql = `
-      INSERT INTO users (full_name, email, password, role, department, status)
-      VALUES (?, ?, ?, ?, ?, 'active')
+      INSERT INTO users (full_name, email, password, role, status)
+      VALUES (?, ?, ?, ?, 'active')
     `;
 
     db.query(
       sql,
-      [full_name, email, hashedPassword, role, department],
+      [full_name, email, hashedPassword, role],
       (err, result) => {
         if (err) {
           return res.status(500).json({ message: "Database error", error: err.message });
@@ -227,7 +227,7 @@ const changePassword = async (req, res) => {
 
 const updateUser = (req, res) => {
   const userId = req.params.id;
-  const { role, department, status } = req.body;
+  const { role, status } = req.body;
 
   if (Number(userId) === Number(req.user.id)) {
     if (status === "inactive") {
@@ -235,12 +235,12 @@ const updateUser = (req, res) => {
     }
   }
 
-  if (!role || !department || !status) {
-    return res.status(400).json({ message: "Role, department, and status are required" });
+  if (!role || !status) {
+    return res.status(400).json({ message: "Role and status are required" });
   }
 
-  const sql = "UPDATE users SET role = ?, department = ?, status = ? WHERE id = ?";
-  db.query(sql, [role, department, status, userId], (err, result) => {
+  const sql = "UPDATE users SET role = ?, status = ? WHERE id = ?";
+  db.query(sql, [role, status, userId], (err, result) => {
     if (err) {
       return res.status(500).json({ message: "Database error", error: err.message });
     }

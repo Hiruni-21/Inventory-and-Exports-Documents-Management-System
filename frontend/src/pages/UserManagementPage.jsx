@@ -83,7 +83,6 @@ const UserManagementPage = () => {
     email: "",
     password: "",
     role: "ops",
-    department: "",
   });
   const [isSaving, setIsSaving] = useState(false);
 
@@ -92,7 +91,6 @@ const UserManagementPage = () => {
   const [editingUser, setEditingUser] = useState(null);
   const [editUserForm, setEditUserForm] = useState({
     role: "",
-    department: "",
     status: "",
   });
 
@@ -144,7 +142,6 @@ const UserManagementPage = () => {
         email: "",
         password: "",
         role: "ops",
-        department: "",
       });
       fetchUsers();
     } catch (err) {
@@ -165,7 +162,6 @@ const UserManagementPage = () => {
     setEditingUser(userToEdit);
     setEditUserForm({
       role: userToEdit.role,
-      department: userToEdit.department || "",
       status: userToEdit.status,
     });
     setShowEditModal(true);
@@ -204,7 +200,6 @@ const UserManagementPage = () => {
     try {
       const res = await api.put(`/users/${userToToggle.id}`, {
         role: userToToggle.role,
-        department: userToToggle.department || "",
         status: newStatus,
       });
       setMessage(res.data.message || `User status updated to ${newStatus}`);
@@ -267,7 +262,6 @@ const UserManagementPage = () => {
               <th>FULL NAME</th>
               <th>EMAIL</th>
               <th>ROLE</th>
-              <th>DEPARTMENT</th>
               <th>STATUS</th>
               <th>CREATED AT</th>
               <th style={{ textAlign: "right" }}>ACTIONS</th>
@@ -276,7 +270,7 @@ const UserManagementPage = () => {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="7">Loading users list...</td>
+                <td colSpan="6">Loading users list...</td>
               </tr>
             ) : users.length ? (
               users.map((row) => (
@@ -286,7 +280,6 @@ const UserManagementPage = () => {
                   <td>
                     <span style={{ textTransform: "capitalize" }}>{row.role}</span>
                   </td>
-                  <td>{row.department || "—"}</td>
                   <td>
                     <span className={`badge ${row.status === "active" ? "bg-g" : "bg-r"}`}>
                       {row.status}
@@ -320,7 +313,7 @@ const UserManagementPage = () => {
               ))
             ) : (
               <tr>
-                <td colSpan="7">No users found.</td>
+                <td colSpan="6">No users found.</td>
               </tr>
             )}
           </tbody>
@@ -399,24 +392,7 @@ const UserManagementPage = () => {
                     <option value="supplier">Supplier</option>
                   </select>
                 </div>
-                <div style={formGroupStyle}>
-                  <label style={labelStyle} htmlFor="department">Department</label>
-                  <select
-                    style={inputStyle}
-                    id="department"
-                    name="department"
-                    value={addUserForm.department}
-                    onChange={handleAddChange}
-                    required
-                  >
-                    <option value="">Select Department</option>
-                    <option value="Management">Management</option>
-                    <option value="Operations">Operations</option>
-                    <option value="Logistics">Logistics</option>
-                    <option value="Procurement">Procurement</option>
-                    <option value="Quality Assurance">Quality Assurance</option>
-                  </select>
-                </div>
+
               </div>
               <div style={modalFooterStyle}>
                 <button
@@ -470,24 +446,7 @@ const UserManagementPage = () => {
                     <option value="supplier">Supplier</option>
                   </select>
                 </div>
-                <div style={formGroupStyle}>
-                  <label style={labelStyle} htmlFor="edit-department">Department</label>
-                  <select
-                    style={inputStyle}
-                    id="edit-department"
-                    name="department"
-                    value={editUserForm.department}
-                    onChange={handleEditChange}
-                    required
-                  >
-                    <option value="">Select Department</option>
-                    <option value="Management">Management</option>
-                    <option value="Operations">Operations</option>
-                    <option value="Logistics">Logistics</option>
-                    <option value="Procurement">Procurement</option>
-                    <option value="Quality Assurance">Quality Assurance</option>
-                  </select>
-                </div>
+
                 <div style={formGroupStyle}>
                   <label style={labelStyle} htmlFor="edit-status">Status</label>
                   <select

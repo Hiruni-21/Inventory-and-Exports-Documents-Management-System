@@ -195,10 +195,7 @@ const UserProfilePage = () => {
               <span style={{ color: "#6b7280" }}>Role</span>
               <strong style={{ color: "#111827" }}>{profile.role || "—"}</strong>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid #e5e7eb" }}>
-              <span style={{ color: "#6b7280" }}>Department</span>
-              <strong style={{ color: "#111827" }}>{profile.department || "Not set"}</strong>
-            </div>
+
           </div>
 
           <form onSubmit={handlePhoneSubmit} style={{ marginTop: 24 }}>
