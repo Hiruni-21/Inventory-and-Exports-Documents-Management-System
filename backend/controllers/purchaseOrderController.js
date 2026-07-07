@@ -482,6 +482,15 @@ const sendPurchaseOrder = (req, res) => {
                 });
               }
 
+              const { sendNotification } = require("../utils/notificationHelper");
+              sendNotification({
+                role: "supplier",
+                supplierId: po.supplier_id,
+                title: "New Purchase Order Sent",
+                message: `Purchase Order ${po.po_number} has been sent to you.`,
+                type: "po_sent"
+              }).catch(err => console.error("Supplier PO sent notification error:", err.message));
+
               const emailSubject = encodeURIComponent(
                 `Fresh World Purchase Order ${po.po_number}`
               );

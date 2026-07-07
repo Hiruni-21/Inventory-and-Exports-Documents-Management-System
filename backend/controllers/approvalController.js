@@ -247,6 +247,34 @@ const decideApproval = async (req, res, decision) => {
 
     await commitTransaction();
 
+    if (request.target_table === "purchase_orders") {
+      db.query("SELECT supplier_id, po_number FROM purchase_orders WHERE id = ? LIMIT 1", [request.entity_id], (poErr, poRows) => {
+        if (!poErr && poRows.length > 0) {
+          const { supplier_id, po_number } = poRows[0];
+          const { sendNotification } = require("../utils/notificationHelper");
+
+          // Notify Supplier
+          sendNotification({
+            role: "supplier",
+            supplierId: supplier_id,
+            title: "PO Status Updated",
+            message: `Purchase Order ${po_number} has been ${decision}.`,
+            type: "po_status"
+          }).catch(e => console.error("Supplier PO status notification error:", e.message));
+
+          // If approved, notify Operations
+          if (decision === "approved") {
+            sendNotification({
+              role: "ops",
+              title: "New Purchase Order Needing Action",
+              message: `Purchase Order ${po_number} has been approved and is ready for action.`,
+              type: "po_approved"
+            }).catch(e => console.error("Operations PO action notification error:", e.message));
+          }
+        }
+      });
+    }
+
     res.json({
       message: `Approval request ${decision}`,
       next_status: nextStatus,

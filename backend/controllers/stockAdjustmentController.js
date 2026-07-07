@@ -45,7 +45,13 @@ const refreshInventorySnapshot = (itemId, callback = () => {}) => {
       db.query(
         upsertSql,
         [itemId, qtyOnHand, qtyAvailable, unitCost, totalValue],
-        (upsertErr) => callback(upsertErr)
+        (upsertErr) => {
+          if (!upsertErr) {
+            const { triggerLowStockCheck } = require("../utils/notificationHelper");
+            triggerLowStockCheck(itemId);
+          }
+          callback(upsertErr);
+        }
       );
     });
   });
@@ -245,13 +251,13 @@ const createStockAdjustment = (req, res) => {
                 );
               }
 
-              db.commit((commitErr) => {
-                if (commitErr) {
-                  console.error("Commit failed:", commitErr);
-                  return db.rollback(() =>
-                    res.status(500).json({ message: "Commit failed", error: commitErr.message })
-                  );
-                }
+                const { sendNotification } = require("../utils/notificationHelper");
+                sendNotification({
+                  role: "supervisor",
+                  title: "Stock Adjustment Submitted",
+                  message: `Stock adjustment has been submitted for item ID ${itemId}.`,
+                  type: "stock_adjustment"
+                }).catch(err => console.error("Stock adjustment notification error:", err.message));
 
                 res.status(201).json({ message: "Stock adjustment saved successfully" });
               });

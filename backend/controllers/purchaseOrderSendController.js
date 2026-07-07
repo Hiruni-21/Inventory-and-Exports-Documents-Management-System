@@ -193,7 +193,16 @@ const sendEmail = async (req, res) => {
       pdfFileName: pdfInfo.fileName,
     });
 
-    await updatePoAsSent(bundle.po.id, req.user?.id || null);
+     await updatePoAsSent(bundle.po.id, req.user?.id || null);
+
+    const { sendNotification } = require("../utils/notificationHelper");
+    sendNotification({
+      role: "supplier",
+      supplierId: bundle.po.supplier_id || bundle.supplier.id,
+      title: "New Purchase Order Sent",
+      message: `Purchase Order ${bundle.po.po_number} has been sent to you.`,
+      type: "po_sent"
+    }).catch(err => console.error("Supplier email PO sent notification error:", err.message));
 
     res.json({
       message: "Purchase order PDF emailed successfully",

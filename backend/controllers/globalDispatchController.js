@@ -579,6 +579,24 @@ const createGlobalDispatch = async (req, res) => {
 
     await commitTx();
 
+    const { sendNotification } = require("../utils/notificationHelper");
+    
+    // Notify Supervisor
+    sendNotification({
+      role: "supervisor",
+      title: "Dispatch Ready for Review",
+      message: `Global dispatch ${dispatchNumber} is ready for review.`,
+      type: "dispatch_ready"
+    }).catch(err => console.error("Global dispatch ready notification error:", err.message));
+
+    // Notify Logistics
+    sendNotification({
+      role: "logistics",
+      title: "New Dispatch Assigned",
+      message: `Global dispatch ${dispatchNumber} has been assigned.`,
+      type: "dispatch_assigned"
+    }).catch(err => console.error("Global dispatch assigned notification error:", err.message));
+
     res.status(201).json({
       message: "Shipment created successfully",
       globalDispatchId,
@@ -745,6 +763,14 @@ const clearGlobalDispatch = async (req, res) => {
       refreshInventorySnapshot(itemId, () => {});
     });
 
+    const { sendNotification } = require("../utils/notificationHelper");
+    sendNotification({
+      role: "logistics",
+      title: "Dispatch Status Changed",
+      message: `Global dispatch ID ${id} status has been updated to cleared.`,
+      type: "dispatch_status"
+    }).catch(err => console.error("Global dispatch cleared notification error:", err.message));
+
     res.json({
       message: "Shipment cleared and stock deducted successfully",
     });
@@ -786,6 +812,14 @@ const markGlobalDispatchDelivered = (req, res) => {
         message: "Only cleared shipments can be marked delivered",
       });
     }
+
+    const { sendNotification } = require("../utils/notificationHelper");
+    sendNotification({
+      role: "logistics",
+      title: "Dispatch Status Changed",
+      message: `Global dispatch ID ${id} status has been updated to delivered.`,
+      type: "dispatch_status"
+    }).catch(err => console.error("Global dispatch delivery notification error:", err.message));
 
     res.json({ message: "Shipment marked delivered successfully" });
   });
