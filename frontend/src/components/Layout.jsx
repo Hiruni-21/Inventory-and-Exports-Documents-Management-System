@@ -475,15 +475,7 @@ const Layout = () => {
           </div>
 
           <div className="sb-user">
-            <div className="sb-user-row">
-              <div className="sb-av">{initials}</div>
-              <div>
-                <div className="sb-u-name">{user?.name || "Fresh World User"}</div>
-                <div className="sb-u-role">{user?.role || "Manager"}</div>
-              </div>
-            </div>
-
-            <button className="sb-signout" onClick={logout}>
+            <button className="sb-signout" onClick={logout} style={{ marginTop: 0 }}>
               <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth="2" strokeLinecap="round">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
               </svg>
