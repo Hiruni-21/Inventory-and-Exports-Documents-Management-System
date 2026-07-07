@@ -98,7 +98,6 @@ const navByRole = {
       label: "OVERVIEW",
       items: [
         { to: "/dashboard", text: "Dashboard", icon: <IconDashboard /> },
-        { to: "/profile", text: "My Profile", icon: <IconUserCircle /> },
         { to: "/activity", text: "Activity Log", icon: <IconActivity /> },
       ],
     },
@@ -151,7 +150,6 @@ const navByRole = {
       label: "OVERVIEW",
       items: [
         { to: "/dashboard", text: "Dashboard", icon: <IconDashboard /> },
-        { to: "/profile", text: "My Profile", icon: <IconUserCircle /> },
         { to: "/approvals", text: "Approval Notes", icon: <IconShieldCheck /> },
       ],
     },
@@ -190,7 +188,6 @@ const navByRole = {
       label: "OVERVIEW",
       items: [
         { to: "/dashboard", text: "Dashboard", icon: <IconDashboard /> },
-        { to: "/profile", text: "My Profile", icon: <IconUserCircle /> },
         { to: "/approvals", text: "Approval Notes", icon: <IconShieldCheck /> },
       ],
     },
@@ -220,7 +217,7 @@ const navByRole = {
     },
   ],
   logistics: [
-    { label: "OVERVIEW", items: [{ to: "/dashboard", text: "Dashboard", icon: <IconDashboard /> }, { to: "/profile", text: "My Profile", icon: <IconUserCircle /> }] },
+    { label: "OVERVIEW", items: [{ to: "/dashboard", text: "Dashboard", icon: <IconDashboard /> }] },
     {
       label: "CLIENTS & DISPATCH",
       items: [
@@ -237,7 +234,6 @@ const navByRole = {
       label: "MY PORTAL",
       items: [
         { to: "/dashboard", text: "My Dashboard", icon: <IconDashboard /> },
-        { to: "/profile", text: "My Profile", icon: <IconUserCircle /> },
         { to: "/supplier/orders", text: "My Purchase Orders", icon: <IconFile /> },
         { to: "/supplier/returns", text: "My Return Notes", icon: <IconReturn /> },
         { to: "/supplier/messages", text: "Messages", icon: <IconMessage /> },
@@ -531,6 +527,10 @@ const Layout = () => {
                 </svg>
                 <span className="ndot"></span>
               </button>
+
+              <Link to="/profile" className="tb-profile-btn" style={{ marginLeft: 12 }}>
+                {initials}
+              </Link>
             </div>
           </div>
 
