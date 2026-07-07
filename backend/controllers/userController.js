@@ -7,7 +7,7 @@ const logActivity = require("../utils/logActivity");
 
 const getAllUsers = (req, res) => {
   db.query(
-    "SELECT id, full_name, email, role, phone, status, department, supplier_id, created_at FROM users ORDER BY id DESC",
+    "SELECT id, full_name, email, role, phone, phone AS phone_number, status, department, supplier_id, created_at FROM users ORDER BY id DESC",
     (err, results) => {
       if (err) {
         return res.status(500).json({ message: "Database error", error: err.message });

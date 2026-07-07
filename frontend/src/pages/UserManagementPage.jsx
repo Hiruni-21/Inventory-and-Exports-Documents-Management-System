@@ -261,6 +261,7 @@ const UserManagementPage = () => {
             <tr>
               <th>FULL NAME</th>
               <th>EMAIL</th>
+              <th>PHONE</th>
               <th>ROLE</th>
               <th>STATUS</th>
               <th>CREATED AT</th>
@@ -270,13 +271,14 @@ const UserManagementPage = () => {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="6">Loading users list...</td>
+                <td colSpan="7">Loading users list...</td>
               </tr>
             ) : users.length ? (
               users.map((row) => (
                 <tr key={row.id}>
                   <td style={{ fontWeight: 700 }}>{row.full_name}</td>
                   <td>{row.email}</td>
+                  <td>{row.phone_number || row.phone || "—"}</td>
                   <td>
                     <span style={{ textTransform: "capitalize" }}>{row.role}</span>
                   </td>
@@ -313,7 +315,7 @@ const UserManagementPage = () => {
               ))
             ) : (
               <tr>
-                <td colSpan="6">No users found.</td>
+                <td colSpan="7">No users found.</td>
               </tr>
             )}
           </tbody>
@@ -429,6 +431,18 @@ const UserManagementPage = () => {
                 </button>
               </div>
               <div style={modalBodyStyle}>
+                <div style={formGroupStyle}>
+                  <span style={labelStyle}>Email</span>
+                  <div style={{ padding: "10px 12px", background: "#f8fafc", borderRadius: "8px", border: "1.5px solid var(--border)", color: "#64748b", fontSize: "14px", fontWeight: 500 }}>
+                    {editingUser.email}
+                  </div>
+                </div>
+                <div style={formGroupStyle}>
+                  <span style={labelStyle}>Phone</span>
+                  <div style={{ padding: "10px 12px", background: "#f8fafc", borderRadius: "8px", border: "1.5px solid var(--border)", color: "#64748b", fontSize: "14px", fontWeight: 500 }}>
+                    {editingUser.phone_number || editingUser.phone || "—"}
+                  </div>
+                </div>
                 <div style={formGroupStyle}>
                   <label style={labelStyle} htmlFor="edit-role">Role</label>
                   <select
