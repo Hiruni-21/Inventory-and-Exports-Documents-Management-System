@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import api from "../utils/api";
+import { getPostLoginRedirectPath } from "../utils/authRouting";
 
 const AuthContext = createContext();
 
@@ -44,6 +45,8 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem("token", receivedToken);
     setToken(receivedToken);
     setUser(receivedUser);
+
+    return getPostLoginRedirectPath(receivedUser?.role);
   };
 
   const logout = () => {

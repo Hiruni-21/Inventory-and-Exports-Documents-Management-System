@@ -10,9 +10,9 @@ const {
 
 const { verifyToken, allowRoles } = require("../middleware/authMiddleware");
 
-router.get("/", verifyToken, getAllCategories);
-router.post("/", verifyToken, allowRoles("manager", "ops"), createCategory);
-router.put("/:id", verifyToken, allowRoles("manager", "ops"), updateCategory);
+router.get("/", verifyToken, allowRoles("manager", "operations"), getAllCategories);
+router.post("/", verifyToken, allowRoles("manager", "operations"), createCategory);
+router.put("/:id", verifyToken, allowRoles("manager", "operations"), updateCategory);
 router.delete("/:id", verifyToken, allowRoles("manager"), deleteCategory);
 
 module.exports = router;

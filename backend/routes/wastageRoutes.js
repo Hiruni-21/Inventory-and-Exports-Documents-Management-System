@@ -6,9 +6,9 @@ const {
   createWastage,
 } = require("../controllers/wastageController");
 
-const { verifyToken } = require("../middleware/authMiddleware");
+const { verifyToken, allowRoles } = require("../middleware/authMiddleware");
 
-router.get("/", verifyToken, getAllWastage);
-router.post("/", verifyToken, createWastage);
+router.get("/", verifyToken, allowRoles("manager", "operations", "supervisor"), getAllWastage);
+router.post("/", verifyToken, allowRoles("manager", "operations", "supervisor"), createWastage);
 
 module.exports = router;

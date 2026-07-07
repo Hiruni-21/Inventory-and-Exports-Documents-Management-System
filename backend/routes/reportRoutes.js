@@ -11,14 +11,14 @@ const {
   getExportDocumentReport,
 } = require("../controllers/reportController");
 
-const { verifyToken } = require("../middleware/authMiddleware");
+const { verifyToken, allowRoles } = require("../middleware/authMiddleware");
 
-router.get("/stock-summary", verifyToken, getStockSummaryReport);
-router.get("/low-stock", verifyToken, getLowStockReport);
-router.get("/stock-movements", verifyToken, getStockMovementsReport);
-router.get("/dispatch", verifyToken, getDispatchReport);
-router.get("/wastage", verifyToken, getWastageReport);
-router.get("/returns", verifyToken, getReturnReport);
-router.get("/export-documents", verifyToken, getExportDocumentReport);
+router.get("/stock-summary", verifyToken, allowRoles("manager", "operations", "supervisor", "logistics"), getStockSummaryReport);
+router.get("/low-stock", verifyToken, allowRoles("manager", "operations", "supervisor"), getLowStockReport);
+router.get("/stock-movements", verifyToken, allowRoles("manager", "operations", "supervisor"), getStockMovementsReport);
+router.get("/dispatch", verifyToken, allowRoles("manager", "operations", "supervisor", "logistics"), getDispatchReport);
+router.get("/wastage", verifyToken, allowRoles("manager", "operations", "supervisor"), getWastageReport);
+router.get("/returns", verifyToken, allowRoles("manager", "operations", "supervisor"), getReturnReport);
+router.get("/export-documents", verifyToken, allowRoles("manager", "operations", "supervisor", "logistics"), getExportDocumentReport);
 
 module.exports = router;

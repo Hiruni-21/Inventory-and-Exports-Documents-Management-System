@@ -9,6 +9,7 @@ import OperationsDashboard from "./pages/OperationsDashboard";
 import LogisticsDashboard from "./pages/LogisticsDashboard";
 import SupervisorDashboard from "./pages/SupervisorDashboard";
 import SupplierDashboard from "./pages/SupplierDashboard";
+import AdminDashboard from "./pages/AdminDashboard";
 
 import SupplierListPage from "./pages/SupplierListPage";
 import AddSupplierPage from "./pages/AddSupplierPage";
@@ -59,6 +60,9 @@ import SupplierMessagesPage from "./pages/SupplierMessagesPage";
 
 import StockValuationPage from "./pages/StockValuationPage";
 import PhysicalStockCountPage from "./pages/PhysicalStockCountPage";
+import UserProfilePage from "./pages/UserProfilePage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 
 const DashboardRouter = () => {
   const { user } = useAuth();
@@ -68,6 +72,7 @@ const DashboardRouter = () => {
   if (role.includes("logistics")) return <LogisticsDashboard />;
   if (role.includes("supervisor")) return <SupervisorDashboard />;
   if (role.includes("supplier")) return <SupplierDashboard />;
+  if (role.includes("admin")) return <AdminDashboard />;
   return <ManagerDashboard />;
 };
 
@@ -75,6 +80,8 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<LoginPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
 
       <Route
         element={
@@ -84,6 +91,7 @@ function App() {
         }
       >
         <Route path="/dashboard" element={<DashboardRouter />} />
+        <Route path="/admin/dashboard" element={<AdminDashboard />} />
 
         <Route path="/suppliers" element={<SupplierListPage />} />
         <Route path="/suppliers/add" element={<AddSupplierPage />} />
@@ -146,6 +154,7 @@ function App() {
         <Route path="/supplier/returns" element={<SupplierReturnsPage />} />
         <Route path="/supplier/returns/:id" element={<SupplierReturnDetailsPage />} />
         <Route path="/supplier/messages" element={<SupplierMessagesPage />} />
+        <Route path="/profile" element={<UserProfilePage />} />
       </Route>
     </Routes>
   );

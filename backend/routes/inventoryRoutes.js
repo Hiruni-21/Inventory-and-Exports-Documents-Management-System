@@ -9,12 +9,12 @@ const {
   getInventoryValuation,
 } = require("../controllers/inventoryController");
 
-const { verifyToken } = require("../middleware/authMiddleware");
+const { verifyToken, allowRoles } = require("../middleware/authMiddleware");
 
-router.get("/", verifyToken, getInventory);
-router.get("/low-stock", verifyToken, getLowStockItems);
-router.get("/expiry", verifyToken, getExpiryItems);
-router.get("/batches/:itemId", verifyToken, getBatchesByItemId);
-router.get("/valuation", verifyToken, getInventoryValuation);
+router.get("/", verifyToken, allowRoles("manager", "operations", "supervisor"), getInventory);
+router.get("/low-stock", verifyToken, allowRoles("manager", "operations", "supervisor"), getLowStockItems);
+router.get("/expiry", verifyToken, allowRoles("manager", "operations", "supervisor"), getExpiryItems);
+router.get("/batches/:itemId", verifyToken, allowRoles("manager", "operations", "supervisor"), getBatchesByItemId);
+router.get("/valuation", verifyToken, allowRoles("manager", "operations", "supervisor"), getInventoryValuation);
 
 module.exports = router;
