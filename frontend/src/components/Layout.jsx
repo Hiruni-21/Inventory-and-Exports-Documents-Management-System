@@ -252,7 +252,7 @@ const pageMeta = {
   "/inventory/valuation": { title: "Stock Valuation", subtitle: "Current inventory value" },
   "/stock-adjustments": { title: "Stock Adjustments", subtitle: "Adjustment history" },
   "/stock-adjustments/add": { title: "Stock Adjustments", subtitle: "Create adjustment" },
-  "/stock-count": { title: "Physical Stock Count", subtitle: "Count and reconcile warehouse stock" },
+  "/stock-count": { title: "Physical Stock Count", subtitle: "Verify actual quantities of packaging materials stored in the warehouse." },
   "/packaging": { title: "Packaging Stock", subtitle: "Boxes, labels and packing materials" },
   "/purchase-orders": { title: "Purchase Orders", subtitle: "Procurement orders" },
   "/purchase-orders/add": { title: "Purchase Orders", subtitle: "Create purchase order" },

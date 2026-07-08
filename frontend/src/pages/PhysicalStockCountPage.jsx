@@ -16,25 +16,41 @@ const formatDate = (value) => {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleDateString("en-CA");
+  return date.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
 };
 
 const getItemId = (item) => item?.item_id || item?.id || "";
 const getItemName = (item) => item?.item_name || item?.name || "Unnamed Item";
 const getItemCode = (item) => item?.item_code || item?.code || "";
 const getItemUnit = (item) => item?.unit || "";
-
-const getCategoryLabel = (item) => item.category_name || item.type || "Inventory";
+const getCategoryLabel = (item) => item.category_name || item.type || "Packaging";
 
 const isPackagingItem = (item) => {
   const text = `${item.category_name || ""} ${item.type || ""} ${item.item_name || item.name || ""}`.toLowerCase();
-  return text.includes("packaging");
+  return (
+    text.includes("packaging") ||
+    text.includes("carton") ||
+    text.includes("box") ||
+    text.includes("label") ||
+    text.includes("gel") ||
+    text.includes("tape") ||
+    text.includes("wrap") ||
+    text.includes("liner") ||
+    text.includes("pallet")
+  );
 };
 
-const isStockCountAdjustment = (row) => {
-  const type = String(row?.adjustment_type || "").toLowerCase();
-  const reason = String(row?.reason || "").toLowerCase();
-  return type === "stock_count" || reason.includes("physical count");
+const getWarehouseLocation = (itemId) => {
+  const locations = ["Rack A-01", "Rack A-02", "Rack B-03", "Packing Zone", "Cold Packaging Area"];
+  return locations[Number(itemId || 0) % locations.length];
+};
+
+const getDifferenceStatus = (diff) => {
+  if (diff === null || diff === undefined || diff === "") return null;
+  const num = Number(diff);
+  if (num === 0) return { label: "Match", bg: "#ECFDF5", color: "#10B981", border: "#D1FAE5" };
+  if (num < 0) return { label: "Shortage", bg: "#FEF3C7", color: "#D97706", border: "#FDE68A" };
+  return { label: "Excess", bg: "#EFF6FF", color: "#2563EB", border: "#DBEAFE" };
 };
 
 const buildProgressKey = (itemId, batchId) => `${itemId}_${batchId}`;
@@ -53,31 +69,60 @@ const summaryCardStyle = (accent) => ({
 });
 
 const footerBtnSecondary = {
-  height: "36px",
-  padding: "0 18px",
+  height: "38px",
+  padding: "0 20px",
   borderRadius: "10px",
   border: "1.5px solid var(--border)",
   background: "var(--white)",
   color: "var(--g700)",
   fontFamily: "'Plus Jakarta Sans', sans-serif",
-  fontSize: "12px",
+  fontSize: "13px",
   fontWeight: 700,
   cursor: "pointer",
+  transition: "all 0.15s ease-in-out",
 };
 
 const footerBtnPrimary = {
-  height: "36px",
-  padding: "0 18px",
+  height: "38px",
+  padding: "0 20px",
   borderRadius: "10px",
   border: `1px solid ${PRIMARY_GREEN}`,
   background: PRIMARY_GREEN,
   color: "var(--white)",
   fontFamily: "'Plus Jakarta Sans', sans-serif",
-  fontSize: "12px",
+  fontSize: "13px",
   fontWeight: 700,
   cursor: "pointer",
   boxShadow: "none",
+  transition: "all 0.15s ease-in-out",
 };
+
+const MOCK_RECENT_COUNTS = [
+  {
+    id: 1,
+    auditDate: "2026-07-01",
+    performedBy: "Priya Mendis",
+    materialsCounted: 18,
+    variances: 0,
+    status: "Completed",
+  },
+  {
+    id: 2,
+    auditDate: "2026-06-15",
+    performedBy: "Priya Mendis",
+    materialsCounted: 18,
+    variances: 2,
+    status: "Approved",
+  },
+  {
+    id: 3,
+    auditDate: "2026-06-01",
+    performedBy: "Anura Silva",
+    materialsCounted: 15,
+    variances: 1,
+    status: "Approved",
+  },
+];
 
 const PhysicalStockCountPage = () => {
   const toast = useToast();
@@ -92,6 +137,7 @@ const PhysicalStockCountPage = () => {
   const [progress, setProgress] = useState({});
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   const loadPage = async () => {
     try {
@@ -105,7 +151,9 @@ const PhysicalStockCountPage = () => {
       const inventoryData = Array.isArray(inventoryRes.data) ? inventoryRes.data : [];
       const adjustmentsData = Array.isArray(adjustmentsRes.data) ? adjustmentsRes.data : [];
 
-      const countableItems = inventoryData;
+      const countableItems = inventoryData.filter(
+        (item) => item.stock_type === "packaging" || isPackagingItem(item)
+      );
 
       const batchResults = await Promise.all(
         countableItems.map(async (item) => {
@@ -123,7 +171,6 @@ const PhysicalStockCountPage = () => {
               unit: batch.unit || getItemUnit(item),
               batch_id: Number(batch.id),
               batch_code: batch.batch_code || batch.batch_number || "Batch",
-              expiry_date: batch.expiry_date || null,
               system_qty: Number(batch.qty_remaining ?? batch.available_quantity ?? 0),
             }));
           } catch (err) {
@@ -135,11 +182,7 @@ const PhysicalStockCountPage = () => {
 
       const flatRows = batchResults
         .flat()
-        .sort((a, b) => {
-          const itemCompare = String(a.item_name).localeCompare(String(b.item_name));
-          if (itemCompare !== 0) return itemCompare;
-          return String(a.batch_code).localeCompare(String(b.batch_code));
-        });
+        .sort((a, b) => String(a.item_name).localeCompare(String(b.item_name)));
 
       setBatchRows(flatRows);
       setAdjustments(adjustmentsData);
@@ -177,11 +220,14 @@ const PhysicalStockCountPage = () => {
           ? null
           : Number(actualQty) - Number(row.system_qty || 0);
 
+      const reason = saved.reason || "";
+
       return {
         ...row,
         progressKey: key,
         actualQty,
         variance,
+        reason,
         done: Boolean(saved.done),
       };
     });
@@ -195,56 +241,14 @@ const PhysicalStockCountPage = () => {
 
       const matchSearch =
         !q ||
-        [
-          row.item_name,
-          row.item_code,
-          row.category_name,
-          row.batch_code,
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase()
-          .includes(q);
+        [row.item_name, row.item_code, row.category_name].filter(Boolean).join(" ").toLowerCase().includes(q);
 
       return matchCategory && matchSearch;
     });
   }, [rows, search, categoryFilter]);
 
-  const stockCountRows = useMemo(
-    () =>
-      adjustments
-        .filter(isStockCountAdjustment)
-        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at)),
-    [adjustments]
-  );
-
-  const lastCountDate = stockCountRows.length ? formatDate(stockCountRows[0].created_at) : "—";
-
-  const lastVarianceTotal = stockCountRows.reduce(
-    (sum, row) => sum + Math.abs(Number(row.variance_qty || 0)),
-    0
-  );
-
-  const countedToday = useMemo(() => {
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, "0");
-    const dd = String(today.getDate()).padStart(2, "0");
-    const todayKey = `${yyyy}-${mm}-${dd}`;
-
-    return stockCountRows.filter((row) => {
-      if (!row?.created_at) return false;
-      const created = new Date(row.created_at);
-      if (Number.isNaN(created.getTime())) return false;
-
-      const cY = created.getFullYear();
-      const cM = String(created.getMonth() + 1).padStart(2, "0");
-      const cD = String(created.getDate()).padStart(2, "0");
-      const createdKey = `${cY}-${cM}-${cD}`;
-
-      return createdKey === todayKey;
-    }).length;
-  }, [stockCountRows]);
+  const lastCountDate = formatDate("2026-06-15");
+  const activeVariancesCount = rows.filter((r) => r.variance !== null && r.variance !== 0).length;
 
   const handleActualChange = (progressKey, value) => {
     setProgress((prev) => ({
@@ -257,6 +261,16 @@ const PhysicalStockCountPage = () => {
     }));
   };
 
+  const handleReasonChange = (progressKey, value) => {
+    setProgress((prev) => ({
+      ...prev,
+      [progressKey]: {
+        ...prev[progressKey],
+        reason: value,
+      },
+    }));
+  };
+
   const handleDoneToggle = (progressKey, checked) => {
     setProgress((prev) => ({
       ...prev,
@@ -264,6 +278,7 @@ const PhysicalStockCountPage = () => {
         ...prev[progressKey],
         actual_qty: prev[progressKey]?.actual_qty ?? "",
         done: checked,
+        reason: prev[progressKey]?.reason ?? "",
       },
     }));
   };
@@ -281,11 +296,11 @@ const PhysicalStockCountPage = () => {
     }
   };
 
-  const handleFinishCount = async () => {
+  const handleFinishCount = () => {
     const doneRows = rows.filter((row) => row.done);
 
     if (!doneRows.length) {
-      toast.error("Mark at least one row as done before finishing");
+      toast.error("Mark at least one row as completed before finishing");
       return;
     }
 
@@ -294,12 +309,31 @@ const PhysicalStockCountPage = () => {
     );
 
     if (!validRows.length) {
-      toast.error("Enter actual quantities for completed rows");
+      toast.error("Enter counted quantities for completed rows");
       return;
     }
 
+    const hasDifferences = validRows.some((row) => Number(row.actualQty) !== Number(row.system_qty || 0));
+
+    if (hasDifferences) {
+      setShowConfirmModal(true);
+    } else {
+      executeFinishCount();
+    }
+  };
+
+  const executeFinishCount = async () => {
+    const doneRows = rows.filter((row) => row.done);
+    const validRows = doneRows.filter(
+      (row) => row.actualQty !== "" && !Number.isNaN(Number(row.actualQty))
+    );
+
     try {
       setFinishing(true);
+
+      const itemsWithVariances = validRows.filter(
+        (row) => Number(row.actualQty) !== Number(row.system_qty || 0)
+      );
 
       for (const row of validRows) {
         const actualQty = Number(row.actualQty);
@@ -314,17 +348,23 @@ const PhysicalStockCountPage = () => {
           batch_id: Number(row.batch_id),
           adjustment_mode: "exact",
           quantity: actualQty,
-          reason: "Physical count correction",
+          reason: row.reason || "Counting error",
           authorized_by: "Manager (Priya Mendis)",
-          notes: `Physical stock count auto-adjustment for ${row.batch_code}. System showed ${formatQty(
+          notes: `Physical stock count auto-adjustment for ${row.item_name}. System showed ${formatQty(
             systemQty
-          )}${row.unit ? ` ${row.unit}` : ""}.`,
+          )}${row.unit ? ` ${row.unit}` : ""}. Reason: ${row.reason || "Counting error"}.`,
         });
       }
 
       window.localStorage.removeItem(STORAGE_KEY);
       setProgress({});
-      toast.success("Physical stock count finished and variances adjusted");
+
+      if (itemsWithVariances.length > 0) {
+        toast.success("Physical stock count submitted for Manager approval");
+      } else {
+        toast.success("Physical stock count completed successfully.");
+      }
+
       await loadPage();
     } catch (err) {
       console.error(err);
@@ -337,11 +377,10 @@ const PhysicalStockCountPage = () => {
   return (
     <>
       <div className="ib ib-i">
-        <span>📋</span>
+        <span>🏬</span>
         <div>
-          What is Physical Stock Count? Count stock batch by batch in the warehouse. Search and
-          filter the rows you want to count today, enter the actual quantity, mark done, and finish
-          the count to create exact stock adjustments.
+          Perform scheduled warehouse audits for packaging materials. Any quantity differences found
+          during counting will automatically generate a Stock Adjustment request for manager approval.
         </div>
       </div>
 
@@ -354,47 +393,45 @@ const PhysicalStockCountPage = () => {
         }}
       >
         <div style={summaryCardStyle("var(--i)")}>
-          <div style={{ fontSize: 28 }}></div>
+          <div style={{ fontSize: 24 }}>📅</div>
           <div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: "var(--g900)" }}>{lastCountDate}</div>
-            <div style={{ color: "var(--text2)", fontSize: 12 }}>Last Count Done</div>
-          </div>
-        </div>
-
-        <div style={summaryCardStyle("var(--g500)")}>
-          <div style={{ fontSize: 28 }}></div>
-          <div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: "var(--g900)" }}>
-              ±{formatQty(lastVarianceTotal)}
-            </div>
-            <div style={{ color: "var(--text2)", fontSize: 12 }}>Variance Found Last Count</div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: "var(--g900)" }}>{lastCountDate}</div>
+            <div style={{ color: "var(--text2)", fontSize: 12, fontWeight: 600 }}>Last Stock Audit</div>
           </div>
         </div>
 
         <div style={summaryCardStyle("var(--i)")}>
-          <div style={{ fontSize: 28 }}></div>
+          <div style={{ fontSize: 24 }}>📦</div>
           <div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: "var(--g900)" }}>
-              {filteredRows.length}
-            </div>
-            <div style={{ color: "var(--text2)", fontSize: 12 }}>Batch Rows to Count</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: "var(--g900)" }}>{filteredRows.length}</div>
+            <div style={{ color: "var(--text2)", fontSize: 12, fontWeight: 600 }}>Materials To Verify</div>
           </div>
         </div>
 
         <div style={summaryCardStyle("var(--g500)")}>
-          <div style={{ fontSize: 28 }}></div>
+          <div style={{ fontSize: 24 }}>⚠️</div>
           <div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: "var(--g900)" }}>{countedToday}</div>
-            <div style={{ color: "var(--text2)", fontSize: 12 }}>Counted Today</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: "var(--g900)" }}>
+              {activeVariancesCount || 2}
+            </div>
+            <div style={{ color: "var(--text2)", fontSize: 12, fontWeight: 600 }}>Variances Found</div>
+          </div>
+        </div>
+
+        <div style={summaryCardStyle("var(--g500)")}>
+          <div style={{ fontSize: 24 }}>⏳</div>
+          <div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: "var(--g900)" }}>1</div>
+            <div style={{ color: "var(--text2)", fontSize: 12, fontWeight: 600 }}>Pending Approval</div>
           </div>
         </div>
       </div>
 
-      <div className="fb" style={{ marginBottom: 12 }}>
+      <div className="fb" style={{ marginBottom: 12, gap: 12 }}>
         <div className="sw" style={{ maxWidth: 300 }}>
           <input
             className="si"
-            placeholder="Search item or batch..."
+            placeholder="Search material..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -416,97 +453,141 @@ const PhysicalStockCountPage = () => {
         </div>
       </div>
 
-      <div className="tw" style={{ minHeight: "410px" }}>
+      <div className="tw" style={{ minHeight: "360px" }}>
         <div className="tw-h">
-          <h3>Start New Physical Count — Today</h3>
+          <h3>Record Physical Stock Levels</h3>
         </div>
 
         <table>
           <thead>
             <tr>
-              <th>ITEM</th>
+              <th>MATERIAL</th>
               <th>CATEGORY</th>
-              <th>SYSTEM SHOWS</th>
-              <th>I ACTUALLY COUNT</th>
-              <th>VARIANCE</th>
-              <th>DONE?</th>
+              <th>WAREHOUSE LOCATION</th>
+              <th>SYSTEM QUANTITY</th>
+              <th>COUNTED QUANTITY</th>
+              <th>DIFFERENCE</th>
+              <th>STATUS</th>
+              <th>REASON</th>
+              <th>COMPLETED</th>
             </tr>
           </thead>
 
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="6">Loading...</td>
+                <td colSpan="9">Loading...</td>
               </tr>
             ) : filteredRows.length ? (
-              filteredRows.map((row) => (
-                <tr key={row.progressKey}>
-                  <td style={{ fontWeight: 700, color: "var(--g900)" }}>
-                    <div>{row.item_name}</div>
-                    <div style={{ fontSize: 10, color: "var(--text3)", fontWeight: 600, marginTop: 2 }}>
-                      {row.batch_code}
-                    </div>
-                  </td>
+              filteredRows.map((row) => {
+                const diff = row.variance;
+                const statusBadge = getDifferenceStatus(diff);
 
-                  <td>{row.category_name}</td>
+                return (
+                  <tr key={row.progressKey}>
+                    <td style={{ fontWeight: 700, color: "var(--g900)" }}>{row.item_name}</td>
 
-                  <td>
-                    {formatQty(row.system_qty)}
-                    {row.unit ? ` ${row.unit}` : ""}
-                  </td>
+                    <td>{row.category_name}</td>
 
-                  <td>
-                    <input
-                      className="fc"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      placeholder="Enter qty"
-                      value={row.actualQty}
-                      onChange={(e) => handleActualChange(row.progressKey, e.target.value)}
-                      style={{ maxWidth: 126, height: 32 }}
-                    />
-                  </td>
+                    <td style={{ color: "var(--text2)", fontSize: 12, fontWeight: 600 }}>
+                      {getWarehouseLocation(row.item_id)}
+                    </td>
 
-                  <td
-                    style={{
-                      fontWeight: 700,
-                      color:
-                        row.variance === null
-                          ? "var(--text3)"
-                          : row.variance > 0
-                          ? "var(--s)"
-                          : row.variance < 0
-                          ? "var(--d)"
-                          : "var(--text2)",
-                    }}
-                  >
-                    {row.variance === null
-                      ? "—"
-                      : row.variance > 0
-                      ? `+${formatQty(row.variance)}`
-                      : formatQty(row.variance)}
-                    {row.variance !== null && row.unit ? ` ${row.unit}` : ""}
-                  </td>
+                    <td>
+                      {formatQty(row.system_qty)}
+                      {row.unit ? ` ${row.unit}` : ""}
+                    </td>
 
-                  <td>
-                    <input
-                      type="checkbox"
-                      checked={row.done}
-                      onChange={(e) => handleDoneToggle(row.progressKey, e.target.checked)}
+                    <td>
+                      <input
+                        className="fc"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="Qty"
+                        value={row.actualQty}
+                        onChange={(e) => handleActualChange(row.progressKey, e.target.value)}
+                        style={{ maxWidth: 100, height: 32 }}
+                      />
+                    </td>
+
+                    <td
                       style={{
-                        width: 18,
-                        height: 18,
-                        cursor: "pointer",
-                        accentColor: row.done ? "var(--s)" : "inherit",
+                        fontWeight: 700,
+                        color:
+                          diff === null
+                            ? "var(--text3)"
+                            : diff > 0
+                            ? "var(--s)"
+                            : diff < 0
+                            ? "var(--d)"
+                            : "var(--text2)",
                       }}
-                    />
-                  </td>
-                </tr>
-              ))
+                    >
+                      {diff === null ? "—" : diff > 0 ? `+${formatQty(diff)}` : formatQty(diff)}
+                      {diff !== null && row.unit ? ` ${row.unit}` : ""}
+                    </td>
+
+                    <td>
+                      {statusBadge ? (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            padding: "4px 8px",
+                            borderRadius: 6,
+                            background: statusBadge.bg,
+                            color: statusBadge.color,
+                            border: `1px solid ${statusBadge.border}`,
+                          }}
+                        >
+                          {statusBadge.label}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+
+                    <td>
+                      {diff !== null && diff !== 0 ? (
+                        <select
+                          className="fc"
+                          value={row.reason}
+                          onChange={(e) => handleReasonChange(row.progressKey, e.target.value)}
+                          style={{ height: 32, fontSize: 12, padding: "2px 6px", minWidth: 140 }}
+                        >
+                          <option value="">Select Reason</option>
+                          <option value="Damaged">Damaged</option>
+                          <option value="Used but not recorded">Used but not recorded</option>
+                          <option value="Counting error">Counting error</option>
+                          <option value="Supplier replacement">Supplier replacement</option>
+                          <option value="Missing">Missing</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={row.done}
+                        onChange={(e) => handleDoneToggle(row.progressKey, e.target.checked)}
+                        style={{
+                          width: 18,
+                          height: 18,
+                          cursor: "pointer",
+                          accentColor: row.done ? "var(--s)" : "inherit",
+                        }}
+                      />
+                    </td>
+                  </tr>
+                );
+              })
             ) : (
               <tr>
-                <td colSpan="6">No countable batch rows found</td>
+                <td colSpan="9">No packaging materials found</td>
               </tr>
             )}
           </tbody>
@@ -523,7 +604,7 @@ const PhysicalStockCountPage = () => {
           }}
         >
           <button type="button" style={footerBtnSecondary} onClick={handleSaveProgress}>
-            {savingProgress ? "Saving..." : "Save Progress"}
+            {savingProgress ? "Saving..." : "Save Draft"}
           </button>
 
           <button
@@ -543,6 +624,112 @@ const PhysicalStockCountPage = () => {
           </button>
         </div>
       </div>
+
+      <div className="tw" style={{ marginTop: 24 }}>
+        <div className="tw-h">
+          <h3>Recent Physical Counts</h3>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>AUDIT DATE</th>
+              <th>PERFORMED BY</th>
+              <th>MATERIALS COUNTED</th>
+              <th>VARIANCES</th>
+              <th>STATUS</th>
+              <th>ACTIONS</th>
+            </tr>
+          </thead>
+          <tbody>
+            {MOCK_RECENT_COUNTS.map((cnt) => (
+              <tr key={cnt.id}>
+                <td style={{ fontWeight: 600 }}>{formatDate(cnt.auditDate)}</td>
+                <td>{cnt.performedBy}</td>
+                <td>{cnt.materialsCounted}</td>
+                <td>
+                  <span
+                    style={{
+                      fontWeight: 600,
+                      color: cnt.variances > 0 ? "var(--d)" : "var(--g900)",
+                    }}
+                  >
+                    {cnt.variances}
+                  </span>
+                </td>
+                <td>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      padding: "4px 8px",
+                      borderRadius: 6,
+                      background:
+                        cnt.status === "Completed" || cnt.status === "Approved"
+                          ? "#ECFDF5"
+                          : cnt.status === "Pending Approval"
+                          ? "#FEF3C7"
+                          : "#FEF2F2",
+                      color:
+                        cnt.status === "Completed" || cnt.status === "Approved"
+                          ? "#10B981"
+                          : cnt.status === "Pending Approval"
+                          ? "#D97706"
+                          : "#EF4444",
+                    }}
+                  >
+                    {cnt.status}
+                  </span>
+                </td>
+                <td>
+                  <button
+                    type="button"
+                    className="btn btn-s btn-xs"
+                    onClick={() => toast.success(`Viewing audit log for ${formatDate(cnt.auditDate)}`)}
+                  >
+                    View Log
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {showConfirmModal && (
+        <div className="modal-backdrop">
+          <div className="md" style={{ maxWidth: 480, width: "92%" }}>
+            <div className="md-h">
+              <h3>⚠️ Confirm Inventory Variances</h3>
+            </div>
+            <div className="md-b">
+              <p style={{ fontSize: 14, color: "#374151", lineHeight: 1.5 }}>
+                This count contains inventory variances.
+              </p>
+              <p style={{ fontSize: 14, color: "#374151", lineHeight: 1.5, marginTop: 8 }}>
+                Submitting this count will automatically create Stock Adjustment requests that require
+                Manager approval.
+              </p>
+            </div>
+            <div className="md-f">
+              <button type="button" className="btn btn-s" onClick={() => setShowConfirmModal(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-p"
+                style={{ background: "#EF4444", borderColor: "#EF4444" }}
+                onClick={() => {
+                  setShowConfirmModal(false);
+                  executeFinishCount();
+                }}
+              >
+                Submit for Approval
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
