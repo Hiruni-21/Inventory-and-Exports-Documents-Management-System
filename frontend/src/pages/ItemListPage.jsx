@@ -496,6 +496,7 @@ const ItemListPage = () => {
   }, [rows, activeTab]);
 
   const filteredRows = useMemo(() => {
+    let result = [...rows];
     // Filter by stock_type (activeTab: 'packaging' or 'produce')
     result = result.filter(
       (row) => (row.stock_type || "produce") === activeTab
