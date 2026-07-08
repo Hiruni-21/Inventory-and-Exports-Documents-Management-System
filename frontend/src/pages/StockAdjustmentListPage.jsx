@@ -188,17 +188,7 @@ const buildBatchOptionLabel = (batch) => {
   const qty = formatQty(batch?.qty_remaining ?? batch?.available_quantity ?? 0);
   const unit = batch?.unit || "";
 
-  let expiryText = "";
-  if (batch?.expiry_date) {
-    const today = new Date();
-    const expiry = new Date(batch.expiry_date);
-    if (!Number.isNaN(expiry.getTime())) {
-      const diffDays = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
-      if (diffDays >= 0) expiryText = ` (exp ${diffDays}d)`;
-    }
-  }
-
-  return `${code} — ${qty}${unit ? ` ${unit}` : ""}${expiryText}`;
+  return `${code} — ${qty}${unit ? ` ${unit}` : ""}`;
 };
 
 const extractAuthorizedBy = (row) => {

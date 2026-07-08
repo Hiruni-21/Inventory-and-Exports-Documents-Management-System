@@ -40,7 +40,7 @@ const getDashboardStats = (req, res) => {
       SELECT COUNT(*) AS total
       FROM items i
       LEFT JOIN inventory inv ON inv.item_id = i.id
-      WHERE i.item_kind = 'packaging_supply'
+      WHERE i.stock_type = 'packaging'
         AND i.status = 'active'
         AND COALESCE(inv.qty_on_hand, 0) <= COALESCE(i.reorder_level, 0)
     `,
@@ -49,7 +49,7 @@ const getDashboardStats = (req, res) => {
       SELECT COUNT(*) AS total
       FROM items i
       LEFT JOIN inventory inv ON inv.item_id = i.id
-      WHERE i.item_kind = 'packaging_supply'
+      WHERE i.stock_type = 'packaging'
         AND i.status = 'active'
         AND COALESCE(inv.qty_on_hand, 0) <= 0
     `,

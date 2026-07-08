@@ -105,7 +105,7 @@ const PhysicalStockCountPage = () => {
       const inventoryData = Array.isArray(inventoryRes.data) ? inventoryRes.data : [];
       const adjustmentsData = Array.isArray(adjustmentsRes.data) ? adjustmentsRes.data : [];
 
-      const countableItems = inventoryData.filter((item) => !isPackagingItem(item));
+      const countableItems = inventoryData;
 
       const batchResults = await Promise.all(
         countableItems.map(async (item) => {
@@ -445,7 +445,6 @@ const PhysicalStockCountPage = () => {
                     <div>{row.item_name}</div>
                     <div style={{ fontSize: 10, color: "var(--text3)", fontWeight: 600, marginTop: 2 }}>
                       {row.batch_code}
-                      {row.expiry_date ? ` · exp ${formatDate(row.expiry_date)}` : ""}
                     </div>
                   </td>
 

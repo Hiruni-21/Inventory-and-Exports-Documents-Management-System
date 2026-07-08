@@ -424,6 +424,7 @@ const createEmptyForm = (rows) => ({
   supplier_ids: [],
   description: "",
   is_active: 1,
+  stock_type: "produce",
 });
 
 const ItemListPage = () => {
@@ -572,6 +573,7 @@ const ItemListPage = () => {
           : Number(row.is_active) === 1 || row.is_active === true
           ? 1
           : 0,
+      stock_type: row.stock_type || "produce",
     });
 
     setShowModal(true);
@@ -634,6 +636,7 @@ const ItemListPage = () => {
       supplier_ids: (form.supplier_ids || []).map((id) => Number(id)).filter(Boolean),
       description: "",
       status: "active",
+      stock_type: form.stock_type,
     };
   };
 
@@ -989,6 +992,20 @@ const ItemListPage = () => {
                             {textValue(row.category_name, row.name)}
                           </option>
                         ))}
+                      </select>
+                    </div>
+
+                    <div className="ff">
+                      <label className="fl">
+                        Stock Type <span className="rq">*</span>
+                      </label>
+                      <select
+                        className="fc"
+                        value={form.stock_type}
+                        onChange={(e) => setField("stock_type", e.target.value)}
+                      >
+                        <option value="produce">Produce</option>
+                        <option value="packaging">Packaging</option>
                       </select>
                     </div>
 

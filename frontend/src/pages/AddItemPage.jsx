@@ -61,6 +61,7 @@ const AddItemPage = () => {
     returnable: 1,
     description: "",
     status: "active",
+    stock_type: "produce",
   });
 
   const selectedCategory = useMemo(
@@ -150,6 +151,7 @@ const AddItemPage = () => {
         returnable: Number(form.returnable),
         description: form.description.trim(),
         status: form.status,
+        stock_type: form.stock_type,
       });
 
       toast.success("Item created successfully");
@@ -245,6 +247,21 @@ const AddItemPage = () => {
                             {row.category_name}
                           </option>
                         ))}
+                      </select>
+                    </div>
+
+                    <div className="ff">
+                      <label className="fl">
+                        Stock Type <span className="rq">*</span>
+                      </label>
+                      <select
+                        className="fc"
+                        name="stock_type"
+                        value={form.stock_type}
+                        onChange={handleChange}
+                      >
+                        <option value="produce">Produce</option>
+                        <option value="packaging">Packaging</option>
                       </select>
                     </div>
                   </div>
