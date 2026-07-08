@@ -253,6 +253,14 @@ const createStockAdjustment = (req, res) => {
                 );
               }
 
+              db.commit((commitErr) => {
+                if (commitErr) {
+                  console.error("Transaction commit failed:", commitErr);
+                  return db.rollback(() =>
+                    res.status(500).json({ message: "Transaction commit failed", error: commitErr.message })
+                  );
+                }
+
                 const { sendNotification } = require("../utils/notificationHelper");
                 sendNotification({
                   role: "supervisor",
