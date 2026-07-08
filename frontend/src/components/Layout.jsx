@@ -104,7 +104,6 @@ const navByRole = {
     {
       label: "INVENTORY",
       items: [
-        { to: "/inventory", text: "Inventory", icon: <IconInventory /> },
         { to: "/items", text: "Items", icon: <IconTag /> },
         { to: "/categories", text: "Item Categories", icon: <IconLayers /> },
         { to: "/inventory/low-stock", text: "Low Stock", icon: <IconAlert />, badge: { text: "5", cls: "nb-r" } },
@@ -156,7 +155,6 @@ const navByRole = {
     {
       label: "INVENTORY",
       items: [
-        { to: "/inventory", text: "Inventory", icon: <IconInventory /> },
         { to: "/items", text: "Items", icon: <IconTag /> },
         { to: "/inventory/low-stock", text: "Low Stock", icon: <IconAlert />, badge: { text: "5", cls: "nb-r" } },
         { to: "/packaging", text: "Packaging Stock", icon: <IconBox />, badge: { text: "!", cls: "nb-r" } },
@@ -194,7 +192,6 @@ const navByRole = {
     {
       label: "INVENTORY",
       items: [
-        { to: "/inventory", text: "Inventory", icon: <IconInventory /> },
         { to: "/items", text: "Items", icon: <IconTag /> },
         { to: "/categories", text: "Item Categories", icon: <IconLayers /> },
         { to: "/inventory/low-stock", text: "Low Stock", icon: <IconAlert />, badge: { text: "5", cls: "nb-r" } },
@@ -250,7 +247,6 @@ const pageMeta = {
   "/categories/add": { title: "Item Categories", subtitle: "Create category" },
   "/items": { title: "Items", subtitle: "Manage selling and storage items" },
   "/items/add": { title: "Items", subtitle: "Create item" },
-  "/inventory": { title: "Inventory", subtitle: "Current stock levels" },
   "/inventory/low-stock": { title: "Low Stock Alerts", subtitle: "Items below reorder level" },
   "/inventory/expiry": { title: "Expiry Items", subtitle: "Items with batches expiring within 14 days" },
   "/inventory/valuation": { title: "Stock Valuation", subtitle: "Current inventory value" },

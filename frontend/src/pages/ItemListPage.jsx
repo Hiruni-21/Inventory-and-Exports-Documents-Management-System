@@ -819,25 +819,27 @@ const ItemListPage = () => {
           <thead>
             {activeTab === "packaging" ? (
               <tr>
-                <th style={{ width: "12%", ...tableHeaderCellStyle }}>CODE</th>
-                <th style={{ width: "20%", ...tableHeaderCellStyle }}>ITEM NAME</th>
-                <th style={{ width: "15%", ...tableHeaderCellStyle }}>CATEGORY</th>
+                <th style={{ width: "10%", ...tableHeaderCellStyle }}>CODE</th>
+                <th style={{ width: "18%", ...tableHeaderCellStyle }}>ITEM NAME</th>
+                <th style={{ width: "13%", ...tableHeaderCellStyle }}>CATEGORY</th>
                 <th style={{ width: "8%", ...tableHeaderCellStyle }}>UNIT</th>
                 <th style={{ width: "10%", ...tableHeaderCellStyle }}>REORDER</th>
-                <th style={{ width: "12%", ...tableHeaderCellStyle }}>RETURNABLE</th>
-                <th style={{ width: "13%", ...tableHeaderCellStyle }}>SUPPLIERS</th>
-                <th style={{ width: "10%", ...tableHeaderCellStyle }}>ACTIONS</th>
+                <th style={{ width: "13%", ...tableHeaderCellStyle }}>UNIT COST</th>
+                <th style={{ width: "10%", ...tableHeaderCellStyle }}>RETURNABLE</th>
+                <th style={{ width: "11%", ...tableHeaderCellStyle }}>SUPPLIERS</th>
+                <th style={{ width: "7%", ...tableHeaderCellStyle }}>ACTIONS</th>
               </tr>
             ) : (
               <tr>
-                <th style={{ width: "12%", ...tableHeaderCellStyle }}>CODE</th>
-                <th style={{ width: "20%", ...tableHeaderCellStyle }}>ITEM NAME</th>
-                <th style={{ width: "18%", ...tableHeaderCellStyle }}>BOTANICAL NAME</th>
-                <th style={{ width: "15%", ...tableHeaderCellStyle }}>CATEGORY</th>
+                <th style={{ width: "10%", ...tableHeaderCellStyle }}>CODE</th>
+                <th style={{ width: "18%", ...tableHeaderCellStyle }}>ITEM NAME</th>
+                <th style={{ width: "15%", ...tableHeaderCellStyle }}>BOTANICAL NAME</th>
+                <th style={{ width: "13%", ...tableHeaderCellStyle }}>CATEGORY</th>
                 <th style={{ width: "8%", ...tableHeaderCellStyle }}>UNIT</th>
-                <th style={{ width: "12%", ...tableHeaderCellStyle }}>RETURNABLE</th>
-                <th style={{ width: "15%", ...tableHeaderCellStyle }}>SUPPLIERS</th>
-                <th style={{ width: "10%", ...tableHeaderCellStyle }}>ACTIONS</th>
+                <th style={{ width: "13%", ...tableHeaderCellStyle }}>UNIT COST</th>
+                <th style={{ width: "10%", ...tableHeaderCellStyle }}>RETURNABLE</th>
+                <th style={{ width: "11%", ...tableHeaderCellStyle }}>SUPPLIERS</th>
+                <th style={{ width: "7%", ...tableHeaderCellStyle }}>ACTIONS</th>
               </tr>
             )}
           </thead>
@@ -845,7 +847,7 @@ const ItemListPage = () => {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="8">Loading items...</td>
+                <td colSpan="9">Loading items...</td>
               </tr>
             ) : filteredRows.length ? (
               filteredRows.map((row, index) => {
@@ -901,6 +903,13 @@ const ItemListPage = () => {
                       </td>
                     )}
 
+                    <td style={{ fontSize: 12, color: "var(--g900)", fontWeight: 600 }}>
+                      LKR {Number(row.unit_cost || 0).toLocaleString("en-US", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </td>
+
                     <td style={{ ...returnableColorStyle(row), fontSize: 12 }}>
                       {returnableLabel(row)}
                     </td>
@@ -934,7 +943,7 @@ const ItemListPage = () => {
               })
             ) : (
               <tr>
-                <td colSpan={activeTab === "packaging" ? "8" : "8"}>No items found</td>
+                <td colSpan="9">No items found</td>
               </tr>
             )}
           </tbody>
@@ -1033,28 +1042,28 @@ const ItemListPage = () => {
                 <div className="fs2" style={{ marginBottom: 18 }}>
                   <div style={modalSectionTitleStyle}>▍ Stock & Storage</div>
 
-                  <div className="fr3" style={{ marginBottom: 14 }}>
-                    <div className="ff">
-                      <label className="fl">
-                        Unit of Measure <span className="rq">*</span>
-                      </label>
-                      <select
-                        className="fc"
-                        value={form.unit}
-                        onChange={(e) => setField("unit", e.target.value)}
-                      >
-                        <option value="kg">kg</option>
-                        <option value="g">g</option>
-                        <option value="piece">piece</option>
-                        <option value="bunch">bunch</option>
-                        <option value="tray">tray</option>
-                        <option value="box">box</option>
-                        <option value="pack">pack</option>
-                        <option value="litre">litre</option>
-                      </select>
-                    </div>
+                  {form.stock_type === "packaging" ? (
+                    <div className="fr" style={{ marginBottom: 14 }}>
+                      <div className="ff">
+                        <label className="fl">
+                          Unit of Measure <span className="rq">*</span>
+                        </label>
+                        <select
+                          className="fc"
+                          value={form.unit}
+                          onChange={(e) => setField("unit", e.target.value)}
+                        >
+                          <option value="kg">kg</option>
+                          <option value="g">g</option>
+                          <option value="piece">piece</option>
+                          <option value="bunch">bunch</option>
+                          <option value="tray">tray</option>
+                          <option value="box">box</option>
+                          <option value="pack">pack</option>
+                          <option value="litre">litre</option>
+                        </select>
+                      </div>
 
-                    {form.stock_type === "packaging" && (
                       <div className="ff">
                         <label className="fl">
                           Reorder Level <span className="rq">*</span>
@@ -1068,20 +1077,31 @@ const ItemListPage = () => {
                           placeholder="e.g. 50"
                         />
                       </div>
-                    )}
-
-                    <div className="ff">
-                      <label className="fl">Shelf Life (days)</label>
-                      <input
-                        className="fc"
-                        type="number"
-                        min="0"
-                        value={form.shelf_life}
-                        onChange={(e) => setField("shelf_life", e.target.value)}
-                        placeholder="e.g. 7"
-                      />
                     </div>
-                  </div>
+                  ) : (
+                    <div className="fr" style={{ marginBottom: 14 }}>
+                      <div className="ff">
+                        <label className="fl">
+                          Unit of Measure <span className="rq">*</span>
+                        </label>
+                        <select
+                          className="fc"
+                          value={form.unit}
+                          onChange={(e) => setField("unit", e.target.value)}
+                        >
+                          <option value="kg">kg</option>
+                          <option value="g">g</option>
+                          <option value="piece">piece</option>
+                          <option value="bunch">bunch</option>
+                          <option value="tray">tray</option>
+                          <option value="box">box</option>
+                          <option value="pack">pack</option>
+                          <option value="litre">litre</option>
+                        </select>
+                      </div>
+                      <div className="ff" style={{ visibility: "hidden" }} />
+                    </div>
+                  )}
 
                   <div className="fr" style={{ marginBottom: 14 }}>
                     <div className="ff">
