@@ -817,24 +817,35 @@ const ItemListPage = () => {
           }}
         >
           <thead>
-            <tr>
-              <th style={{ width: "11%", ...tableHeaderCellStyle }}>CODE</th>
-              <th style={{ width: "17%", ...tableHeaderCellStyle }}>ITEM NAME</th>
-              <th style={{ width: "16%", ...tableHeaderCellStyle }}>BOTANICAL NAME</th>
-              <th style={{ width: "13%", ...tableHeaderCellStyle }}>CATEGORY</th>
-              <th style={{ width: "6%", ...tableHeaderCellStyle }}>UNIT</th>
-              <th style={{ width: "9%", ...tableHeaderCellStyle }}>REORDER</th>
-              <th style={{ width: "10%", ...tableHeaderCellStyle }}>STORAGE</th>
-              <th style={{ width: "10%", ...tableHeaderCellStyle }}>RETURNABLE</th>
-              <th style={{ width: "12%", ...tableHeaderCellStyle }}>SUPPLIERS</th>
-              <th style={{ width: "10%", ...tableHeaderCellStyle }}>ACTIONS</th>
-            </tr>
+            {activeTab === "packaging" ? (
+              <tr>
+                <th style={{ width: "12%", ...tableHeaderCellStyle }}>CODE</th>
+                <th style={{ width: "20%", ...tableHeaderCellStyle }}>ITEM NAME</th>
+                <th style={{ width: "15%", ...tableHeaderCellStyle }}>CATEGORY</th>
+                <th style={{ width: "8%", ...tableHeaderCellStyle }}>UNIT</th>
+                <th style={{ width: "10%", ...tableHeaderCellStyle }}>REORDER</th>
+                <th style={{ width: "12%", ...tableHeaderCellStyle }}>RETURNABLE</th>
+                <th style={{ width: "13%", ...tableHeaderCellStyle }}>SUPPLIERS</th>
+                <th style={{ width: "10%", ...tableHeaderCellStyle }}>ACTIONS</th>
+              </tr>
+            ) : (
+              <tr>
+                <th style={{ width: "12%", ...tableHeaderCellStyle }}>CODE</th>
+                <th style={{ width: "20%", ...tableHeaderCellStyle }}>ITEM NAME</th>
+                <th style={{ width: "18%", ...tableHeaderCellStyle }}>BOTANICAL NAME</th>
+                <th style={{ width: "15%", ...tableHeaderCellStyle }}>CATEGORY</th>
+                <th style={{ width: "8%", ...tableHeaderCellStyle }}>UNIT</th>
+                <th style={{ width: "12%", ...tableHeaderCellStyle }}>RETURNABLE</th>
+                <th style={{ width: "15%", ...tableHeaderCellStyle }}>SUPPLIERS</th>
+                <th style={{ width: "10%", ...tableHeaderCellStyle }}>ACTIONS</th>
+              </tr>
+            )}
           </thead>
 
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="10">Loading items...</td>
+                <td colSpan="8">Loading items...</td>
               </tr>
             ) : filteredRows.length ? (
               filteredRows.map((row, index) => {
@@ -860,9 +871,11 @@ const ItemListPage = () => {
                       {textValue(row.name, row.item_name) || "—"}
                     </td>
 
-                    <td style={botanicalCellStyle}>
-                      {textValue(row.botanical_name) || "—"}
-                    </td>
+                    {activeTab === "produce" && (
+                      <td style={botanicalCellStyle}>
+                        {textValue(row.botanical_name) || "—"}
+                      </td>
+                    )}
 
                     <td>
                       <span
@@ -882,13 +895,11 @@ const ItemListPage = () => {
                       {textValue(row.unit) || "—"}
                     </td>
 
-                    <td style={{ fontSize: 12, color: "var(--g900)" }}>
-                      {numberValue(row.reorder_level)} {textValue(row.unit)}
-                    </td>
-
-                    <td style={{ fontSize: 12, color: "var(--g900)" }}>
-                      {formatStorageDisplay(textValue(row.storage_temp))}
-                    </td>
+                    {activeTab === "packaging" && (
+                      <td style={{ fontSize: 12, color: "var(--g900)" }}>
+                        {numberValue(row.reorder_level)} {textValue(row.unit)}
+                      </td>
+                    )}
 
                     <td style={{ ...returnableColorStyle(row), fontSize: 12 }}>
                       {returnableLabel(row)}
@@ -923,7 +934,7 @@ const ItemListPage = () => {
               })
             ) : (
               <tr>
-                <td colSpan="10">No items found</td>
+                <td colSpan={activeTab === "packaging" ? "8" : "8"}>No items found</td>
               </tr>
             )}
           </tbody>
@@ -970,16 +981,18 @@ const ItemListPage = () => {
                       />
                     </div>
 
-                    <div className="ff">
-                      <label className="fl">Botanical Name</label>
-                      <input
-                        className="fc"
-                        value={form.botanical_name}
-                        onChange={(e) => setField("botanical_name", e.target.value)}
-                        placeholder="e.g. Hylocereus undatus"
-                        style={{ fontStyle: "italic" }}
-                      />
-                    </div>
+                    {form.stock_type === "produce" && (
+                      <div className="ff">
+                        <label className="fl">Botanical Name</label>
+                        <input
+                          className="fc"
+                          value={form.botanical_name}
+                          onChange={(e) => setField("botanical_name", e.target.value)}
+                          placeholder="e.g. Hylocereus undatus"
+                          style={{ fontStyle: "italic" }}
+                        />
+                      </div>
+                    )}
                   </div>
 
                   <div className="fr" style={{ marginBottom: 4 }}>
@@ -1041,19 +1054,21 @@ const ItemListPage = () => {
                       </select>
                     </div>
 
-                    <div className="ff">
-                      <label className="fl">
-                        Reorder Level <span className="rq">*</span>
-                      </label>
-                      <input
-                        className="fc"
-                        type="number"
-                        min="0"
-                        value={form.reorder_level}
-                        onChange={(e) => setField("reorder_level", e.target.value)}
-                        placeholder="e.g. 50"
-                      />
-                    </div>
+                    {form.stock_type === "packaging" && (
+                      <div className="ff">
+                        <label className="fl">
+                          Reorder Level <span className="rq">*</span>
+                        </label>
+                        <input
+                          className="fc"
+                          type="number"
+                          min="0"
+                          value={form.reorder_level}
+                          onChange={(e) => setField("reorder_level", e.target.value)}
+                          placeholder="e.g. 50"
+                        />
+                      </div>
+                    )}
 
                     <div className="ff">
                       <label className="fl">Shelf Life (days)</label>
@@ -1069,21 +1084,6 @@ const ItemListPage = () => {
                   </div>
 
                   <div className="fr" style={{ marginBottom: 14 }}>
-                    <div className="ff">
-                      <label className="fl">Storage Temperature</label>
-                      <select
-                        className="fc"
-                        value={form.storage_temp}
-                        onChange={(e) => setField("storage_temp", e.target.value)}
-                      >
-                        {STORAGE_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
                     <div className="ff">
                       <label className="fl">Standard Unit Cost (LKR)</label>
                       <input
