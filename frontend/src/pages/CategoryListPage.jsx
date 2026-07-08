@@ -29,45 +29,6 @@ const addButtonStyle = {
   whiteSpace: "nowrap",
 };
 
-const statBoxStyle = {
-  background: "#F7FAF8",
-  border: "1px solid #E7F0EA",
-  borderRadius: 16,
-  padding: "10px 12px",
-  minHeight: 58,
-  display: "flex",
-  flexDirection: "column",
-  justifyContent: "center",
-};
-
-const metaBadgeStyle = {
-  display: "inline-flex",
-  alignItems: "center",
-  padding: "5px 10px",
-  borderRadius: 999,
-  background: "#F2F7F4",
-  color: "#7D9486",
-  fontSize: 11,
-  fontWeight: 800,
-  letterSpacing: "0.04em",
-};
-
-const getActionButtonStyle = (hovered, danger = false) => ({
-  width: 38,
-  height: 38,
-  borderRadius: 12,
-  border: `1px solid ${danger ? "#F3D4CD" : "#CFE2D4"}`,
-  background: hovered ? (danger ? "#FFF4F1" : "#F4FBF6") : "#FFFFFF",
-  color: danger ? "#D15D47" : "#587064",
-  fontSize: 14,
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  transition: "all 0.18s ease",
-  boxShadow: hovered ? "0 4px 10px rgba(16,24,40,.06)" : "none",
-});
-
 const textValue = (...values) => {
   for (const value of values) {
     if (value !== undefined && value !== null && String(value).trim() !== "") {
@@ -89,28 +50,42 @@ const numberValue = (...values) => {
 
 const categoryCode = (id) => `CAT-${String(id).padStart(3, "0")}`;
 
-const shelfLifeLabel = (minValue, maxValue) => {
-  const min = Number(minValue);
-  const max = Number(maxValue);
-
-  if (!min && !max) return "—";
-  if (min && max && min !== max) return `${min}-${max}d`;
-  return `${max || min}d`;
+const isPackagingCategory = (categoryName) => {
+  const name = String(categoryName || "").toLowerCase();
+  return (
+    name.includes("carton") ||
+    name.includes("box") ||
+    name.includes("regiform") ||
+    name.includes("foam") ||
+    name.includes("liner") ||
+    name.includes("label") ||
+    name.includes("tape") ||
+    name.includes("wrapping") ||
+    name.includes("cooling") ||
+    name.includes("bag") ||
+    name.includes("vacuum") ||
+    name.includes("divider") ||
+    name.includes("insert") ||
+    name.includes("tray") ||
+    name.includes("crate") ||
+    name.includes("packing")
+  );
 };
 
-const getCategoryAccent = (name) => {
-  const text = String(name || "").toLowerCase();
-
-  if (text.includes("leaf")) return "#2F69C8";
-  if (text.includes("herb") || text.includes("aromatic")) return "#7C3AED";
-  if (text.includes("fruit")) return "#2E8B57";
-  if (text.includes("exotic")) return "#E39A1C";
-  if (text.includes("micro")) return "#4F8B3A";
-  if (text.includes("dry")) return "#6E8B74";
-  if (text.includes("dairy")) return "#0F766E";
-
-  return "#2E8B57";
-};
+const actionBtnStyle = (hovered, danger = false) => ({
+  width: 32,
+  height: 32,
+  borderRadius: 8,
+  border: `1px solid ${danger ? "#FCA5A5" : "#D1D5DB"}`,
+  background: hovered ? (danger ? "#FEF2F2" : "#F9FAFB") : "#FFFFFF",
+  color: danger ? "#EF4444" : "#4B5563",
+  fontSize: 12,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  transition: "all 0.15s ease-in-out",
+});
 
 const emptyForm = {
   category_name: "",
@@ -123,6 +98,7 @@ export default function CategoryListPage() {
 
   const [rows, setRows] = useState([]);
   const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState("packaging");
   const [loading, setLoading] = useState(true);
 
   const [showModal, setShowModal] = useState(false);
@@ -159,26 +135,32 @@ export default function CategoryListPage() {
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
 
-    const base = !q
-      ? rows
-      : rows.filter((row) =>
-          [
-            row.id,
-            row.category_name,
-            row.description,
-            row.status,
-            row.item_count,
-            row.min_shelf_life,
-            row.max_shelf_life,
-          ]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase()
-            .includes(q)
-        );
+    let result = [...rows];
 
-    return [...base].sort((a, b) => Number(a.id || 0) - Number(b.id || 0));
-  }, [rows, search]);
+    // Filter categories by the active tab stock classification
+    result = result.filter((row) => {
+      const isPkg = isPackagingCategory(row.category_name);
+      return activeTab === "packaging" ? isPkg : !isPkg;
+    });
+
+    if (q) {
+      result = result.filter((row) =>
+        [
+          row.id,
+          row.category_name,
+          row.description,
+          row.status,
+          row.item_count,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(q)
+      );
+    }
+
+    return result.sort((a, b) => Number(a.id || 0) - Number(b.id || 0));
+  }, [rows, search, activeTab]);
 
   const openNewModal = () => {
     setEditingId(null);
@@ -265,6 +247,21 @@ export default function CategoryListPage() {
 
   return (
     <div>
+      <div className="tab-bar" style={{ marginBottom: 18 }}>
+        <button
+          className={`tbb ${activeTab === "packaging" ? "on" : ""}`}
+          onClick={() => setActiveTab("packaging")}
+        >
+          📦 Packaging Materials
+        </button>
+        <button
+          className={`tbb ${activeTab === "produce" ? "on" : ""}`}
+          onClick={() => setActiveTab("produce")}
+        >
+          🌱 Export Products
+        </button>
+      </div>
+
       <div
         className="fb"
         style={{
@@ -332,18 +329,14 @@ export default function CategoryListPage() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(310px, 1fr))",
-            gap: 18,
+            gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+            gap: 20,
+            alignItems: "stretch",
           }}
         >
           {filteredRows.length ? (
             filteredRows.map((row) => {
-              const accent = getCategoryAccent(row.category_name);
               const itemCount = numberValue(row.item_count);
-              const shelfRange = shelfLifeLabel(
-                row.min_shelf_life,
-                row.max_shelf_life
-              );
               const isHovered = hoveredCardId === row.id;
 
               return (
@@ -353,93 +346,109 @@ export default function CategoryListPage() {
                   onMouseEnter={() => setHoveredCardId(row.id)}
                   onMouseLeave={() => setHoveredCardId(null)}
                   style={{
-                    borderRadius: 24,
-                    border: isHovered
-                      ? `1px solid ${accent}55`
-                      : "1px solid #D8E6DD",
+                    borderRadius: 16,
+                    border: "1px solid var(--g200, #E5E7EB)",
                     background: "#FFFFFF",
-                    padding: "12px 20px",
+                    padding: "20px 24px",
+                    display: "flex",
+                    flexDirection: "column",
                     position: "relative",
-                    overflow: "hidden",
-                    transition: "all 0.18s ease",
-                    transform: isHovered ? "translateY(-4px)" : "translateY(0)",
+                    transition: "all 0.2s ease-in-out",
                     boxShadow: isHovered
-                      ? "0 12px 28px rgba(16,24,40,.08)"
-                      : "0 2px 8px rgba(16,24,40,.03)",
+                      ? "0 10px 20px rgba(0,0,0,0.04)"
+                      : "0 2px 4px rgba(0,0,0,0.01)",
+                    height: "100%",
+                    boxSizing: "border-box",
                   }}
                 >
                   <div
                     style={{
-                      position: "absolute",
-                      left: 0,
-                      top: 0,
-                      bottom: 0,
-                      width: 5,
-                      background: accent,
-                    }}
-                  />
-
-                  <div
-                    className="fb"
-                    style={{
-                      alignItems: "flex-start",
+                      display: "flex",
+                      alignItems: "center",
                       justifyContent: "space-between",
-                      gap: 12,
-                      marginBottom: 10,
+                      marginBottom: 14,
                     }}
                   >
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ ...metaBadgeStyle, marginBottom: 8 }}>
-                        {categoryCode(row.id)}
-                      </div>
-
-                      <div
-                        style={{
-                          fontSize: 16,
-                          fontWeight: 800,
-                          color: "var(--g900)",
-                          lineHeight: 1.2,
-                          marginBottom: 2,
-                        }}
-                      >
-                        {row.category_name}
-                      </div>
-
-                      <div
-                        style={{
-                          fontSize: 12,
-                          color: "#7F978A",
-                          lineHeight: 1.45,
-                        }}
-                      >
-                        {textValue(row.description) || "No description"}
-                      </div>
-                    </div>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 600,
+                        color: "#6B7280",
+                        background: "#F3F4F6",
+                        padding: "4px 8px",
+                        borderRadius: 6,
+                        letterSpacing: "0.05em",
+                        fontFamily: "monospace",
+                      }}
+                    >
+                      {categoryCode(row.id)}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        padding: "4px 10px",
+                        borderRadius: 6,
+                        background: row.status === "inactive" ? "#FEF2F2" : "#ECFDF5",
+                        color: row.status === "inactive" ? "#EF4444" : "#10B981",
+                        border: `1px solid ${row.status === "inactive" ? "#FEE2E2" : "#D1FAE5"}`,
+                      }}
+                    >
+                      {row.status === "inactive" ? "Inactive" : "Active"}
+                    </span>
                   </div>
 
                   <div
                     style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: 12,
-                      marginBottom: 10,
+                      fontSize: 16,
+                      fontWeight: 700,
+                      color: "#111827",
+                      marginBottom: 6,
+                      lineHeight: 1.3,
                     }}
                   >
-                    <div style={statBoxStyle}>
+                    {row.category_name}
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: "#4B5563",
+                      lineHeight: 1.5,
+                      marginBottom: 20,
+                    }}
+                  >
+                    {textValue(row.description) || "No description"}
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-end",
+                      justifyContent: "space-between",
+                      marginTop: "auto",
+                      paddingTop: 16,
+                      borderTop: "1px solid #F3F4F6",
+                    }}
+                  >
+                    <div>
                       <div
                         style={{
-                          fontSize: 12,
-                          color: "#7F978A",
-                          marginBottom: 5,
+                          fontSize: 10,
+                          color: "#9CA3AF",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.05em",
+                          marginBottom: 2,
+                          fontWeight: 600,
                         }}
                       >
                         Items
                       </div>
                       <div
                         style={{
-                          fontSize: 24,
-                          fontWeight: 800,
-                          color: "var(--g900)",
+                          fontSize: 28,
+                          fontWeight: 700,
+                          color: "#111827",
                           lineHeight: 1,
                         }}
                       >
@@ -447,51 +456,10 @@ export default function CategoryListPage() {
                       </div>
                     </div>
 
-                    <div style={statBoxStyle}>
-                      <div
-                        style={{
-                          fontSize: 12,
-                          color: "#7F978A",
-                          marginBottom: 5,
-                        }}
-                      >
-                        Shelf Life
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 20,
-                          fontWeight: 800,
-                          color: "var(--g900)",
-                          lineHeight: 1,
-                        }}
-                      >
-                        {shelfRange}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div
-                    className="fb"
-                    style={{
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 12,
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: "#8AA092",
-                        fontWeight: 700,
-                      }}
-                    >
-                      {textValue(row.status) === "inactive" ? "Inactive" : "Active"}
-                    </div>
-
                     <div style={{ display: "flex", gap: 8 }}>
                       <button
                         type="button"
-                        style={getActionButtonStyle(hoveredEditId === row.id)}
+                        style={actionBtnStyle(hoveredEditId === row.id)}
                         onMouseEnter={() => setHoveredEditId(row.id)}
                         onMouseLeave={() => setHoveredEditId(null)}
                         onClick={() => openEditModal(row)}
@@ -499,10 +467,9 @@ export default function CategoryListPage() {
                       >
                         ✏️
                       </button>
-
                       <button
                         type="button"
-                        style={getActionButtonStyle(hoveredDeleteId === row.id, true)}
+                        style={actionBtnStyle(hoveredDeleteId === row.id, true)}
                         onMouseEnter={() => setHoveredDeleteId(row.id)}
                         onMouseLeave={() => setHoveredDeleteId(null)}
                         onClick={() => handleDelete(row)}
@@ -516,7 +483,19 @@ export default function CategoryListPage() {
               );
             })
           ) : (
-            <div className="card" style={{ padding: 22 }}>
+            <div
+              className="card"
+              style={{
+                gridColumn: "1 / -1",
+                padding: "40px 24px",
+                textAlign: "center",
+                color: "#6B7280",
+                fontSize: 14,
+                border: "1px dashed #D1D5DB",
+                background: "#F9FAFB",
+                borderRadius: 16,
+              }}
+            >
               No categories found
             </div>
           )}
