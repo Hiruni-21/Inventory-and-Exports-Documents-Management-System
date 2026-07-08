@@ -437,7 +437,12 @@ const ItemListPage = () => {
 
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All Categories");
-  const [typeFilter, setTypeFilter] = useState("All Types");
+  const [activeTab, setActiveTab] = useState("packaging");
+
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    setCategory("All Categories");
+  };
 
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -478,33 +483,27 @@ const ItemListPage = () => {
   }, []);
 
   const categoryOptions = useMemo(() => {
-    const fromApi = categories
-      .map((row) => textValue(row.category_name, row.name))
-      .filter(Boolean);
-
     const fromItems = rows
+      .filter((row) => (row.stock_type || "produce") === activeTab)
       .map((row) => textValue(row.category_name, row.category))
       .filter(Boolean);
 
-    const merged = Array.from(new Set([...fromApi, ...fromItems])).sort((a, b) =>
+    const merged = Array.from(new Set(fromItems)).sort((a, b) =>
       a.localeCompare(b)
     );
 
     return ["All Categories", ...merged];
-  }, [categories, rows]);
+  }, [rows, activeTab]);
 
   const filteredRows = useMemo(() => {
-    let result = [...rows];
+    // Filter by stock_type (activeTab: 'packaging' or 'produce')
+    result = result.filter(
+      (row) => (row.stock_type || "produce") === activeTab
+    );
 
     if (category !== "All Categories") {
       result = result.filter(
         (row) => textValue(row.category_name, row.category) === category
-      );
-    }
-
-    if (typeFilter !== "All Types") {
-      result = result.filter(
-        (row) => normalizeTypeLabel(row.type).toLowerCase() === typeFilter.toLowerCase()
       );
     }
 
@@ -520,7 +519,6 @@ const ItemListPage = () => {
           row.botanical_name,
           row.category_name,
           row.category,
-          row.type,
           row.unit,
           row.reorder_level,
           formatStorageDisplay(row.storage_temp),
@@ -535,7 +533,7 @@ const ItemListPage = () => {
     }
 
     return result;
-  }, [rows, search, category, typeFilter, suppliers]);
+  }, [rows, search, category, activeTab, suppliers]);
 
   const selectedSupplierRows = useMemo(() => {
     const ids = new Set((form.supplier_ids || []).map(String));
@@ -545,7 +543,10 @@ const ItemListPage = () => {
   const openNewModal = () => {
     setEditingItemId(null);
     setSupplierPickerId("");
-    setForm(createEmptyForm(rows));
+    setForm({
+      ...createEmptyForm(rows),
+      stock_type: activeTab,
+    });
     setShowModal(true);
   };
 
@@ -626,7 +627,7 @@ const ItemListPage = () => {
       name: form.name.trim(),
       botanical_name: form.botanical_name.trim(),
       category_id: Number(categoryId),
-      type: form.type === "n" ? "Non-Perishable" : "Perishable",
+      type: form.stock_type === "packaging" ? "Non-Perishable" : "Perishable",
       unit: form.unit.trim(),
       reorder_level: Number(form.reorder_level || 0),
       shelf_life_days: Number(form.shelf_life || 0),
@@ -730,6 +731,21 @@ const ItemListPage = () => {
 
   return (
     <div>
+      <div className="tab-bar">
+        <button
+          className={`tbb ${activeTab === "packaging" ? "on" : ""}`}
+          onClick={() => handleTabChange("packaging")}
+        >
+          📦 Packaging Materials
+        </button>
+        <button
+          className={`tbb ${activeTab === "produce" ? "on" : ""}`}
+          onClick={() => handleTabChange("produce")}
+        >
+          🌱 Export Products
+        </button>
+      </div>
+
       <div
         className="fb"
         style={{
@@ -764,17 +780,6 @@ const ItemListPage = () => {
               {option}
             </option>
           ))}
-        </select>
-
-        <select
-          className="fc"
-          style={filterSelectStyle}
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
-        >
-          <option>All Types</option>
-          <option>Perishable</option>
-          <option>Non-Perishable</option>
         </select>
 
         <div style={{ marginLeft: "auto" }}>
@@ -1007,28 +1012,6 @@ const ItemListPage = () => {
                         <option value="produce">Produce</option>
                         <option value="packaging">Packaging</option>
                       </select>
-                    </div>
-
-                    <div className="ff">
-                      <label className="fl">
-                        Item Type <span className="rq">*</span>
-                      </label>
-                      <div className="tg" style={{ display: "flex", gap: 8 }}>
-                        <button
-                          type="button"
-                          style={toggleButtonStyle(form.type === "p")}
-                          onClick={() => setField("type", "p")}
-                        >
-                          Perishable
-                        </button>
-                        <button
-                          type="button"
-                          style={toggleButtonStyle(form.type === "n")}
-                          onClick={() => setField("type", "n")}
-                        >
-                          Non-Perishable
-                        </button>
-                      </div>
                     </div>
                   </div>
                 </div>
