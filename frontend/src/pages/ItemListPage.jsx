@@ -465,10 +465,12 @@ const ItemListPage = () => {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All Categories");
   const [activeTab, setActiveTab] = useState("packaging");
+  const [showInactive, setShowInactive] = useState(false);
 
   const handleTabChange = (newTab) => {
     setActiveTab(newTab);
     setCategory("All Categories");
+    setShowInactive(false);
   };
 
   const [showModal, setShowModal] = useState(false);
@@ -513,10 +515,9 @@ const ItemListPage = () => {
   const categoryOptions = useMemo(() => {
     const fromItems = rows
       .filter((row) => {
-        if (activeTab === "inactive") {
-          return row.status === "inactive";
-        }
-        return (row.stock_type || "produce") === activeTab && row.status !== "inactive";
+        if ((row.stock_type || "produce") !== activeTab) return false;
+        if (!showInactive && row.status === "inactive") return false;
+        return true;
       })
       .map((row) => textValue(row.category_name, row.category))
       .filter(Boolean);
@@ -526,17 +527,18 @@ const ItemListPage = () => {
     );
 
     return ["All Categories", ...merged];
-  }, [rows, activeTab]);
+  }, [rows, activeTab, showInactive]);
 
   const filteredRows = useMemo(() => {
     let result = [...rows];
-    // Filter by stock_type (activeTab: 'packaging' or 'produce' or 'inactive')
-    if (activeTab === "inactive") {
-      result = result.filter((row) => row.status === "inactive");
-    } else {
-      result = result.filter(
-        (row) => (row.stock_type || "produce") === activeTab && row.status !== "inactive"
-      );
+    // Filter by stock_type (activeTab: 'packaging' or 'produce')
+    result = result.filter(
+      (row) => (row.stock_type || "produce") === activeTab
+    );
+
+    // Filter by active status
+    if (!showInactive) {
+      result = result.filter((row) => row.status !== "inactive");
     }
 
     if (category !== "All Categories") {
@@ -816,12 +818,6 @@ const ItemListPage = () => {
         >
           🌱 Export Products
         </button>
-        <button
-          className={`tbb ${activeTab === "inactive" ? "on" : ""}`}
-          onClick={() => handleTabChange("inactive")}
-        >
-          🗑️ Inactive Items
-        </button>
       </div>
 
       <div
@@ -859,6 +855,33 @@ const ItemListPage = () => {
             </option>
           ))}
         </select>
+
+        <label
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: 13,
+            fontWeight: 600,
+            color: "#4B5563",
+            cursor: "pointer",
+            marginLeft: 8,
+            userSelect: "none",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={showInactive}
+            onChange={(e) => setShowInactive(e.target.checked)}
+            style={{
+              width: 16,
+              height: 16,
+              cursor: "pointer",
+              accentColor: PRIMARY_GREEN,
+            }}
+          />
+          Show inactive items
+        </label>
 
         <div style={{ marginLeft: "auto" }}>
           <button
@@ -906,23 +929,11 @@ const ItemListPage = () => {
                 <th style={{ width: "11%", ...tableHeaderCellStyle }}>SUPPLIERS</th>
                 <th style={{ width: "7%", ...tableHeaderCellStyle }}>ACTIONS</th>
               </tr>
-            ) : activeTab === "produce" ? (
-              <tr>
-                <th style={{ width: "10%", ...tableHeaderCellStyle }}>CODE</th>
-                <th style={{ width: "18%", ...tableHeaderCellStyle }}>ITEM NAME</th>
-                <th style={{ width: "15%", ...tableHeaderCellStyle }}>BOTANICAL NAME</th>
-                <th style={{ width: "13%", ...tableHeaderCellStyle }}>CATEGORY</th>
-                <th style={{ width: "8%", ...tableHeaderCellStyle }}>UNIT</th>
-                <th style={{ width: "13%", ...tableHeaderCellStyle }}>UNIT COST</th>
-                <th style={{ width: "10%", ...tableHeaderCellStyle }}>RETURNABLE</th>
-                <th style={{ width: "11%", ...tableHeaderCellStyle }}>SUPPLIERS</th>
-                <th style={{ width: "7%", ...tableHeaderCellStyle }}>ACTIONS</th>
-              </tr>
             ) : (
               <tr>
                 <th style={{ width: "10%", ...tableHeaderCellStyle }}>CODE</th>
                 <th style={{ width: "18%", ...tableHeaderCellStyle }}>ITEM NAME</th>
-                <th style={{ width: "15%", ...tableHeaderCellStyle }}>STOCK TYPE</th>
+                <th style={{ width: "15%", ...tableHeaderCellStyle }}>BOTANICAL NAME</th>
                 <th style={{ width: "13%", ...tableHeaderCellStyle }}>CATEGORY</th>
                 <th style={{ width: "8%", ...tableHeaderCellStyle }}>UNIT</th>
                 <th style={{ width: "13%", ...tableHeaderCellStyle }}>UNIT COST</th>
@@ -943,15 +954,20 @@ const ItemListPage = () => {
                 const id = row.id || row.item_id || index;
                 const categoryLabel = textValue(row.category_name, row.category) || "—";
                 const badgeTone = categoryBadgeStyle(categoryLabel);
+                const isInactive = row.status === "inactive";
 
                 return (
                   <tr
                     key={id}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "#F7FBF8";
+                      e.currentTarget.style.background = isInactive ? "#F3F4F6" : "#F7FBF8";
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "transparent";
+                      e.currentTarget.style.background = isInactive ? "#F9FAFB" : "transparent";
+                    }}
+                    style={{
+                      background: isInactive ? "#F9FAFB" : "transparent",
+                      color: isInactive ? "#9CA3AF" : "inherit",
                     }}
                   >
                     <td style={codeCellStyle}>
@@ -960,17 +976,27 @@ const ItemListPage = () => {
 
                     <td style={nameCellStyle}>
                       {textValue(row.name, row.item_name) || "—"}
+                      {isInactive && (
+                        <span
+                          style={{
+                            marginLeft: 8,
+                            fontSize: 10,
+                            fontWeight: 700,
+                            padding: "2px 6px",
+                            borderRadius: 4,
+                            background: "#EF4444",
+                            color: "#FFFFFF",
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          Inactive
+                        </span>
+                      )}
                     </td>
 
                     {activeTab === "produce" && (
                       <td style={botanicalCellStyle}>
                         {textValue(row.botanical_name) || "—"}
-                      </td>
-                    )}
-
-                    {activeTab === "inactive" && (
-                      <td style={{ fontSize: 12, textTransform: "capitalize", color: "var(--text2)" }}>
-                        {textValue(row.stock_type) || "—"}
                       </td>
                     )}
 
