@@ -163,6 +163,21 @@ const PhysicalStockCountPage = () => {
             const res = await api.get(`/inventory/batches/${itemId}`);
             const rows = Array.isArray(res.data) ? res.data : [];
 
+            if (rows.length === 0) {
+              return [
+                {
+                  item_id: Number(itemId),
+                  item_name: getItemName(item),
+                  item_code: getItemCode(item),
+                  category_name: getCategoryLabel(item),
+                  unit: getItemUnit(item) || "pcs",
+                  batch_id: 0,
+                  batch_code: "—",
+                  system_qty: 0,
+                },
+              ];
+            }
+
             return rows.map((batch) => ({
               item_id: Number(itemId),
               item_name: getItemName(item),
@@ -175,7 +190,18 @@ const PhysicalStockCountPage = () => {
             }));
           } catch (err) {
             console.error(err);
-            return [];
+            return [
+              {
+                item_id: Number(itemId),
+                item_name: getItemName(item),
+                item_code: getItemCode(item),
+                category_name: getCategoryLabel(item),
+                unit: getItemUnit(item) || "pcs",
+                batch_id: 0,
+                batch_code: "—",
+                system_qty: 0,
+              },
+            ];
           }
         })
       );
