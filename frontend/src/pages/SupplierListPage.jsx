@@ -285,18 +285,18 @@ const SupplierListPage = () => {
                 <div className="fr">
                   <div className="ff">
                     <label className="fl">Supplier Name</label>
-                    <input className="fc" name="supplier_name" value={form.supplier_name} onChange={handleChange} />
+                    <input className="fc" name="supplier_name" value={form.supplier_name} onChange={handleChange} placeholder="e.g. Kegalle Fresh Fields" />
                   </div>
                   <div className="ff">
                     <label className="fl">Contact Number</label>
-                    <input className="fc" name="contact_number" value={form.contact_number} onChange={handleChange} />
+                    <input className="fc" name="contact_number" value={form.contact_number} onChange={handleChange} placeholder="e.g. 0771234567" />
                   </div>
                 </div>
 
                 <div className="fr">
                   <div className="ff">
                     <label className="fl">Email</label>
-                    <input className="fc" type="email" name="email" value={form.email} onChange={handleChange} />
+                    <input className="fc" type="email" name="email" value={form.email} onChange={handleChange} placeholder="e.g. orders@supplier.lk" />
                   </div>
                 </div>
 
@@ -310,13 +310,13 @@ const SupplierListPage = () => {
                   </div>
                   <div className="ff">
                     <label className="fl">Rating Score</label>
-                    <input className="fc" type="number" step="0.1" min="0" max="5" name="rating_score" value={form.rating_score} onChange={handleChange} />
+                    <input className="fc" type="number" step="0.1" min="0" max="5" name="rating_score" value={form.rating_score} onChange={handleChange} placeholder="e.g. 4.5" />
                   </div>
                 </div>
 
                 <div className="ff">
                   <label className="fl">Address</label>
-                  <textarea className="fc" name="address" value={form.address} onChange={handleChange} rows="4" />
+                  <textarea className="fc" name="address" value={form.address} onChange={handleChange} rows="4" placeholder="e.g. No. 45, Main Street, Kegalle" />
                 </div>
 
                 {editingId && (
