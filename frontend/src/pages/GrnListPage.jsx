@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
 
 const fmtDate = (value) => {
@@ -17,6 +17,7 @@ const fmtTime = (value) => {
 };
 
 const GrnListPage = () => {
+  const navigate = useNavigate();
   const [grnList, setGrnList] = useState([]);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -92,13 +93,12 @@ const GrnListPage = () => {
               <th>Received Time</th>
               <th>Created By</th>
               <th>Status</th>
-              <th></th>
             </tr>
           </thead>
           <tbody>
             {filteredGrn.length > 0 ? (
               filteredGrn.map((grn) => (
-                <tr key={grn.id}>
+                <tr key={grn.id} onClick={() => navigate(`/grn/${grn.id}`)} style={{ cursor: "pointer" }}>
                   <td style={{ fontFamily: "monospace", fontWeight: 700, color: "var(--g800)" }}>
                     {grn.grn_number}
                   </td>
@@ -110,16 +110,11 @@ const GrnListPage = () => {
                   <td>
                     <span className="badge bg-g">Recorded</span>
                   </td>
-                  <td>
-                    <Link to={`/grn/${grn.id}`} className="ab" title="View GRN">
-                      👁
-                    </Link>
-                  </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="8" style={{ textAlign: "center", color: "var(--text3)" }}>
+                <td colSpan="7" style={{ textAlign: "center", color: "var(--text3)" }}>
                   No GRN records found
                 </td>
               </tr>
