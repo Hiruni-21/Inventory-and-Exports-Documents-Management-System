@@ -205,6 +205,11 @@ const createItem = async (req, res) => {
       });
     }
 
+    const existing = await query("SELECT id FROM items WHERE LOWER(TRIM(code)) = LOWER(TRIM(?)) LIMIT 1", [code]);
+    if (existing.length > 0) {
+      return res.status(409).json({ message: "Item code already exists" });
+    }
+
     const insertSql = `
       INSERT INTO items
       (
