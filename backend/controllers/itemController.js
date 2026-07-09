@@ -87,7 +87,6 @@ const getAllItems = async (req, res) => {
         ) AS supplier_ids_csv
       FROM items i
       LEFT JOIN item_categories c ON i.category_id = c.id
-      WHERE COALESCE(i.status, 'active') <> 'inactive'
       ORDER BY i.id DESC
     `;
 

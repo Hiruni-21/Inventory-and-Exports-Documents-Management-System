@@ -387,30 +387,57 @@ const getCategoryIdFromRow = (row, categories) => {
   return match ? String(match.id) : "";
 };
 
-const buildNextItemCode = (rows) => {
-  const codes = rows.map((row) => textValue(row.code, row.item_code)).filter(Boolean);
+const buildNextItemCode = (rows, stockType = "produce", categoryName = "") => {
+  let prefix = "ITM-"; // default for produce
 
-  if (!codes.length) return "FW-PRD-001";
+  if (stockType === "packaging") {
+    const catName = String(categoryName || "").trim();
+    if (catName.includes("Cartons") || catName.includes("Boxes")) {
+      prefix = "PKG-BOX-";
+    } else if (catName.includes("Regiform") || catName.includes("Foam")) {
+      prefix = "PKG-RGF-";
+    } else if (catName.includes("Liners")) {
+      prefix = "PKG-LIN-";
+    } else if (catName.includes("Labels")) {
+      prefix = "PKG-LBL-";
+    } else if (catName.includes("Tape") || catName.includes("Wrapping")) {
+      prefix = "PKG-TAP-";
+    } else if (catName.includes("Cooling") || catName.includes("Gel Ice")) {
+      prefix = "PKG-ICE-";
+    } else if (catName.includes("Bags") || catName.includes("Vacuum")) {
+      prefix = "PKG-BAG-";
+    } else if (catName.includes("Dividers") || catName.includes("Inserts")) {
+      prefix = "PKG-DIV-";
+    } else if (catName.includes("Trays") || catName.includes("Crates")) {
+      prefix = "PKG-TRY-";
+    } else if (catName.includes("Packing Supplies") || catName.includes("Hotel Packing")) {
+      prefix = "PKG-HPK-";
+    } else {
+      prefix = "PKG-";
+    }
+  }
 
-  let bestPrefix = "FW-PRD-";
+  // Look only at existing codes that start with the resolved prefix
+  const matchingCodes = rows
+    .map((row) => textValue(row.code, row.item_code).trim())
+    .filter((code) => code.toUpperCase().startsWith(prefix.toUpperCase()));
+
   let maxNumber = 0;
-
-  codes.forEach((code) => {
-    const match = String(code).match(/^(.*?)(\d+)$/);
-    if (!match) return;
-    const [, prefix, digits] = match;
-    const num = Number(digits);
-    if (num >= maxNumber) {
-      maxNumber = num;
-      bestPrefix = prefix;
+  matchingCodes.forEach((code) => {
+    const match = code.match(/(\d+)$/);
+    if (match) {
+      const num = Number(match[1]);
+      if (num > maxNumber) {
+        maxNumber = num;
+      }
     }
   });
 
-  return `${bestPrefix}${String(maxNumber + 1).padStart(3, "0")}`;
+  return `${prefix}${String(maxNumber + 1).padStart(3, "0")}`;
 };
 
 const createEmptyForm = (rows) => ({
-  code: buildNextItemCode(rows),
+  code: "",
   name: "",
   botanical_name: "",
   category_id: "",
@@ -447,6 +474,7 @@ const ItemListPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingItemId, setEditingItemId] = useState(null);
+  const [codeManuallyEdited, setCodeManuallyEdited] = useState(false);
   const [form, setForm] = useState(createEmptyForm([]));
   const [supplierPickerId, setSupplierPickerId] = useState("");
 
@@ -484,7 +512,12 @@ const ItemListPage = () => {
 
   const categoryOptions = useMemo(() => {
     const fromItems = rows
-      .filter((row) => (row.stock_type || "produce") === activeTab)
+      .filter((row) => {
+        if (activeTab === "inactive") {
+          return row.status === "inactive";
+        }
+        return (row.stock_type || "produce") === activeTab && row.status !== "inactive";
+      })
       .map((row) => textValue(row.category_name, row.category))
       .filter(Boolean);
 
@@ -497,10 +530,14 @@ const ItemListPage = () => {
 
   const filteredRows = useMemo(() => {
     let result = [...rows];
-    // Filter by stock_type (activeTab: 'packaging' or 'produce')
-    result = result.filter(
-      (row) => (row.stock_type || "produce") === activeTab
-    );
+    // Filter by stock_type (activeTab: 'packaging' or 'produce' or 'inactive')
+    if (activeTab === "inactive") {
+      result = result.filter((row) => row.status === "inactive");
+    } else {
+      result = result.filter(
+        (row) => (row.stock_type || "produce") === activeTab && row.status !== "inactive"
+      );
+    }
 
     if (category !== "All Categories") {
       result = result.filter(
@@ -544,9 +581,12 @@ const ItemListPage = () => {
   const openNewModal = () => {
     setEditingItemId(null);
     setSupplierPickerId("");
+    setCodeManuallyEdited(false);
+    const initialCode = buildNextItemCode(rows, activeTab === "inactive" ? "produce" : activeTab, "");
     setForm({
       ...createEmptyForm(rows),
-      stock_type: activeTab,
+      stock_type: activeTab === "inactive" ? "produce" : activeTab,
+      code: initialCode,
     });
     setShowModal(true);
   };
@@ -554,6 +594,7 @@ const ItemListPage = () => {
   const openEditModal = (row) => {
     setEditingItemId(row.id || row.item_id);
     setSupplierPickerId("");
+    setCodeManuallyEdited(true);
 
     setForm({
       code: textValue(row.code, row.item_code),
@@ -570,11 +611,9 @@ const ItemListPage = () => {
       supplier_ids: extractSupplierIds(row),
       description: textValue(row.description, row.notes),
       is_active:
-        row.is_active === undefined || row.is_active === null
-          ? 1
-          : Number(row.is_active) === 1 || row.is_active === true
-          ? 1
-          : 0,
+        row.status === "inactive"
+          ? 0
+          : 1,
       stock_type: row.stock_type || "produce",
     });
 
@@ -589,6 +628,38 @@ const ItemListPage = () => {
 
   const setField = (name, value) => {
     setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleCategoryChange = (catId) => {
+    const cat = categories.find((row) => String(row.id) === String(catId));
+    const catName = cat ? cat.category_name : "";
+
+    setForm((prev) => {
+      const nextCode = !codeManuallyEdited
+        ? buildNextItemCode(rows, prev.stock_type, catName)
+        : prev.code;
+      return {
+        ...prev,
+        category_id: catId,
+        code: nextCode,
+      };
+    });
+  };
+
+  const handleStockTypeChange = (newStockType) => {
+    const cat = categories.find((row) => String(row.id) === String(form.category_id));
+    const catName = cat ? cat.category_name : "";
+
+    setForm((prev) => {
+      const nextCode = !codeManuallyEdited
+        ? buildNextItemCode(rows, newStockType, catName)
+        : prev.code;
+      return {
+        ...prev,
+        stock_type: newStockType,
+        code: nextCode,
+      };
+    });
   };
 
   const addSupplierToForm = () => {
@@ -637,7 +708,7 @@ const ItemListPage = () => {
       returnable: Number(form.returnable_mode === "yes"),
       supplier_ids: (form.supplier_ids || []).map((id) => Number(id)).filter(Boolean),
       description: "",
-      status: "active",
+      status: form.is_active ? "active" : "inactive",
       stock_type: form.stock_type,
     };
   };
@@ -745,6 +816,12 @@ const ItemListPage = () => {
         >
           🌱 Export Products
         </button>
+        <button
+          className={`tbb ${activeTab === "inactive" ? "on" : ""}`}
+          onClick={() => handleTabChange("inactive")}
+        >
+          🗑️ Inactive Items
+        </button>
       </div>
 
       <div
@@ -829,11 +906,23 @@ const ItemListPage = () => {
                 <th style={{ width: "11%", ...tableHeaderCellStyle }}>SUPPLIERS</th>
                 <th style={{ width: "7%", ...tableHeaderCellStyle }}>ACTIONS</th>
               </tr>
-            ) : (
+            ) : activeTab === "produce" ? (
               <tr>
                 <th style={{ width: "10%", ...tableHeaderCellStyle }}>CODE</th>
                 <th style={{ width: "18%", ...tableHeaderCellStyle }}>ITEM NAME</th>
                 <th style={{ width: "15%", ...tableHeaderCellStyle }}>BOTANICAL NAME</th>
+                <th style={{ width: "13%", ...tableHeaderCellStyle }}>CATEGORY</th>
+                <th style={{ width: "8%", ...tableHeaderCellStyle }}>UNIT</th>
+                <th style={{ width: "13%", ...tableHeaderCellStyle }}>UNIT COST</th>
+                <th style={{ width: "10%", ...tableHeaderCellStyle }}>RETURNABLE</th>
+                <th style={{ width: "11%", ...tableHeaderCellStyle }}>SUPPLIERS</th>
+                <th style={{ width: "7%", ...tableHeaderCellStyle }}>ACTIONS</th>
+              </tr>
+            ) : (
+              <tr>
+                <th style={{ width: "10%", ...tableHeaderCellStyle }}>CODE</th>
+                <th style={{ width: "18%", ...tableHeaderCellStyle }}>ITEM NAME</th>
+                <th style={{ width: "15%", ...tableHeaderCellStyle }}>STOCK TYPE</th>
                 <th style={{ width: "13%", ...tableHeaderCellStyle }}>CATEGORY</th>
                 <th style={{ width: "8%", ...tableHeaderCellStyle }}>UNIT</th>
                 <th style={{ width: "13%", ...tableHeaderCellStyle }}>UNIT COST</th>
@@ -876,6 +965,12 @@ const ItemListPage = () => {
                     {activeTab === "produce" && (
                       <td style={botanicalCellStyle}>
                         {textValue(row.botanical_name) || "—"}
+                      </td>
+                    )}
+
+                    {activeTab === "inactive" && (
+                      <td style={{ fontSize: 12, textTransform: "capitalize", color: "var(--text2)" }}>
+                        {textValue(row.stock_type) || "—"}
                       </td>
                     )}
 
@@ -973,7 +1068,10 @@ const ItemListPage = () => {
                       <input
                         className="fc"
                         value={form.code}
-                        onChange={(e) => setField("code", e.target.value)}
+                        onChange={(e) => {
+                          setField("code", e.target.value);
+                          setCodeManuallyEdited(true);
+                        }}
                         placeholder="FW-PRD-248"
                       />
                     </div>
@@ -1004,7 +1102,7 @@ const ItemListPage = () => {
                     )}
                   </div>
 
-                  <div className="fr" style={{ marginBottom: 4 }}>
+                  <div className="fr3" style={{ marginBottom: 4 }}>
                     <div className="ff">
                       <label className="fl">
                         Category <span className="rq">*</span>
@@ -1012,7 +1110,7 @@ const ItemListPage = () => {
                       <select
                         className="fc"
                         value={form.category_id}
-                        onChange={(e) => setField("category_id", e.target.value)}
+                        onChange={(e) => handleCategoryChange(e.target.value)}
                       >
                         <option value="">Select category</option>
                         {categories.map((row) => (
@@ -1030,10 +1128,22 @@ const ItemListPage = () => {
                       <select
                         className="fc"
                         value={form.stock_type}
-                        onChange={(e) => setField("stock_type", e.target.value)}
+                        onChange={(e) => handleStockTypeChange(e.target.value)}
                       >
                         <option value="produce">Produce</option>
                         <option value="packaging">Packaging</option>
+                      </select>
+                    </div>
+
+                    <div className="ff">
+                      <label className="fl">Status</label>
+                      <select
+                        className="fc"
+                        value={form.is_active ? "active" : "inactive"}
+                        onChange={(e) => setField("is_active", e.target.value === "active" ? 1 : 0)}
+                      >
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
                       </select>
                     </div>
                   </div>
