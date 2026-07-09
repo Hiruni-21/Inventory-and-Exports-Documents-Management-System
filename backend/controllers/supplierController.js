@@ -25,7 +25,24 @@ const getSupplierById = (req, res) => {
       return res.status(404).json({ message: "Supplier not found" });
     }
 
-    res.json(results[0]);
+    const supplier = results[0];
+    const itemsSql = `
+      SELECT i.id, i.name, i.code, i.stock_type
+      FROM items i
+      JOIN supplier_items si ON i.id = si.item_id
+      WHERE si.supplier_id = ? AND COALESCE(i.status, 'active') <> 'inactive'
+    `;
+
+    db.query(itemsSql, [id], (itemsErr, itemsResults) => {
+      if (itemsErr) {
+        return res.status(500).json({ message: "Database error", error: itemsErr.message });
+      }
+
+      res.json({
+        ...supplier,
+        items: itemsResults,
+      });
+    });
   });
 };
 

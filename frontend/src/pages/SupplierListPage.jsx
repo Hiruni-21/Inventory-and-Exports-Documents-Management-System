@@ -7,7 +7,6 @@ const emptyForm = {
   contact_number: "",
   email: "",
   address: "",
-  lead_time_days: "",
   return_eligibility: "Yes",
   rating_score: "",
   status: "active",
@@ -21,7 +20,9 @@ const SupplierListPage = () => {
 
   const [search, setSearch] = useState("");
 
-  const [showEditModal, setShowEditModal] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedSupplier, setSelectedSupplier] = useState(null);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
@@ -46,17 +47,26 @@ const SupplierListPage = () => {
   }, []);
 
   useEffect(() => {
-    if (!showEditModal) return;
+    const handleOpenAdd = () => {
+      openNew();
+    };
+    window.addEventListener("fw-open-add-supplier-modal", handleOpenAdd);
+    return () => window.removeEventListener("fw-open-add-supplier-modal", handleOpenAdd);
+  }, []);
+
+  useEffect(() => {
+    if (!showModal && !showDetailsModal) return;
 
     const onKeyDown = (e) => {
       if (e.key === "Escape") {
-        closeEdit();
+        closeModal();
+        closeDetails();
       }
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [showEditModal]);
+  }, [showModal, showDetailsModal]);
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -86,25 +96,47 @@ const SupplierListPage = () => {
       );
   }, [rows, search]);
 
-  const openEdit = (row) => {
+  const openNew = () => {
+    setEditingId(null);
+    setForm(emptyForm);
+    setShowModal(true);
+  };
+
+  const openEdit = (row, e) => {
+    if (e) e.stopPropagation();
     setEditingId(row.id);
     setForm({
       supplier_name: row.supplier_name || "",
       contact_number: row.contact_number || "",
       email: row.email || "",
       address: row.address || "",
-      lead_time_days: row.lead_time_days || "",
       return_eligibility: row.return_eligibility || "Yes",
       rating_score: row.rating_score || "",
       status: row.status || "active",
     });
-    setShowEditModal(true);
+    setShowModal(true);
   };
 
-  const closeEdit = () => {
-    setShowEditModal(false);
+  const closeModal = () => {
+    setShowModal(false);
     setEditingId(null);
     setForm(emptyForm);
+  };
+
+  const closeDetails = () => {
+    setShowDetailsModal(false);
+    setSelectedSupplier(null);
+  };
+
+  const handleRowClick = async (row) => {
+    try {
+      const res = await api.get(`/suppliers/${row.id}`);
+      setSelectedSupplier(res.data);
+      setShowDetailsModal(true);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load supplier details");
+    }
   };
 
   const handleChange = (e) => {
@@ -112,7 +144,7 @@ const SupplierListPage = () => {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleUpdate = async (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
 
     if (!form.supplier_name.trim() || !form.contact_number.trim()) {
@@ -122,29 +154,36 @@ const SupplierListPage = () => {
 
     try {
       setSaving(true);
-      await api.put(`/suppliers/${editingId}`, {
+      const payload = {
         supplier_name: form.supplier_name.trim(),
         contact_number: form.contact_number.trim(),
         email: form.email.trim(),
         address: form.address.trim(),
-        lead_time_days: Number(form.lead_time_days || 0),
         return_eligibility: form.return_eligibility,
         rating_score: Number(form.rating_score || 0),
         status: form.status,
-      });
+      };
 
-      toast.success("Supplier updated successfully");
-      closeEdit();
+      if (editingId) {
+        await api.put(`/suppliers/${editingId}`, payload);
+        toast.success("Supplier updated successfully");
+      } else {
+        await api.post("/suppliers", payload);
+        toast.success("Supplier added successfully");
+      }
+
+      closeModal();
       await loadRows();
     } catch (err) {
       console.error(err);
-      toast.error(err?.response?.data?.message || "Failed to update supplier");
+      toast.error(err?.response?.data?.message || "Failed to save supplier");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = async (row) => {
+  const handleDelete = async (row, e) => {
+    if (e) e.stopPropagation();
     const ok = window.confirm(`Delete supplier "${row.supplier_name}"?`);
     if (!ok) return;
 
@@ -160,14 +199,6 @@ const SupplierListPage = () => {
 
   return (
     <>
-      <div className="ib ib-i">
-        <span>🌿</span>
-        <div>
-          Supplier master for procurement. Keep supplier contacts, lead time, return eligibility and
-          rating up to date.
-        </div>
-      </div>
-
       <div className="fb">
         <div className="sw">
           <input
@@ -191,7 +222,6 @@ const SupplierListPage = () => {
               <th>SUPPLIER NAME</th>
               <th>CONTACT NUMBER</th>
               <th>EMAIL</th>
-              <th>LEAD TIME</th>
               <th>RETURN ELIGIBLE</th>
               <th>RATING</th>
               <th>STATUS</th>
@@ -201,15 +231,14 @@ const SupplierListPage = () => {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="8">Loading...</td>
+                <td colSpan="7">Loading...</td>
               </tr>
             ) : filteredRows.length ? (
               filteredRows.map((row) => (
-                <tr key={row.id}>
+                <tr key={row.id} onClick={() => handleRowClick(row)} style={{ cursor: "pointer" }}>
                   <td style={{ fontWeight: 700 }}>{row.supplier_name}</td>
                   <td>{row.contact_number || "—"}</td>
                   <td>{row.email || "—"}</td>
-                  <td>{Number(row.lead_time_days || 0)} days</td>
                   <td>
                     <span className={`badge ${String(row.return_eligibility || "Yes") === "Yes" ? "bg-g" : "bg-r"}`}>
                       {row.return_eligibility || "Yes"}
@@ -223,10 +252,10 @@ const SupplierListPage = () => {
                   </td>
                   <td>
                     <div style={{ display: "flex", gap: 8 }}>
-                      <button type="button" className="ab" title="Edit" onClick={() => openEdit(row)}>
+                      <button type="button" className="ab" title="Edit" onClick={(e) => openEdit(row, e)}>
                         ✏️
                       </button>
-                      <button type="button" className="ab d" title="Delete" onClick={() => handleDelete(row)}>
+                      <button type="button" className="ab d" title="Delete" onClick={(e) => handleDelete(row, e)}>
                         🗑
                       </button>
                     </div>
@@ -235,24 +264,24 @@ const SupplierListPage = () => {
               ))
             ) : (
               <tr>
-                <td colSpan="8">No suppliers found</td>
+                <td colSpan="7">No suppliers found</td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
 
-      {showEditModal && (
-        <div className="modal-backdrop" onClick={closeEdit}>
+      {showModal && (
+        <div className="modal-backdrop" onClick={closeModal}>
           <div className="md md-lg" onClick={(e) => e.stopPropagation()}>
             <div className="md-h">
-              <h3>✏️ Edit Supplier</h3>
-              <button type="button" className="md-x" onClick={closeEdit}>
+              <h3>{editingId ? "✏️ Edit Supplier" : "🌿 Add Supplier"}</h3>
+              <button type="button" className="md-x" onClick={closeModal}>
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleUpdate}>
+            <form onSubmit={handleSave}>
               <div className="md-b">
                 <div className="fr">
                   <div className="ff">
@@ -269,10 +298,6 @@ const SupplierListPage = () => {
                   <div className="ff">
                     <label className="fl">Email</label>
                     <input className="fc" type="email" name="email" value={form.email} onChange={handleChange} />
-                  </div>
-                  <div className="ff">
-                    <label className="fl">Lead Time (days)</label>
-                    <input className="fc" type="number" name="lead_time_days" value={form.lead_time_days} onChange={handleChange} />
                   </div>
                 </div>
 
@@ -295,17 +320,19 @@ const SupplierListPage = () => {
                   <textarea className="fc" name="address" value={form.address} onChange={handleChange} rows="4" />
                 </div>
 
-                <div className="ff">
-                  <label className="fl">Status</label>
-                  <select className="fc" name="status" value={form.status} onChange={handleChange}>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div>
+                {editingId && (
+                  <div className="ff">
+                    <label className="fl">Status</label>
+                    <select className="fc" name="status" value={form.status} onChange={handleChange}>
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
               <div className="md-f">
-                <button type="button" className="btn btn-s" onClick={closeEdit}>
+                <button type="button" className="btn btn-s" onClick={closeModal}>
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-p" disabled={saving}>
@@ -313,6 +340,126 @@ const SupplierListPage = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showDetailsModal && selectedSupplier && (
+        <div className="modal-backdrop" onClick={closeDetails}>
+          <div className="md md-lg" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 720 }}>
+            <div className="md-h">
+              <h3>🔍 Supplier Details</h3>
+              <button type="button" className="md-x" onClick={closeDetails}>
+                ✕
+              </button>
+            </div>
+
+            <div className="md-b">
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 24 }}>
+                <div>
+                  <h4 style={{ margin: "0 0 16px", color: "var(--g800)", borderBottom: "2px solid var(--border)", paddingBottom: 6 }}>Contact Profile</h4>
+                  <div style={{ display: "grid", gap: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--text3)" }}>Supplier Name</div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{selectedSupplier.supplier_name}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--text3)" }}>Contact Number</div>
+                      <div style={{ fontSize: 14, color: "var(--text2)" }}>{selectedSupplier.contact_number || "—"}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--text3)" }}>Email</div>
+                      <div style={{ fontSize: 14, color: "var(--text2)" }}>{selectedSupplier.email || "—"}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--text3)" }}>Address</div>
+                      <div style={{ fontSize: 14, color: "var(--text2)", whiteSpace: "pre-wrap" }}>{selectedSupplier.address || "—"}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 style={{ margin: "0 0 16px", color: "var(--g800)", borderBottom: "2px solid var(--border)", paddingBottom: 6 }}>Metrics & Status</h4>
+                  <div style={{ display: "grid", gap: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--text3)" }}>Return Eligibility</div>
+                      <span className={`badge ${String(selectedSupplier.return_eligibility || "Yes") === "Yes" ? "bg-g" : "bg-r"}`} style={{ marginTop: 4, display: "inline-block" }}>
+                        {selectedSupplier.return_eligibility || "Yes"}
+                      </span>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--text3)" }}>Rating Score</div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text2)" }}>{Number(selectedSupplier.rating_score || 0).toFixed(1)} / 5.0</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--text3)" }}>Status</div>
+                      <span className={`badge ${String(selectedSupplier.status || "active").toLowerCase() === "active" ? "bg-g" : "bg-r"}`} style={{ marginTop: 4, display: "inline-block" }}>
+                        {String(selectedSupplier.status || "active").toLowerCase() === "active" ? "Active" : "Inactive"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ borderTop: "1px solid var(--border)", paddingTop: 20 }}>
+                <h4 style={{ margin: "0 0 16px", color: "var(--g800)" }}>📦 What They Supply</h4>
+                
+                {(!selectedSupplier.items || selectedSupplier.items.length === 0) ? (
+                  <div className="ib ib-i" style={{ margin: 0 }}>
+                    <span>ℹ️</span>
+                    <div>No linked items found for this supplier. You can link items from the <strong>Items form</strong> page.</div>
+                  </div>
+                ) : (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+                    <div>
+                      <h5 style={{ margin: "0 0 10px", color: "var(--text2)", borderBottom: "1px dashed var(--border)", paddingBottom: 4 }}>
+                        📦 Packaging Materials
+                      </h5>
+                      {selectedSupplier.items.filter(i => i.stock_type === "packaging").length === 0 ? (
+                        <div style={{ fontSize: 13, color: "var(--text3)", fontStyle: "italic" }}>No linked packaging materials.</div>
+                      ) : (
+                        <ul style={{ paddingLeft: 18, margin: 0, fontSize: 13, color: "var(--text2)" }}>
+                          {selectedSupplier.items
+                            .filter(i => i.stock_type === "packaging")
+                            .map(i => (
+                              <li key={i.id} style={{ marginBottom: 4 }}>
+                                <strong>{i.code}</strong> — {i.name}
+                              </li>
+                            ))
+                          }
+                        </ul>
+                      )}
+                    </div>
+
+                    <div>
+                      <h5 style={{ margin: "0 0 10px", color: "var(--text2)", borderBottom: "1px dashed var(--border)", paddingBottom: 4 }}>
+                        🌱 Export Products
+                      </h5>
+                      {selectedSupplier.items.filter(i => i.stock_type === "produce").length === 0 ? (
+                        <div style={{ fontSize: 13, color: "var(--text3)", fontStyle: "italic" }}>No linked produce products.</div>
+                      ) : (
+                        <ul style={{ paddingLeft: 18, margin: 0, fontSize: 13, color: "var(--text2)" }}>
+                          {selectedSupplier.items
+                            .filter(i => i.stock_type === "produce")
+                            .map(i => (
+                              <li key={i.id} style={{ marginBottom: 4 }}>
+                                <strong>{i.code}</strong> — {i.name}
+                              </li>
+                            ))
+                          }
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="md-f">
+              <button type="button" className="btn btn-s" onClick={closeDetails}>
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

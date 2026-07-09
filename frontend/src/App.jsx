@@ -12,7 +12,6 @@ import SupplierDashboard from "./pages/SupplierDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 
 import SupplierListPage from "./pages/SupplierListPage";
-import AddSupplierPage from "./pages/AddSupplierPage";
 import CategoryListPage from "./pages/CategoryListPage";
 import AddCategoryPage from "./pages/AddCategoryPage";
 import ItemListPage from "./pages/ItemListPage";
@@ -95,7 +94,6 @@ function App() {
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
 
         <Route path="/suppliers" element={<SupplierListPage />} />
-        <Route path="/suppliers/add" element={<AddSupplierPage />} />
 
         <Route path="/categories" element={<CategoryListPage />} />
         <Route path="/categories/add" element={<AddCategoryPage />} />
