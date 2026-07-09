@@ -6,6 +6,14 @@ const FILTER_HEIGHT = 38;
 const PRIMARY_GREEN = "#166534";
 const PRIMARY_GREEN_HOVER = "#14532D";
 
+const tableHeaderCellStyle = {
+  fontSize: 11,
+  letterSpacing: "0.08em",
+  fontWeight: 800,
+  color: "#4F6F5C",
+  textTransform: "uppercase",
+};
+
 const searchWrapStyle = {
   width: 320,
 };
@@ -327,178 +335,102 @@ export default function CategoryListPage() {
         </div>
       ) : (
         <div
+          className="tw"
           style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
-            gap: 20,
-            alignItems: "stretch",
+            borderRadius: 24,
+            overflowX: "auto",
+            overflowY: "hidden",
           }}
         >
-          {filteredRows.length ? (
-            filteredRows.map((row) => {
-              const itemCount = numberValue(row.item_count);
-              const isHovered = hoveredCardId === row.id;
+          <table style={{ minWidth: 800, tableLayout: "fixed" }}>
+            <thead>
+              <tr>
+                <th style={{ width: "12%", ...tableHeaderCellStyle }}>Category Code</th>
+                <th style={{ width: "22%", ...tableHeaderCellStyle }}>Category Name</th>
+                <th style={{ width: "38%", ...tableHeaderCellStyle }}>Description</th>
+                <th style={{ width: "12%", ...tableHeaderCellStyle }}>Item Count</th>
+                <th style={{ width: "12%", ...tableHeaderCellStyle }}>Status</th>
+                <th style={{ width: "8%", ...tableHeaderCellStyle }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredRows.length ? (
+                filteredRows.map((row) => {
+                  const itemCount = numberValue(row.item_count);
+                  const isInactive = row.status === "inactive";
 
-              return (
-                <div
-                  key={row.id}
-                  className="card"
-                  onMouseEnter={() => setHoveredCardId(row.id)}
-                  onMouseLeave={() => setHoveredCardId(null)}
-                  style={{
-                    borderRadius: 16,
-                    border: "1px solid var(--g200, #E5E7EB)",
-                    background: "#FFFFFF",
-                    padding: "20px 24px",
-                    display: "flex",
-                    flexDirection: "column",
-                    position: "relative",
-                    transition: "all 0.2s ease-in-out",
-                    boxShadow: isHovered
-                      ? "0 10px 20px rgba(0,0,0,0.04)"
-                      : "0 2px 4px rgba(0,0,0,0.01)",
-                    height: "100%",
-                    boxSizing: "border-box",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      marginBottom: 14,
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 600,
-                        color: "#6B7280",
-                        background: "#F3F4F6",
-                        padding: "4px 8px",
-                        borderRadius: 6,
-                        letterSpacing: "0.05em",
-                        fontFamily: "monospace",
-                      }}
-                    >
-                      {categoryCode(row.id)}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 600,
-                        padding: "4px 10px",
-                        borderRadius: 6,
-                        background: row.status === "inactive" ? "#FEF2F2" : "#ECFDF5",
-                        color: row.status === "inactive" ? "#EF4444" : "#10B981",
-                        border: `1px solid ${row.status === "inactive" ? "#FEE2E2" : "#D1FAE5"}`,
-                      }}
-                    >
-                      {row.status === "inactive" ? "Inactive" : "Active"}
-                    </span>
-                  </div>
-
-                  <div
-                    style={{
-                      fontSize: 16,
-                      fontWeight: 700,
-                      color: "#111827",
-                      marginBottom: 6,
-                      lineHeight: 1.3,
-                    }}
-                  >
-                    {row.category_name}
-                  </div>
-
-                  <div
-                    style={{
-                      fontSize: 13,
-                      color: "#4B5563",
-                      lineHeight: 1.5,
-                      marginBottom: 20,
-                    }}
-                  >
-                    {textValue(row.description) || "No description"}
-                  </div>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "flex-end",
-                      justifyContent: "space-between",
-                      marginTop: "auto",
-                      paddingTop: 16,
-                      borderTop: "1px solid #F3F4F6",
-                    }}
-                  >
-                    <div>
-                      <div
+                  return (
+                    <tr key={row.id}>
+                      <td
                         style={{
-                          fontSize: 10,
-                          color: "#9CA3AF",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.05em",
-                          marginBottom: 2,
+                          fontFamily: "monospace",
+                          fontSize: 12,
                           fontWeight: 600,
+                          color: "var(--g700)",
                         }}
                       >
-                        Items
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 28,
-                          fontWeight: 700,
-                          color: "#111827",
-                          lineHeight: 1,
-                        }}
-                      >
+                        {categoryCode(row.id)}
+                      </td>
+                      <td style={{ fontWeight: 700, color: "var(--g900)" }}>
+                        {row.category_name}
+                      </td>
+                      <td style={{ color: "var(--text2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {textValue(row.description) || "—"}
+                      </td>
+                      <td style={{ fontWeight: 700, color: "var(--g900)" }}>
                         {itemCount}
-                      </div>
-                    </div>
-
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button
-                        type="button"
-                        style={actionBtnStyle(hoveredEditId === row.id)}
-                        onMouseEnter={() => setHoveredEditId(row.id)}
-                        onMouseLeave={() => setHoveredEditId(null)}
-                        onClick={() => openEditModal(row)}
-                        title="Edit category"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        type="button"
-                        style={actionBtnStyle(hoveredDeleteId === row.id, true)}
-                        onMouseEnter={() => setHoveredDeleteId(row.id)}
-                        onMouseLeave={() => setHoveredDeleteId(null)}
-                        onClick={() => handleDelete(row)}
-                        title="Delete category"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          ) : (
-            <div
-              className="card"
-              style={{
-                gridColumn: "1 / -1",
-                padding: "40px 24px",
-                textAlign: "center",
-                color: "#6B7280",
-                fontSize: 14,
-                border: "1px dashed #D1D5DB",
-                background: "#F9FAFB",
-                borderRadius: 16,
-              }}
-            >
-              No categories found
-            </div>
-          )}
+                      </td>
+                      <td>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            padding: "4px 10px",
+                            borderRadius: 6,
+                            background: isInactive ? "#FEF2F2" : "#ECFDF5",
+                            color: isInactive ? "#EF4444" : "#10B981",
+                            border: `1px solid ${isInactive ? "#FEE2E2" : "#D1FAE5"}`,
+                          }}
+                        >
+                          {isInactive ? "Inactive" : "Active"}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button
+                            type="button"
+                            style={actionBtnStyle(hoveredEditId === row.id)}
+                            onMouseEnter={() => setHoveredEditId(row.id)}
+                            onMouseLeave={() => setHoveredEditId(null)}
+                            onClick={() => openEditModal(row)}
+                            title="Edit category"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            type="button"
+                            style={actionBtnStyle(hoveredDeleteId === row.id, true)}
+                            onMouseEnter={() => setHoveredDeleteId(row.id)}
+                            onMouseLeave={() => setHoveredDeleteId(null)}
+                            onClick={() => handleDelete(row)}
+                            title="Delete category"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan="6" style={{ textAlign: "center", color: "#6B7280", padding: "30px 0" }}>
+                    No categories found
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       )}
 
