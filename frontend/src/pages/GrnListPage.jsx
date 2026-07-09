@@ -9,6 +9,13 @@ const fmtDate = (value) => {
   return date.toLocaleDateString("en-CA");
 };
 
+const fmtTime = (value) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
+};
+
 const GrnListPage = () => {
   const [grnList, setGrnList] = useState([]);
   const [error, setError] = useState("");
@@ -98,7 +105,7 @@ const GrnListPage = () => {
                   <td>{grn.po_number || "—"}</td>
                   <td>{grn.supplier_name || "—"}</td>
                   <td>{fmtDate(grn.received_date)}</td>
-                  <td>{grn.received_time || "—"}</td>
+                  <td>{fmtTime(grn.created_at)}</td>
                   <td>{grn.created_by_name || "—"}</td>
                   <td>
                     <span className="badge bg-g">Recorded</span>
