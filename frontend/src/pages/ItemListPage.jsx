@@ -1084,7 +1084,11 @@ const ItemListPage = () => {
                         className="fc"
                         value={form.name}
                         onChange={(e) => setField("name", e.target.value)}
-                        placeholder="e.g. Dragon Fruit (Red)"
+                        placeholder={
+                          form.stock_type === "packaging"
+                            ? "e.g. Corrugated Carton Box"
+                            : "e.g. Dragon Fruit (Red)"
+                        }
                       />
                     </div>
 
