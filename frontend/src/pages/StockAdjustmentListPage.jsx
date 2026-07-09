@@ -366,6 +366,23 @@ const StockAdjustmentListPage = () => {
       return;
     }
 
+    if (name === "quantity") {
+      if (value === "") {
+        setForm((prev) => ({
+          ...prev,
+          quantity: "",
+        }));
+        return;
+      }
+      const parsed = parseInt(value, 10);
+      const num = isNaN(parsed) ? 0 : Math.max(0, parsed);
+      setForm((prev) => ({
+        ...prev,
+        quantity: num,
+      }));
+      return;
+    }
+
     setForm((prev) => ({
       ...prev,
       [name]: value,
@@ -675,12 +692,12 @@ const StockAdjustmentListPage = () => {
                     <input
                       style={inputStyle}
                       type="number"
-                      step="0.01"
+                      step="1"
                       min="0"
                       name="quantity"
                       value={form.quantity}
                       onChange={handleChange}
-                      placeholder="0.0"
+                      placeholder="0"
                     />
                   </div>
 
