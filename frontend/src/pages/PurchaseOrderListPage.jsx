@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import api from "../utils/api";
 
 const statusClassMap = {
@@ -162,6 +162,12 @@ const PurchaseOrderListPage = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+        </div>
+
+        <div style={{ marginLeft: 12 }}>
+          <Link to="/purchase-orders/add" className="btn btn-p" style={{ textDecoration: "none" }}>
+            + Create PO
+          </Link>
         </div>
       </div>
 
