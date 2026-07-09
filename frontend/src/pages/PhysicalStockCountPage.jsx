@@ -59,13 +59,14 @@ const summaryCardStyle = (accent) => ({
   background: "var(--white)",
   border: "1px solid var(--border)",
   borderRadius: 18,
-  padding: "18px 20px",
+  padding: "22px 20px",
   minHeight: 116,
   display: "flex",
   flexDirection: "column",
-  justifyContent: "space-between",
+  justifyContent: "center",
   boxShadow: "0 2px 6px rgba(10,40,24,.03)",
   borderBottom: `4px solid ${accent}`,
+  boxSizing: "border-box",
 });
 
 const footerBtnSecondary = {
@@ -173,7 +174,7 @@ const PhysicalStockCountPage = () => {
                   unit: getItemUnit(item) || "pcs",
                   batch_id: 0,
                   batch_code: "—",
-                  system_qty: 0,
+                  system_qty: Number(item.qty_available ?? 0),
                 },
               ];
             }
@@ -199,7 +200,7 @@ const PhysicalStockCountPage = () => {
                 unit: getItemUnit(item) || "pcs",
                 batch_id: 0,
                 batch_code: "—",
-                system_qty: 0,
+                system_qty: Number(item.qty_available ?? 0),
               },
             ];
           }
@@ -277,11 +278,12 @@ const PhysicalStockCountPage = () => {
   const activeVariancesCount = rows.filter((r) => r.variance !== null && r.variance !== 0).length;
 
   const handleActualChange = (progressKey, value) => {
+    const cleanValue = value.replace(/[^0-9]/g, "");
     setProgress((prev) => ({
       ...prev,
       [progressKey]: {
         ...prev[progressKey],
-        actual_qty: value,
+        actual_qty: cleanValue,
         done: prev[progressKey]?.done || false,
       },
     }));
@@ -419,7 +421,6 @@ const PhysicalStockCountPage = () => {
         }}
       >
         <div style={summaryCardStyle("var(--i)")}>
-          <div style={{ fontSize: 24 }}>📅</div>
           <div>
             <div style={{ fontSize: 24, fontWeight: 800, color: "var(--g900)" }}>{lastCountDate}</div>
             <div style={{ color: "var(--text2)", fontSize: 12, fontWeight: 600 }}>Last Stock Audit</div>
@@ -427,7 +428,6 @@ const PhysicalStockCountPage = () => {
         </div>
 
         <div style={summaryCardStyle("var(--i)")}>
-          <div style={{ fontSize: 24 }}>📦</div>
           <div>
             <div style={{ fontSize: 28, fontWeight: 800, color: "var(--g900)" }}>{filteredRows.length}</div>
             <div style={{ color: "var(--text2)", fontSize: 12, fontWeight: 600 }}>Materials To Verify</div>
@@ -435,7 +435,6 @@ const PhysicalStockCountPage = () => {
         </div>
 
         <div style={summaryCardStyle("var(--g500)")}>
-          <div style={{ fontSize: 24 }}>⚠️</div>
           <div>
             <div style={{ fontSize: 28, fontWeight: 800, color: "var(--g900)" }}>
               {activeVariancesCount || 2}
@@ -445,7 +444,6 @@ const PhysicalStockCountPage = () => {
         </div>
 
         <div style={summaryCardStyle("var(--g500)")}>
-          <div style={{ fontSize: 24 }}>⏳</div>
           <div>
             <div style={{ fontSize: 28, fontWeight: 800, color: "var(--g900)" }}>1</div>
             <div style={{ color: "var(--text2)", fontSize: 12, fontWeight: 600 }}>Pending Approval</div>
