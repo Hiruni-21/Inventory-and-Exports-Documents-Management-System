@@ -25,7 +25,6 @@ import ReportsPage from "./pages/ReportsPage";
 import ManagerApprovalsPage from "./pages/ManagerApprovalsPage";
 
 import PurchaseOrderListPage from "./pages/PurchaseOrderListPage";
-import AddPurchaseOrderPage from "./pages/AddPurchaseOrderPage";
 import PurchaseOrderDetailsPage from "./pages/PurchaseOrderDetailsPage";
 import GrnListPage from "./pages/GrnListPage";
 import AddGrnPage from "./pages/AddGrnPage";
@@ -113,7 +112,6 @@ function App() {
         <Route path="/approvals" element={<ManagerApprovalsPage />} />
 
         <Route path="/purchase-orders" element={<PurchaseOrderListPage />} />
-        <Route path="/purchase-orders/add" element={<AddPurchaseOrderPage />} />
         <Route path="/purchase-orders/:id" element={<PurchaseOrderDetailsPage />} />
 
         <Route path="/grn" element={<GrnListPage />} />

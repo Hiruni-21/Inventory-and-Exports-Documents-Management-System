@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
+import AddPurchaseOrderModal from "../components/AddPurchaseOrderModal";
 
 const statusClassMap = {
   draft: "bg-x",
@@ -47,22 +48,23 @@ const PurchaseOrderListPage = () => {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(true);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+
+  const fetchPurchaseOrders = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const res = await api.get("/purchase-orders");
+      setPurchaseOrders(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to load purchase orders");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchPurchaseOrders = async () => {
-      setLoading(true);
-      setError("");
-
-      try {
-        const res = await api.get("/purchase-orders");
-        setPurchaseOrders(Array.isArray(res.data) ? res.data : []);
-      } catch (err) {
-        setError(err.response?.data?.message || "Failed to load purchase orders");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchPurchaseOrders();
   }, []);
 
@@ -165,9 +167,9 @@ const PurchaseOrderListPage = () => {
         </div>
 
         <div style={{ marginLeft: 12 }}>
-          <Link to="/purchase-orders/add" className="btn btn-p" style={{ textDecoration: "none" }}>
+          <button type="button" className="btn btn-p" onClick={() => setShowCreateModal(true)}>
             + Create PO
-          </Link>
+          </button>
         </div>
       </div>
 
@@ -240,6 +242,16 @@ const PurchaseOrderListPage = () => {
           </table>
         </div>
       </div>
+
+      {showCreateModal && (
+        <AddPurchaseOrderModal
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={() => {
+            setShowCreateModal(false);
+            fetchPurchaseOrders();
+          }}
+        />
+      )}
     </div>
   );
 };
