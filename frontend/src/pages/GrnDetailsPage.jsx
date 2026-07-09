@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import api from "../utils/api";
 
 const fmtDate = (value) => {
@@ -78,19 +78,11 @@ const GrnDetailsPage = () => {
 
   return (
     <div style={{ paddingBottom: 32, maxWidth: 1360, margin: "0 auto" }}>
-      <div style={{ marginBottom: 28, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 18, flexWrap: "wrap" }}>
-        <div style={{ maxWidth: 760 }}>
-          <span style={{ color: "#2563EB", fontSize: 13, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-            Warehouse Operations
-          </span>
-          <h1 style={{ margin: "12px 0 0", fontSize: 34, fontWeight: 800, color: "#111827", lineHeight: 1.1 }}>
-            Goods Receiving Note
-          </h1>
-          <p style={{ margin: "14px 0 0", maxWidth: 720, fontSize: 15, color: "#4B5563", lineHeight: 1.75 }}>
-            Detailed GRN review for supplier receipt tracking, item variance, and inventory reconciliation.
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+      <div style={{ marginBottom: 18, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <Link to="/grn" className="btn btn-s" style={{ textDecoration: "none" }}>
+          ← Back
+        </Link>
+        <div style={{ display: "flex", gap: 12 }}>
           <button style={{ borderRadius: 999, border: "1px solid #E5E7EB", background: "#FFFFFF", color: "#111827", padding: "10px 18px", fontWeight: 700, cursor: "pointer" }}>
             Print GRN
           </button>
@@ -113,7 +105,15 @@ const GrnDetailsPage = () => {
           <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#6B7280", marginBottom: 12 }}>
             Purchase Order
           </div>
-          <div style={{ fontSize: 28, fontWeight: 800, color: "#111827", lineHeight: 1.2 }}>{grn.po_number || "—"}</div>
+          <div style={{ fontSize: 28, fontWeight: 800, color: "#111827", lineHeight: 1.2 }}>
+            {grn.purchase_order_id ? (
+              <Link to={`/purchase-orders/${grn.purchase_order_id}`} style={{ color: "#2563EB", textDecoration: "none" }}>
+                {grn.po_number || "—"}
+              </Link>
+            ) : (
+              grn.po_number || "—"
+            )}
+          </div>
           <div style={{ fontSize: 12, color: "#6B7280", marginTop: 10 }}>Linked purchase order reference</div>
         </div>
 

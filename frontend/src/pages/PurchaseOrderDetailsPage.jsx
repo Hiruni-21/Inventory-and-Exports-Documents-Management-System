@@ -171,7 +171,7 @@ const PurchaseOrderDetailsPage = () => {
           ) : null}
 
           {canCreateGrn ? (
-            <Link to={`/grn/add?po=${purchaseOrder.id}`} className="btn btn-a">
+            <Link to={`/grn/add?po=${purchaseOrder.id}`} className="btn btn-p">
               Create GRN
             </Link>
           ) : null}
