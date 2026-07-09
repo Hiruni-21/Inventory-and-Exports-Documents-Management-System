@@ -103,26 +103,48 @@ const MOCK_RECENT_COUNTS = [
     id: 1,
     auditDate: "2026-07-01",
     performedBy: "Priya Mendis",
-    materialsCounted: 18,
+    materialsCounted: 6,
     variances: 0,
     status: "Completed",
+    items: [
+      { name: "Corrugated Carton Box", category: "Cartons/Boxes", systemQty: 242, countedQty: 242, diff: 0, status: "Match", reason: "" },
+      { name: "Regiform Box", category: "Cartons/Boxes", systemQty: 2, countedQty: 2, diff: 0, status: "Match", reason: "" },
+      { name: "Liner Bag", category: "Cooling Materials", systemQty: 850, countedQty: 850, diff: 0, status: "Match", reason: "" },
+      { name: "Export Label Roll", category: "Labels", systemQty: 65, countedQty: 65, diff: 0, status: "Match", reason: "" },
+      { name: "Packing Tape Roll", category: "Cooling Materials", systemQty: 140, countedQty: 140, diff: 0, status: "Match", reason: "" },
+      { name: "Gel Ice Pack", category: "Cooling Materials", systemQty: 180, countedQty: 180, diff: 0, status: "Match", reason: "" }
+    ]
   },
   {
     id: 2,
     auditDate: "2026-06-15",
     performedBy: "Priya Mendis",
-    materialsCounted: 18,
+    materialsCounted: 6,
     variances: 2,
     status: "Approved",
+    items: [
+      { name: "Corrugated Carton Box", category: "Cartons/Boxes", systemQty: 245, countedQty: 242, diff: -3, status: "Shortage", reason: "Damaged" },
+      { name: "Regiform Box", category: "Cartons/Boxes", systemQty: 2, countedQty: 2, diff: 0, status: "Match", reason: "" },
+      { name: "Liner Bag", category: "Cooling Materials", systemQty: 850, countedQty: 850, diff: 0, status: "Match", reason: "" },
+      { name: "Export Label Roll", category: "Labels", systemQty: 60, countedQty: 65, diff: 5, status: "Excess", reason: "Supplier replacement" },
+      { name: "Packing Tape Roll", category: "Cooling Materials", systemQty: 140, countedQty: 140, diff: 0, status: "Match", reason: "" },
+      { name: "Gel Ice Pack", category: "Cooling Materials", systemQty: 180, countedQty: 180, diff: 0, status: "Match", reason: "" }
+    ]
   },
   {
     id: 3,
     auditDate: "2026-06-01",
     performedBy: "Anura Silva",
-    materialsCounted: 15,
+    materialsCounted: 4,
     variances: 1,
     status: "Approved",
-  },
+    items: [
+      { name: "Corrugated Carton Box", category: "Cartons/Boxes", systemQty: 242, countedQty: 242, diff: 0, status: "Match", reason: "" },
+      { name: "Regiform Box", category: "Cartons/Boxes", systemQty: 5, countedQty: 2, diff: -3, status: "Shortage", reason: "Missing" },
+      { name: "Liner Bag", category: "Cooling Materials", systemQty: 850, countedQty: 850, diff: 0, status: "Match", reason: "" },
+      { name: "Export Label Roll", category: "Labels", systemQty: 65, countedQty: 65, diff: 0, status: "Match", reason: "" }
+    ]
+  }
 ];
 
 const PhysicalStockCountPage = () => {
@@ -139,6 +161,9 @@ const PhysicalStockCountPage = () => {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedSession, setSelectedSession] = useState(null);
+  const [localSessions, setLocalSessions] = useState([]);
 
   const loadPage = async () => {
     try {
@@ -226,14 +251,28 @@ const PhysicalStockCountPage = () => {
     }
   };
 
+  const loadSessions = () => {
+    const saved = window.localStorage.getItem("fw_physical_count_sessions");
+    if (saved) {
+      setLocalSessions(JSON.parse(saved));
+    } else {
+      setLocalSessions([]);
+    }
+  };
+
   useEffect(() => {
     loadPage();
+    loadSessions();
   }, []);
 
   const categories = useMemo(() => {
     const values = Array.from(new Set(batchRows.map((row) => row.category_name).filter(Boolean)));
     return ["All", ...values];
   }, [batchRows]);
+
+  const recentCounts = useMemo(() => {
+    return [...localSessions, ...MOCK_RECENT_COUNTS];
+  }, [localSessions]);
 
   const rows = useMemo(() => {
     return batchRows.map((row) => {
@@ -397,6 +436,37 @@ const PhysicalStockCountPage = () => {
           )}${row.unit ? ` ${row.unit}` : ""}. Reason: ${row.reason || "Counting error"}.`,
         });
       }
+
+      const newSession = {
+        id: Date.now(),
+        auditDate: new Date().toISOString().split("T")[0],
+        performedBy: "Manager (Priya Mendis)",
+        materialsCounted: validRows.length,
+        variances: itemsWithVariances.length,
+        status: itemsWithVariances.length > 0 ? "Pending Approval" : "Completed",
+        items: validRows.map((row) => {
+          const diff = Number(row.actualQty) - Number(row.system_qty || 0);
+          let status = "Match";
+          if (diff < 0) status = "Shortage";
+          if (diff > 0) status = "Excess";
+
+          return {
+            name: row.item_name,
+            category: row.category_name,
+            systemQty: Number(row.system_qty || 0),
+            countedQty: Number(row.actualQty),
+            diff,
+            status,
+            reason: row.reason || (diff !== 0 ? "Counting error" : ""),
+          };
+        }),
+      };
+
+      const savedSessions = window.localStorage.getItem("fw_physical_count_sessions");
+      const sessions = savedSessions ? JSON.parse(savedSessions) : [];
+      sessions.unshift(newSession);
+      window.localStorage.setItem("fw_physical_count_sessions", JSON.stringify(sessions));
+      loadSessions();
 
       window.localStorage.removeItem(STORAGE_KEY);
       setProgress({});
@@ -680,7 +750,7 @@ const PhysicalStockCountPage = () => {
             </tr>
           </thead>
           <tbody>
-            {MOCK_RECENT_COUNTS.map((cnt) => (
+            {recentCounts.map((cnt) => (
               <tr key={cnt.id}>
                 <td style={{ fontWeight: 600 }}>{formatDate(cnt.auditDate)}</td>
                 <td>{cnt.performedBy}</td>
@@ -723,7 +793,10 @@ const PhysicalStockCountPage = () => {
                   <button
                     type="button"
                     className="btn btn-s btn-xs"
-                    onClick={() => toast.success(`Viewing audit log for ${formatDate(cnt.auditDate)}`)}
+                    onClick={() => {
+                      setSelectedSession(cnt);
+                      setShowDetailModal(true);
+                    }}
                   >
                     View Log
                   </button>
@@ -763,6 +836,113 @@ const PhysicalStockCountPage = () => {
                 }}
               >
                 Submit for Approval
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDetailModal && selectedSession && (
+        <div className="modal-backdrop">
+          <div className="md" style={{ maxWidth: 750, width: "95%" }}>
+            <div className="md-h">
+              <h3>📋 Physical Count Session Detail</h3>
+              <button
+                type="button"
+                className="btn btn-s btn-sm"
+                onClick={() => setShowDetailModal(false)}
+                style={{ fontSize: 13, padding: "4px 8px" }}
+              >
+                ✕ Close
+              </button>
+            </div>
+            <div className="md-b">
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 18 }}>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text2)", textTransform: "uppercase" }}>Audit Date</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "var(--g900)", marginTop: 2 }}>
+                    {formatDate(selectedSession.auditDate)}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text2)", textTransform: "uppercase" }}>Performed By</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "var(--g900)", marginTop: 2 }}>
+                    {selectedSession.performedBy}
+                  </div>
+                </div>
+              </div>
+
+              <div className="tw" style={{ minHeight: "auto", border: "1.5px solid var(--border)", borderRadius: 10 }}>
+                <table style={{ margin: 0 }}>
+                  <thead>
+                    <tr>
+                      <th>MATERIAL</th>
+                      <th>SYSTEM QUANTITY</th>
+                      <th>COUNTED QUANTITY</th>
+                      <th>DIFFERENCE</th>
+                      <th>STATUS</th>
+                      <th>REASON</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(selectedSession.items || []).map((item, idx) => {
+                      let diffText = "—";
+                      let diffColor = "var(--text2)";
+                      const dVal = Number(item.diff || 0);
+                      if (dVal > 0) {
+                        diffText = `+${dVal}`;
+                        diffColor = "var(--s)";
+                      } else if (dVal < 0) {
+                        diffText = `${dVal}`;
+                        diffColor = "var(--d)";
+                      }
+
+                      let badgeBg = "#ECFDF5";
+                      let badgeColor = "#10B981";
+                      if (item.status === "Shortage") {
+                        badgeBg = "#FEF3C7";
+                        badgeColor = "#D97706";
+                      } else if (item.status === "Excess") {
+                        badgeBg = "#EFF6FF";
+                        badgeColor = "#2563EB";
+                      }
+
+                      return (
+                        <tr key={idx}>
+                          <td style={{ fontWeight: 700, color: "var(--g900)" }}>{item.name}</td>
+                          <td>{item.systemQty}</td>
+                          <td>{item.countedQty}</td>
+                          <td style={{ fontWeight: 700, color: diffColor }}>{diffText}</td>
+                          <td>
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 600,
+                                padding: "4px 8px",
+                                borderRadius: 6,
+                                background: badgeBg,
+                                color: badgeColor,
+                              }}
+                            >
+                              {item.status}
+                            </span>
+                          </td>
+                          <td>{item.reason || "—"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="md-f">
+              <button
+                type="button"
+                className="btn btn-p"
+                style={{ background: PRIMARY_GREEN, borderColor: PRIMARY_GREEN }}
+                onClick={() => setShowDetailModal(false)}
+              >
+                Done
               </button>
             </div>
           </div>
