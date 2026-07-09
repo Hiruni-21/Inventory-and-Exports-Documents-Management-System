@@ -278,12 +278,26 @@ const PhysicalStockCountPage = () => {
   const activeVariancesCount = rows.filter((r) => r.variance !== null && r.variance !== 0).length;
 
   const handleActualChange = (progressKey, value) => {
-    const cleanValue = value.replace(/[^0-9]/g, "");
+    if (value === "") {
+      setProgress((prev) => ({
+        ...prev,
+        [progressKey]: {
+          ...prev[progressKey],
+          actual_qty: "",
+          done: prev[progressKey]?.done || false,
+        },
+      }));
+      return;
+    }
+
+    const parsed = parseInt(value, 10);
+    const num = isNaN(parsed) ? 0 : Math.max(0, parsed);
+
     setProgress((prev) => ({
       ...prev,
       [progressKey]: {
         ...prev[progressKey],
-        actual_qty: cleanValue,
+        actual_qty: num,
         done: prev[progressKey]?.done || false,
       },
     }));
@@ -526,7 +540,7 @@ const PhysicalStockCountPage = () => {
                       <input
                         className="fc"
                         type="number"
-                        step="0.01"
+                        step="1"
                         min="0"
                         placeholder="Qty"
                         value={row.actualQty}
