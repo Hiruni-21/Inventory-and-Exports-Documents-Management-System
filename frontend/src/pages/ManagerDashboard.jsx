@@ -202,18 +202,8 @@ const ManagerDashboard = () => {
       });
     }
 
-    if (expiringSoon[0]) {
-      rows.push({
-        key: `exp-${expiringSoon[0].id}`,
-        title: `${expiringSoon[0].name || expiringSoon[0].item_name} expiring soon`,
-        subtitle: `${expiringSoon[0].batch_code || expiringSoon[0].batch_number} · ${expiringSoon[0].days_left ?? "—"}d left`,
-        to: "/inventory/expiry",
-        color: "var(--d)",
-      });
-    }
-
     return rows.slice(0, 4);
-  }, [lowStock, pendingApprovals, incompleteExportDocs, expiringSoon]);
+  }, [lowStock, pendingApprovals, incompleteExportDocs]);
 
   const todaysSchedule = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -262,15 +252,10 @@ const ManagerDashboard = () => {
         </div>
       ) : (
         <>
-          <div className="krow k4">
+          <div className="krow k3">
             <div className="kc g">
               <div className="kv">{Number(stats.items || 0)}</div>
               <div className="kl">Items in Stock</div>
-            </div>
-
-            <div className="kc r">
-              <div className="kv">{criticalExpiryCount}</div>
-              <div className="kl">Expiring in 3 Days</div>
             </div>
 
             <div className="kc r">
@@ -309,75 +294,40 @@ const ManagerDashboard = () => {
             </div>
           </div>
 
-          <div className="g2">
-            <div className="cc">
-              <h3>Expiry Watch — Next 14 Days</h3>
-              <p>FEFO priority batches</p>
+          <div className="cc">
+            <h3>Urgent Actions</h3>
+            <p>Needs attention now</p>
 
-              {expiringSoon.length ? (
-                expiringSoon.map((row, index) => (
-                  <Link
-                    key={row.id}
-                    to="/inventory/expiry"
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      padding: "9px 0",
-                      borderBottom: index === expiringSoon.length - 1 ? "none" : "1px solid var(--border)",
-                      textDecoration: "none",
-                    }}
-                  >
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--g900)" }}>
-                        {row.name || row.item_name}
-                      </div>
-                      <div style={{ fontSize: 10, color: "var(--text3)" }}>
-                        {row.batch_code || row.batch_number} · {row.days_left ?? "—"}d left
-                      </div>
+            {urgentActions.length ? (
+              urgentActions.map((action) => (
+                <Link
+                  key={action.key}
+                  to={action.to}
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    padding: "9px 10px",
+                    borderRadius: 8,
+                    background: "var(--ivory)",
+                    borderLeft: `3px solid ${action.color}`,
+                    marginBottom: 8,
+                    textDecoration: "none",
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--g900)" }}>
+                      {action.title}
                     </div>
-                  </Link>
-                ))
-              ) : (
-                <div style={{ fontSize: 12, color: "var(--text3)" }}>No expiry alerts</div>
-              )}
-            </div>
-
-            <div className="cc">
-              <h3>Urgent Actions</h3>
-              <p>Needs attention now</p>
-
-              {urgentActions.length ? (
-                urgentActions.map((action) => (
-                  <Link
-                    key={action.key}
-                    to={action.to}
-                    style={{
-                      display: "flex",
-                      gap: 8,
-                      padding: "9px 10px",
-                      borderRadius: 8,
-                      background: "var(--ivory)",
-                      borderLeft: `3px solid ${action.color}`,
-                      marginBottom: 8,
-                      textDecoration: "none",
-                    }}
-                  >
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: "var(--g900)" }}>
-                        {action.title}
-                      </div>
-                      <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 2 }}>
-                        {action.subtitle}
-                      </div>
+                    <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 2 }}>
+                      {action.subtitle}
                     </div>
-                    <span style={{ fontSize: 10, color: "var(--text3)", alignSelf: "center" }}>→</span>
-                  </Link>
-                ))
-              ) : (
-                <div style={{ fontSize: 12, color: "var(--text3)" }}>No urgent actions</div>
-              )}
-            </div>
+                  </div>
+                  <span style={{ fontSize: 10, color: "var(--text3)", alignSelf: "center" }}>→</span>
+                </Link>
+              ))
+            ) : (
+              <div style={{ fontSize: 12, color: "var(--text3)" }}>No urgent actions</div>
+            )}
           </div>
 
           <div className="g3">

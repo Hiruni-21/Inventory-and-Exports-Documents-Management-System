@@ -103,8 +103,6 @@ function App() {
         <Route path="/items" element={<ItemListPage />} />
         <Route path="/items/add" element={<AddItemPage />} />
         <Route path="/items/edit/:id" element={<AddItemPage />} />
-
-        <Route path="/inventory" element={<InventoryListPage />} />
         <Route path="/inventory/low-stock" element={<LowStockPage />} />
         <Route path="/inventory/expiry" element={<ExpiryItemsPage />} />
         <Route path="/inventory/valuation" element={<StockValuationPage />} />

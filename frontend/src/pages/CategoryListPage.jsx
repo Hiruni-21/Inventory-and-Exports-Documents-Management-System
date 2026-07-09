@@ -6,6 +6,14 @@ const FILTER_HEIGHT = 38;
 const PRIMARY_GREEN = "#166534";
 const PRIMARY_GREEN_HOVER = "#14532D";
 
+const tableHeaderCellStyle = {
+  fontSize: 11,
+  letterSpacing: "0.08em",
+  fontWeight: 800,
+  color: "#4F6F5C",
+  textTransform: "uppercase",
+};
+
 const searchWrapStyle = {
   width: 320,
 };
@@ -29,45 +37,6 @@ const addButtonStyle = {
   whiteSpace: "nowrap",
 };
 
-const statBoxStyle = {
-  background: "#F7FAF8",
-  border: "1px solid #E7F0EA",
-  borderRadius: 16,
-  padding: "10px 12px",
-  minHeight: 58,
-  display: "flex",
-  flexDirection: "column",
-  justifyContent: "center",
-};
-
-const metaBadgeStyle = {
-  display: "inline-flex",
-  alignItems: "center",
-  padding: "5px 10px",
-  borderRadius: 999,
-  background: "#F2F7F4",
-  color: "#7D9486",
-  fontSize: 11,
-  fontWeight: 800,
-  letterSpacing: "0.04em",
-};
-
-const getActionButtonStyle = (hovered, danger = false) => ({
-  width: 38,
-  height: 38,
-  borderRadius: 12,
-  border: `1px solid ${danger ? "#F3D4CD" : "#CFE2D4"}`,
-  background: hovered ? (danger ? "#FFF4F1" : "#F4FBF6") : "#FFFFFF",
-  color: danger ? "#D15D47" : "#587064",
-  fontSize: 14,
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  transition: "all 0.18s ease",
-  boxShadow: hovered ? "0 4px 10px rgba(16,24,40,.06)" : "none",
-});
-
 const textValue = (...values) => {
   for (const value of values) {
     if (value !== undefined && value !== null && String(value).trim() !== "") {
@@ -89,33 +58,74 @@ const numberValue = (...values) => {
 
 const categoryCode = (id) => `CAT-${String(id).padStart(3, "0")}`;
 
-const shelfLifeLabel = (minValue, maxValue) => {
-  const min = Number(minValue);
-  const max = Number(maxValue);
-
-  if (!min && !max) return "—";
-  if (min && max && min !== max) return `${min}-${max}d`;
-  return `${max || min}d`;
+const isPackagingCategory = (categoryName) => {
+  const name = String(categoryName || "").toLowerCase();
+  return (
+    name.includes("carton") ||
+    name.includes("box") ||
+    name.includes("regiform") ||
+    name.includes("foam") ||
+    name.includes("liner") ||
+    name.includes("label") ||
+    name.includes("tape") ||
+    name.includes("wrapping") ||
+    name.includes("cooling") ||
+    name.includes("bag") ||
+    name.includes("vacuum") ||
+    name.includes("divider") ||
+    name.includes("insert") ||
+    name.includes("tray") ||
+    name.includes("crate") ||
+    name.includes("packing")
+  );
 };
 
-const getCategoryAccent = (name) => {
-  const text = String(name || "").toLowerCase();
+const actionBtnStyle = (hovered, danger = false) => ({
+  width: 32,
+  height: 32,
+  borderRadius: 8,
+  border: `1px solid ${danger ? "#FCA5A5" : "#D1D5DB"}`,
+  background: hovered ? (danger ? "#FEF2F2" : "#F9FAFB") : "#FFFFFF",
+  color: danger ? "#EF4444" : "#4B5563",
+  fontSize: 12,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  transition: "all 0.15s ease-in-out",
+});
 
-  if (text.includes("leaf")) return "#2F69C8";
-  if (text.includes("herb") || text.includes("aromatic")) return "#7C3AED";
-  if (text.includes("fruit")) return "#2E8B57";
-  if (text.includes("exotic")) return "#E39A1C";
-  if (text.includes("micro")) return "#4F8B3A";
-  if (text.includes("dry")) return "#6E8B74";
-  if (text.includes("dairy")) return "#0F766E";
+const buildNextCategoryCode = (rows, stockType) => {
+  const prefix = stockType === "packaging" ? "PKG-CAT-" : "CAT-";
 
-  return "#2E8B57";
+  const matchingRows = rows.filter((row) => {
+    if (row.stock_type) {
+      return row.stock_type === stockType;
+    }
+    const code = String(row.category_code || "").toUpperCase();
+    return code.startsWith(prefix.toUpperCase());
+  });
+
+  let maxNumber = 0;
+  matchingRows.forEach((row) => {
+    const code = String(row.category_code || "").trim();
+    const match = code.match(/(\d+)$/);
+    if (match) {
+      const num = Number(match[1]);
+      if (num > maxNumber) {
+        maxNumber = num;
+      }
+    }
+  });
+
+  return `${prefix}${String(maxNumber + 1).padStart(3, "0")}`;
 };
 
 const emptyForm = {
   category_name: "",
   description: "",
   status: "active",
+  stock_type: "produce",
 };
 
 export default function CategoryListPage() {
@@ -123,6 +133,7 @@ export default function CategoryListPage() {
 
   const [rows, setRows] = useState([]);
   const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState("packaging");
   const [loading, setLoading] = useState(true);
 
   const [showModal, setShowModal] = useState(false);
@@ -156,33 +167,54 @@ export default function CategoryListPage() {
     loadCategories();
   }, []);
 
+  const nextCategoryCode = useMemo(() => {
+    if (editingId) {
+      const current = rows.find((r) => r.id === editingId);
+      return current ? (current.category_code || `CAT-${String(editingId).padStart(3, "0")}`) : "";
+    }
+    return buildNextCategoryCode(rows, form.stock_type);
+  }, [rows, form.stock_type, editingId]);
+
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
 
-    const base = !q
-      ? rows
-      : rows.filter((row) =>
-          [
-            row.id,
-            row.category_name,
-            row.description,
-            row.status,
-            row.item_count,
-            row.min_shelf_life,
-            row.max_shelf_life,
-          ]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase()
-            .includes(q)
-        );
+    let result = [...rows];
 
-    return [...base].sort((a, b) => Number(a.id || 0) - Number(b.id || 0));
-  }, [rows, search]);
+    // Filter categories by the active tab stock classification
+    result = result.filter((row) => {
+      if (row.stock_type) {
+        return row.stock_type === activeTab;
+      }
+      const isPkg = isPackagingCategory(row.category_name);
+      return activeTab === "packaging" ? isPkg : !isPkg;
+    });
+
+    if (q) {
+      result = result.filter((row) =>
+        [
+          row.id,
+          row.category_code,
+          row.category_name,
+          row.description,
+          row.status,
+          row.item_count,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(q)
+          );
+    }
+
+    return result.sort((a, b) => Number(a.id || 0) - Number(b.id || 0));
+  }, [rows, search, activeTab]);
 
   const openNewModal = () => {
     setEditingId(null);
-    setForm(emptyForm);
+    setForm({
+      ...emptyForm,
+      stock_type: activeTab,
+    });
     setShowModal(true);
   };
 
@@ -192,6 +224,7 @@ export default function CategoryListPage() {
       category_name: textValue(row.category_name),
       description: textValue(row.description),
       status: textValue(row.status) || "active",
+      stock_type: textValue(row.stock_type) || (isPackagingCategory(row.category_name) ? "packaging" : "produce"),
     });
     setShowModal(true);
   };
@@ -221,6 +254,8 @@ export default function CategoryListPage() {
         category_name: form.category_name.trim(),
         description: form.description.trim(),
         status: form.status || "active",
+        stock_type: form.stock_type,
+        category_code: editingId ? undefined : nextCategoryCode,
       };
 
       if (editingId) {
@@ -265,6 +300,21 @@ export default function CategoryListPage() {
 
   return (
     <div>
+      <div className="tab-bar" style={{ marginBottom: 18 }}>
+        <button
+          className={`tbb ${activeTab === "packaging" ? "on" : ""}`}
+          onClick={() => setActiveTab("packaging")}
+        >
+          📦 Packaging Materials
+        </button>
+        <button
+          className={`tbb ${activeTab === "produce" ? "on" : ""}`}
+          onClick={() => setActiveTab("produce")}
+        >
+          🌱 Export Products
+        </button>
+      </div>
+
       <div
         className="fb"
         style={{
@@ -330,196 +380,102 @@ export default function CategoryListPage() {
         </div>
       ) : (
         <div
+          className="tw"
           style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(310px, 1fr))",
-            gap: 18,
+            borderRadius: 24,
+            overflowX: "auto",
+            overflowY: "hidden",
           }}
         >
-          {filteredRows.length ? (
-            filteredRows.map((row) => {
-              const accent = getCategoryAccent(row.category_name);
-              const itemCount = numberValue(row.item_count);
-              const shelfRange = shelfLifeLabel(
-                row.min_shelf_life,
-                row.max_shelf_life
-              );
-              const isHovered = hoveredCardId === row.id;
+          <table style={{ minWidth: 800, tableLayout: "fixed" }}>
+            <thead>
+              <tr>
+                <th style={{ width: "12%", ...tableHeaderCellStyle }}>Category Code</th>
+                <th style={{ width: "22%", ...tableHeaderCellStyle }}>Category Name</th>
+                <th style={{ width: "38%", ...tableHeaderCellStyle }}>Description</th>
+                <th style={{ width: "12%", ...tableHeaderCellStyle }}>Item Count</th>
+                <th style={{ width: "12%", ...tableHeaderCellStyle }}>Status</th>
+                <th style={{ width: "8%", ...tableHeaderCellStyle }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredRows.length ? (
+                filteredRows.map((row) => {
+                  const itemCount = numberValue(row.item_count);
+                  const isInactive = row.status === "inactive";
 
-              return (
-                <div
-                  key={row.id}
-                  className="card"
-                  onMouseEnter={() => setHoveredCardId(row.id)}
-                  onMouseLeave={() => setHoveredCardId(null)}
-                  style={{
-                    borderRadius: 24,
-                    border: isHovered
-                      ? `1px solid ${accent}55`
-                      : "1px solid #D8E6DD",
-                    background: "#FFFFFF",
-                    padding: "12px 20px",
-                    position: "relative",
-                    overflow: "hidden",
-                    transition: "all 0.18s ease",
-                    transform: isHovered ? "translateY(-4px)" : "translateY(0)",
-                    boxShadow: isHovered
-                      ? "0 12px 28px rgba(16,24,40,.08)"
-                      : "0 2px 8px rgba(16,24,40,.03)",
-                  }}
-                >
-                  <div
-                    style={{
-                      position: "absolute",
-                      left: 0,
-                      top: 0,
-                      bottom: 0,
-                      width: 5,
-                      background: accent,
-                    }}
-                  />
-
-                  <div
-                    className="fb"
-                    style={{
-                      alignItems: "flex-start",
-                      justifyContent: "space-between",
-                      gap: 12,
-                      marginBottom: 10,
-                    }}
-                  >
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ ...metaBadgeStyle, marginBottom: 8 }}>
-                        {categoryCode(row.id)}
-                      </div>
-
-                      <div
+                  return (
+                    <tr key={row.id}>
+                      <td
                         style={{
-                          fontSize: 16,
-                          fontWeight: 800,
-                          color: "var(--g900)",
-                          lineHeight: 1.2,
-                          marginBottom: 2,
+                          fontFamily: "monospace",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: "var(--g700)",
                         }}
                       >
+                        {row.category_code || categoryCode(row.id)}
+                      </td>
+                      <td style={{ fontWeight: 700, color: "var(--g900)" }}>
                         {row.category_name}
-                      </div>
-
-                      <div
-                        style={{
-                          fontSize: 12,
-                          color: "#7F978A",
-                          lineHeight: 1.45,
-                        }}
-                      >
-                        {textValue(row.description) || "No description"}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: 12,
-                      marginBottom: 10,
-                    }}
-                  >
-                    <div style={statBoxStyle}>
-                      <div
-                        style={{
-                          fontSize: 12,
-                          color: "#7F978A",
-                          marginBottom: 5,
-                        }}
-                      >
-                        Items
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 24,
-                          fontWeight: 800,
-                          color: "var(--g900)",
-                          lineHeight: 1,
-                        }}
-                      >
+                      </td>
+                      <td style={{ color: "var(--text2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {textValue(row.description) || "—"}
+                      </td>
+                      <td style={{ fontWeight: 700, color: "var(--g900)" }}>
                         {itemCount}
-                      </div>
-                    </div>
-
-                    <div style={statBoxStyle}>
-                      <div
-                        style={{
-                          fontSize: 12,
-                          color: "#7F978A",
-                          marginBottom: 5,
-                        }}
-                      >
-                        Shelf Life
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 20,
-                          fontWeight: 800,
-                          color: "var(--g900)",
-                          lineHeight: 1,
-                        }}
-                      >
-                        {shelfRange}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div
-                    className="fb"
-                    style={{
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 12,
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: "#8AA092",
-                        fontWeight: 700,
-                      }}
-                    >
-                      {textValue(row.status) === "inactive" ? "Inactive" : "Active"}
-                    </div>
-
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button
-                        type="button"
-                        style={getActionButtonStyle(hoveredEditId === row.id)}
-                        onMouseEnter={() => setHoveredEditId(row.id)}
-                        onMouseLeave={() => setHoveredEditId(null)}
-                        onClick={() => openEditModal(row)}
-                        title="Edit category"
-                      >
-                        ✏️
-                      </button>
-
-                      <button
-                        type="button"
-                        style={getActionButtonStyle(hoveredDeleteId === row.id, true)}
-                        onMouseEnter={() => setHoveredDeleteId(row.id)}
-                        onMouseLeave={() => setHoveredDeleteId(null)}
-                        onClick={() => handleDelete(row)}
-                        title="Delete category"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          ) : (
-            <div className="card" style={{ padding: 22 }}>
-              No categories found
-            </div>
-          )}
+                      </td>
+                      <td>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            padding: "4px 10px",
+                            borderRadius: 6,
+                            background: isInactive ? "#FEF2F2" : "#ECFDF5",
+                            color: isInactive ? "#EF4444" : "#10B981",
+                            border: `1px solid ${isInactive ? "#FEE2E2" : "#D1FAE5"}`,
+                          }}
+                        >
+                          {isInactive ? "Inactive" : "Active"}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button
+                            type="button"
+                            style={actionBtnStyle(hoveredEditId === row.id)}
+                            onMouseEnter={() => setHoveredEditId(row.id)}
+                            onMouseLeave={() => setHoveredEditId(null)}
+                            onClick={() => openEditModal(row)}
+                            title="Edit category"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            type="button"
+                            style={actionBtnStyle(hoveredDeleteId === row.id, true)}
+                            onMouseEnter={() => setHoveredDeleteId(row.id)}
+                            onMouseLeave={() => setHoveredDeleteId(null)}
+                            onClick={() => handleDelete(row)}
+                            title="Delete category"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan="6" style={{ textAlign: "center", color: "#6B7280", padding: "30px 0" }}>
+                    No categories found
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -536,6 +492,16 @@ export default function CategoryListPage() {
             <form onSubmit={handleSave}>
               <div className="md-b">
                 <div className="ff" style={{ marginBottom: 14 }}>
+                  <label className="fl">{editingId ? "Category Code" : "Generated Category Code"}</label>
+                  <input
+                    className="fc"
+                    value={nextCategoryCode}
+                    disabled
+                    style={{ background: "#F3F4F6", fontWeight: 600, color: "var(--g700)" }}
+                  />
+                </div>
+
+                <div className="ff" style={{ marginBottom: 14 }}>
                   <label className="fl">
                     Category Name <span className="rq">*</span>
                   </label>
@@ -550,13 +516,25 @@ export default function CategoryListPage() {
                 <div className="ff" style={{ marginBottom: 14 }}>
                   <label className="fl">Description</label>
                   <textarea
-                    className="fc"
-                    rows="4"
-                    value={form.description}
-                    onChange={(e) => setField("description", e.target.value)}
-                    placeholder="Short category description"
-                    style={{ resize: "vertical", paddingTop: 12 }}
+                     className="fc"
+                     rows="4"
+                     value={form.description}
+                     onChange={(e) => setField("description", e.target.value)}
+                     placeholder="Short category description"
+                     style={{ resize: "vertical", paddingTop: 12 }}
                   />
+                </div>
+
+                <div className="ff" style={{ marginBottom: 14 }}>
+                  <label className="fl">Stock Type <span className="rq">*</span></label>
+                  <select
+                    className="fc"
+                    value={form.stock_type}
+                    onChange={(e) => setField("stock_type", e.target.value)}
+                  >
+                    <option value="produce">Produce</option>
+                    <option value="packaging">Packaging</option>
+                  </select>
                 </div>
 
                 <div className="ff">

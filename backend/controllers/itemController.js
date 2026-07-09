@@ -87,7 +87,6 @@ const getAllItems = async (req, res) => {
         ) AS supplier_ids_csv
       FROM items i
       LEFT JOIN item_categories c ON i.category_id = c.id
-      WHERE COALESCE(i.status, 'active') <> 'inactive'
       ORDER BY i.id DESC
     `;
 
@@ -189,12 +188,25 @@ const createItem = async (req, res) => {
       description,
       status,
       supplier_ids,
+      stock_type,
     } = req.body;
 
     if (!code || !name || !category_id || !type || !unit) {
       return res.status(400).json({
         message: "Code, name, category, type, and unit are required",
       });
+    }
+
+    const finalStockType = stock_type || 'produce';
+    if (!['packaging', 'produce'].includes(finalStockType)) {
+      return res.status(400).json({
+        message: "Invalid stock_type. Must be 'packaging' or 'produce'.",
+      });
+    }
+
+    const existing = await query("SELECT id FROM items WHERE LOWER(TRIM(code)) = LOWER(TRIM(?)) LIMIT 1", [code]);
+    if (existing.length > 0) {
+      return res.status(409).json({ message: "Item code already exists" });
     }
 
     const insertSql = `
@@ -213,9 +225,10 @@ const createItem = async (req, res) => {
         returnable,
         description,
         status,
-        created_by
+        created_by,
+        stock_type
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const result = await query(insertSql, [
@@ -233,6 +246,7 @@ const createItem = async (req, res) => {
       description || null,
       normalizeStatus(status),
       req.user.id,
+      finalStockType,
     ]);
 
     const itemId = result.insertId;
@@ -288,11 +302,18 @@ const updateItem = async (req, res) => {
       description,
       status,
       supplier_ids,
+      stock_type,
     } = req.body;
 
     if (!code || !name || !category_id || !type || !unit) {
       return res.status(400).json({
         message: "Code, name, category, type, and unit are required",
+      });
+    }
+
+    if (stock_type && !['packaging', 'produce'].includes(stock_type)) {
+      return res.status(400).json({
+        message: "Invalid stock_type. Must be 'packaging' or 'produce'.",
       });
     }
 
@@ -311,11 +332,11 @@ const updateItem = async (req, res) => {
         unit_cost = ?,
         returnable = ?,
         description = ?,
-        status = ?
+        status = ?` + (stock_type ? `, stock_type = ?` : "") + `
       WHERE id = ?
     `;
 
-    await query(sql, [
+    const updateParams = [
       code,
       name,
       botanical_name || null,
@@ -329,8 +350,13 @@ const updateItem = async (req, res) => {
       normalizeReturnable(returnable),
       description || null,
       normalizeStatus(status),
-      id,
-    ]);
+    ];
+    if (stock_type) {
+      updateParams.push(stock_type);
+    }
+    updateParams.push(id);
+
+    await query(sql, updateParams);
 
     await query(
       `

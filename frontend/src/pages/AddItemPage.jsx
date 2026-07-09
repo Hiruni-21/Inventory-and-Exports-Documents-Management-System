@@ -22,20 +22,51 @@ const prefixMap = {
   "Tea & Coffee": "TEA",
   "Other Products": "OTH",
   "Hotel Requirements": "HOT",
+  "Cartons / Boxes": "CTN",
+  "Regiform / Foam": "FOA",
+  "Liners": "LIN",
+  "Labels": "LBL",
+  "Tape / Wrapping": "TAP",
+  "Cooling Materials": "COL",
+  "Bags / Vacuum Packs": "BAG",
+  "Dividers / Inserts": "DIV",
+  "Trays / Crates": "TRY",
+  "Hotel Packing Supplies": "HPK",
 };
 
 const buildNextItemCode = (items, categoryName = "") => {
   const prefix = prefixMap[categoryName] || "ITM";
 
-  const matching = items.filter((row) => String(row.code || "").includes(`FW-${prefix}-`));
+  const existingCodes = new Set(items.map((row) => String(row.code || "").trim().toLowerCase()));
 
-  const highest = matching.reduce((max, row) => {
+  const matching = items.filter((row) => {
+    const code = String(row.code || "").toUpperCase();
+    return code.includes(`FW-${prefix}-`) || code.includes(`${prefix}-`);
+  });
+
+  let highest = matching.reduce((max, row) => {
     const match = String(row.code || "").match(/(\d+)$/);
     const value = match ? Number(match[1]) : 0;
     return Math.max(max, value);
   }, 0);
 
-  return `FW-${prefix}-${String(highest + 1).padStart(3, "0")}`;
+  let nextNum = highest + 1;
+  let code = `FW-${prefix}-${String(nextNum).padStart(3, "0")}`;
+
+  const isTaken = (c) => {
+    const lc = c.toLowerCase();
+    if (existingCodes.has(lc)) return true;
+    const bare = lc.replace(/^fw-/, "");
+    if (existingCodes.has(bare)) return true;
+    return false;
+  };
+
+  while (isTaken(code)) {
+    nextNum++;
+    code = `FW-${prefix}-${String(nextNum).padStart(3, "0")}`;
+  }
+
+  return code;
 };
 
 const AddItemPage = () => {
@@ -61,6 +92,7 @@ const AddItemPage = () => {
     returnable: 1,
     description: "",
     status: "active",
+    stock_type: "produce",
   });
 
   const selectedCategory = useMemo(
@@ -125,11 +157,43 @@ const AddItemPage = () => {
     }));
   };
 
+  const handleCodeBlur = (e) => {
+    const value = e.target.value;
+    if (!value.trim()) return;
+
+    const isTaken = items.some(
+      (row) => String(row.code || "").trim().toLowerCase() === value.trim().toLowerCase()
+    );
+
+    if (isTaken) {
+      toast.error(`Item code "${value}" is already taken. A fresh unique code has been suggested.`);
+      const freshCode = buildNextItemCode(items, selectedCategory?.category_name || "");
+      setForm((prev) => ({
+        ...prev,
+        code: freshCode,
+      }));
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!form.code || !form.name || !form.category_id || !form.type || !form.unit) {
       toast.error("Code, name, category, type and unit are required");
+      return;
+    }
+
+    const isTaken = items.some(
+      (row) => String(row.code || "").trim().toLowerCase() === form.code.trim().toLowerCase()
+    );
+
+    if (isTaken) {
+      toast.error(`Item code "${form.code}" is already taken. Suggesting a new unique code...`);
+      const freshCode = buildNextItemCode(items, selectedCategory?.category_name || "");
+      setForm((prev) => ({
+        ...prev,
+        code: freshCode,
+      }));
       return;
     }
 
@@ -150,6 +214,7 @@ const AddItemPage = () => {
         returnable: Number(form.returnable),
         description: form.description.trim(),
         status: form.status,
+        stock_type: form.stock_type,
       });
 
       toast.success("Item created successfully");
@@ -199,6 +264,7 @@ const AddItemPage = () => {
                         name="code"
                         value={form.code}
                         onChange={handleChange}
+                        onBlur={handleCodeBlur}
                         placeholder="FW-VEG-001"
                       />
                     </div>
@@ -245,6 +311,21 @@ const AddItemPage = () => {
                             {row.category_name}
                           </option>
                         ))}
+                      </select>
+                    </div>
+
+                    <div className="ff">
+                      <label className="fl">
+                        Stock Type <span className="rq">*</span>
+                      </label>
+                      <select
+                        className="fc"
+                        name="stock_type"
+                        value={form.stock_type}
+                        onChange={handleChange}
+                      >
+                        <option value="produce">Produce</option>
+                        <option value="packaging">Packaging</option>
                       </select>
                     </div>
                   </div>

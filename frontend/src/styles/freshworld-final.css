@@ -151,7 +151,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--ivory);color:va
 
 /* ─── SHARED ─── */
 .krow{display:grid;gap:16px;margin-bottom:22px}
-.k4{grid-template-columns:repeat(4,1fr)}.k3{grid-template-columns:repeat(3,1fr)}.k2{grid-template-columns:repeat(2,1fr)}
+.k4{grid-template-columns:repeat(4,1fr)}.k3{grid-template-columns:repeat(3,1fr)}.k2{grid-template-columns:repeat(2,1fr)}.k1{grid-template-columns:1fr}
 .kc{background:var(--white);border-radius:var(--r-lg);padding:22px;border:1.5px solid var(--border);transition:all 0.25s cubic-bezier(0.4, 0, 0.2, 1);overflow:hidden;position:relative;box-shadow:var(--sh)}
 .kc:hover{transform:translateY(-3px);box-shadow:var(--sh-md);border-color:var(--g300)}
 .kc::after{content:'';position:absolute;bottom:0;left:0;right:0;height:4px;border-radius:0 0 var(--r-lg) var(--r-lg)}

@@ -85,7 +85,7 @@ const getInventory = (req, res) => {
       GROUP BY item_id
     ) bs
       ON bs.item_id = i.id
-    WHERE 1 = 1
+    WHERE i.stock_type = 'packaging'
   `;
 
   const params = [];
@@ -135,7 +135,8 @@ const getLowStockItems = (req, res) => {
     FROM items i
     JOIN item_categories c ON i.category_id = c.id
     LEFT JOIN inventory inv ON inv.item_id = i.id
-    WHERE COALESCE(inv.qty_on_hand, 0) > 0
+    WHERE i.stock_type = 'packaging'
+      AND COALESCE(inv.qty_on_hand, 0) > 0
       AND COALESCE(inv.qty_on_hand, 0) <= COALESCE(i.reorder_level, 0)
     ORDER BY shortage DESC, i.name ASC
   `;
@@ -174,7 +175,8 @@ const getExpiryItems = (req, res) => {
       ib.status
     FROM inventory_batches ib
     JOIN items i ON ib.item_id = i.id
-    WHERE ib.expiry_date IS NOT NULL
+    WHERE i.stock_type = 'packaging'
+      AND ib.expiry_date IS NOT NULL
       AND ib.available_quantity > 0
       AND ib.expiry_date <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
     ORDER BY ib.expiry_date ASC, i.name ASC
@@ -265,7 +267,8 @@ const getInventoryValuation = (req, res) => {
         GROUP BY item_id
       ) eb
         ON eb.item_id = i.id
-      WHERE COALESCE(i.status, 'active') = 'active'
+      WHERE i.stock_type = 'packaging'
+        AND COALESCE(i.status, 'active') = 'active'
       ORDER BY total_value DESC, i.name ASC
     `;
 
@@ -282,11 +285,13 @@ const getInventoryValuation = (req, res) => {
 
   const summarySql = `
     SELECT
-      COUNT(*) AS total_items,
-      COALESCE(SUM(qty_on_hand), 0) AS total_qty_on_hand,
-      COALESCE(SUM(qty_available), 0) AS total_qty_available,
-      COALESCE(SUM(total_value), 0) AS total_inventory_value
-    FROM inventory
+      COUNT(inv.item_id) AS total_items,
+      COALESCE(SUM(inv.qty_on_hand), 0) AS total_qty_on_hand,
+      COALESCE(SUM(inv.qty_available), 0) AS total_qty_available,
+      COALESCE(SUM(inv.total_value), 0) AS total_inventory_value
+    FROM inventory inv
+    JOIN items i ON inv.item_id = i.id
+    WHERE i.stock_type = 'packaging'
   `;
 
   db.query(summarySql, (err, results) => {

@@ -188,17 +188,7 @@ const buildBatchOptionLabel = (batch) => {
   const qty = formatQty(batch?.qty_remaining ?? batch?.available_quantity ?? 0);
   const unit = batch?.unit || "";
 
-  let expiryText = "";
-  if (batch?.expiry_date) {
-    const today = new Date();
-    const expiry = new Date(batch.expiry_date);
-    if (!Number.isNaN(expiry.getTime())) {
-      const diffDays = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
-      if (diffDays >= 0) expiryText = ` (exp ${diffDays}d)`;
-    }
-  }
-
-  return `${code} — ${qty}${unit ? ` ${unit}` : ""}${expiryText}`;
+  return `${code} — ${qty}${unit ? ` ${unit}` : ""}`;
 };
 
 const extractAuthorizedBy = (row) => {
@@ -372,6 +362,23 @@ const StockAdjustmentListPage = () => {
         ...prev,
         item_id: value,
         batch_id: "",
+      }));
+      return;
+    }
+
+    if (name === "quantity") {
+      if (value === "") {
+        setForm((prev) => ({
+          ...prev,
+          quantity: "",
+        }));
+        return;
+      }
+      const parsed = parseInt(value, 10);
+      const num = isNaN(parsed) ? 0 : Math.max(0, parsed);
+      setForm((prev) => ({
+        ...prev,
+        quantity: num,
       }));
       return;
     }
@@ -685,12 +692,12 @@ const StockAdjustmentListPage = () => {
                     <input
                       style={inputStyle}
                       type="number"
-                      step="0.01"
+                      step="1"
                       min="0"
                       name="quantity"
                       value={form.quantity}
                       onChange={handleChange}
-                      placeholder="0.0"
+                      placeholder="0"
                     />
                   </div>
 

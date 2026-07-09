@@ -79,6 +79,7 @@ const getAllStockAdjustments = (req, res) => {
     JOIN items i ON sa.item_id = i.id
     LEFT JOIN inventory_batches ib ON sa.batch_id = ib.id
     LEFT JOIN users u ON sa.created_by = u.id
+    WHERE i.stock_type = 'packaging'
     ORDER BY sa.id DESC
   `;
 
@@ -118,7 +119,8 @@ const createStockAdjustment = (req, res) => {
       ib.batch_code,
       COALESCE(ib.available_quantity, 0) AS available_quantity
     FROM inventory_batches ib
-    WHERE ib.id = ? AND ib.item_id = ?
+    JOIN items i ON ib.item_id = i.id
+    WHERE ib.id = ? AND ib.item_id = ? AND i.stock_type = 'packaging'
     LIMIT 1
   `;
 
@@ -129,7 +131,7 @@ const createStockAdjustment = (req, res) => {
     }
 
     if (!batchRows.length) {
-      return res.status(404).json({ message: "Selected batch not found" });
+      return res.status(404).json({ message: "Selected batch not found or item is not a packaging material" });
     }
 
     const batch = batchRows[0];
@@ -250,6 +252,14 @@ const createStockAdjustment = (req, res) => {
                   res.status(500).json({ message: "Failed to refresh inventory", error: refreshErr.message })
                 );
               }
+
+              db.commit((commitErr) => {
+                if (commitErr) {
+                  console.error("Transaction commit failed:", commitErr);
+                  return db.rollback(() =>
+                    res.status(500).json({ message: "Transaction commit failed", error: commitErr.message })
+                  );
+                }
 
                 const { sendNotification } = require("../utils/notificationHelper");
                 sendNotification({

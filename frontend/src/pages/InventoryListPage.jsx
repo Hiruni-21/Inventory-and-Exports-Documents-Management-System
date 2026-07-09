@@ -873,16 +873,13 @@ const InventoryListPage = () => {
                       <th>BATCH NO.</th>
                       <th>QTY REMAINING</th>
                       <th>RECEIVED</th>
-                      <th>EXPIRY DATE</th>
-                      <th>DAYS LEFT</th>
-                      <th>FEFO PRIORITY</th>
                     </tr>
                   </thead>
 
                   <tbody>
                     {loadingDetail ? (
                       <tr>
-                        <td colSpan="6">Loading batches...</td>
+                        <td colSpan="3">Loading batches...</td>
                       </tr>
                     ) : detailBatches.length ? (
                       detailBatches.map((batch, index) => {
@@ -892,8 +889,6 @@ const InventoryListPage = () => {
                           batch.quantity,
                           batch.qty_on_hand
                         );
-                        const expiry = textValue(batch.expiry_date);
-                        const daysLeft = daysLeftFromDate(expiry);
 
                         return (
                           <tr key={batch.id || batch.batch_code || index}>
@@ -904,39 +899,12 @@ const InventoryListPage = () => {
                               {qty} {textValue(batch.unit, selectedRow.unit)}
                             </td>
                             <td>{formatLongDate(textValue(batch.received_date, batch.created_at))}</td>
-                            <td
-                              style={
-                                daysLeft !== null && daysLeft <= 7
-                                  ? { color: "#9C2D22", fontWeight: 700 }
-                                  : undefined
-                              }
-                            >
-                              {formatLongDate(expiry)}
-                            </td>
-                            <td
-                              style={
-                                daysLeft !== null && daysLeft <= 7
-                                  ? { color: "#9C2D22", fontWeight: 700 }
-                                  : { color: "var(--text2)" }
-                              }
-                            >
-                              {daysLeft === null ? "—" : `${daysLeft} days`}
-                            </td>
-                            <td
-                              style={
-                                index === 0
-                                  ? { color: "#9C2D22", fontWeight: 700 }
-                                  : { color: "#9AA2B0", fontWeight: 700 }
-                              }
-                            >
-                              {index === 0 ? "#1 — Dispatch First" : `#${index + 1}`}
-                            </td>
                           </tr>
                         );
                       })
                     ) : (
                       <tr>
-                        <td colSpan="6">No active batches found</td>
+                        <td colSpan="3">No active batches found</td>
                       </tr>
                     )}
                   </tbody>

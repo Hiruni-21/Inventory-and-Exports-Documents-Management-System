@@ -14,9 +14,11 @@ const getAllCategories = async (req, res) => {
     const sql = `
       SELECT
         c.id,
+        c.category_code,
         c.category_name,
         COALESCE(c.description, '') AS description,
         COALESCE(c.status, 'active') AS status,
+        c.stock_type,
         c.created_at,
         COUNT(i.id) AS item_count,
         MIN(NULLIF(i.shelf_life_days, 0)) AS min_shelf_life,
@@ -26,7 +28,7 @@ const getAllCategories = async (req, res) => {
         ON i.category_id = c.id
        AND COALESCE(i.status, 'active') <> 'inactive'
       WHERE COALESCE(c.status, 'active') <> 'inactive'
-      GROUP BY c.id, c.category_name, c.description, c.status, c.created_at
+      GROUP BY c.id, c.category_code, c.category_name, c.description, c.status, c.stock_type, c.created_at
       ORDER BY c.id ASC
     `;
 
@@ -45,9 +47,11 @@ const getCategoryById = async (req, res) => {
     const sql = `
       SELECT
         c.id,
+        c.category_code,
         c.category_name,
         COALESCE(c.description, '') AS description,
         COALESCE(c.status, 'active') AS status,
+        c.stock_type,
         c.created_at,
         COUNT(i.id) AS item_count,
         MIN(NULLIF(i.shelf_life_days, 0)) AS min_shelf_life,
@@ -57,7 +61,7 @@ const getCategoryById = async (req, res) => {
         ON i.category_id = c.id
        AND COALESCE(i.status, 'active') <> 'inactive'
       WHERE c.id = ?
-      GROUP BY c.id, c.category_name, c.description, c.status, c.created_at
+      GROUP BY c.id, c.category_code, c.category_name, c.description, c.status, c.stock_type, c.created_at
       LIMIT 1
     `;
 
@@ -76,21 +80,25 @@ const getCategoryById = async (req, res) => {
 
 const createCategory = async (req, res) => {
   try {
-    const { category_name, description, status } = req.body;
+    const { category_name, description, status, stock_type, category_code } = req.body;
 
     if (!category_name || !String(category_name).trim()) {
       return res.status(400).json({ message: "Category name is required" });
     }
 
+    const finalStockType = String(stock_type || "produce").toLowerCase() === "packaging" ? "packaging" : "produce";
+
     const result = await query(
       `
-        INSERT INTO item_categories (category_name, description, status)
-        VALUES (?, ?, ?)
+        INSERT INTO item_categories (category_name, description, status, stock_type, category_code)
+        VALUES (?, ?, ?, ?, ?)
       `,
       [
         String(category_name).trim(),
         description ? String(description).trim() : null,
         String(status || "active").toLowerCase() === "inactive" ? "inactive" : "active",
+        finalStockType,
+        category_code || null,
       ]
     );
 
@@ -118,11 +126,13 @@ const createCategory = async (req, res) => {
 const updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
-    const { category_name, description, status } = req.body;
+    const { category_name, description, status, stock_type, category_code } = req.body;
 
     if (!category_name || !String(category_name).trim()) {
       return res.status(400).json({ message: "Category name is required" });
     }
+
+    const finalStockType = String(stock_type || "produce").toLowerCase() === "packaging" ? "packaging" : "produce";
 
     await query(
       `
@@ -130,13 +140,17 @@ const updateCategory = async (req, res) => {
         SET
           category_name = ?,
           description = ?,
-          status = ?
+          status = ?,
+          stock_type = ?,
+          category_code = COALESCE(?, category_code)
         WHERE id = ?
       `,
       [
         String(category_name).trim(),
         description ? String(description).trim() : null,
         String(status || "active").toLowerCase() === "inactive" ? "inactive" : "active",
+        finalStockType,
+        category_code || null,
         id,
       ]
     );

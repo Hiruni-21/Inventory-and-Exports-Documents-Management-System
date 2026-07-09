@@ -136,26 +136,11 @@ const StockValuationPage = () => {
 
   return (
     <>
-      <div className="krow k4">
+      <div className="krow k1">
         <div className="kc g">
           <div className="kv">{formatCompactLkr(summary.totalStockValue)}</div>
           <div className="kl">Total Stock Value</div>
           <div className="kch up">↑ 8% vs last month</div>
-        </div>
-
-        <div className="kc a">
-          <div className="kv">{formatCompactLkr(summary.perishableValue)}</div>
-          <div className="kl">Perishable Items</div>
-        </div>
-
-        <div className="kc b">
-          <div className="kv">{formatCompactLkr(summary.packagingValue)}</div>
-          <div className="kl">Packaging Materials</div>
-        </div>
-
-        <div className="kc r">
-          <div className="kv">{formatCompactLkr(summary.atRiskValue)}</div>
-          <div className="kl">At-Risk (expiring)</div>
         </div>
       </div>
 
