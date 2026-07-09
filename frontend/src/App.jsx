@@ -27,7 +27,6 @@ import ManagerApprovalsPage from "./pages/ManagerApprovalsPage";
 import PurchaseOrderListPage from "./pages/PurchaseOrderListPage";
 import PurchaseOrderDetailsPage from "./pages/PurchaseOrderDetailsPage";
 import GrnListPage from "./pages/GrnListPage";
-import AddGrnPage from "./pages/AddGrnPage";
 import GrnDetailsPage from "./pages/GrnDetailsPage";
 import ReturnListPage from "./pages/ReturnListPage";
 import AddReturnPage from "./pages/AddReturnPage";
@@ -115,7 +114,6 @@ function App() {
         <Route path="/purchase-orders/:id" element={<PurchaseOrderDetailsPage />} />
 
         <Route path="/grn" element={<GrnListPage />} />
-        <Route path="/grn/add" element={<AddGrnPage />} />
         <Route path="/grn/:id" element={<GrnDetailsPage />} />
 
         <Route path="/returns" element={<ReturnListPage />} />

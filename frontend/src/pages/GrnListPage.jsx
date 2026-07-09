@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
+import AddGrnModal from "../components/AddGrnModal";
 
 const fmtDate = (value) => {
   if (!value) return "—";
@@ -22,21 +23,22 @@ const GrnListPage = () => {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+
+  const fetchGrn = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await api.get("/grn");
+      setGrnList(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to load GRN records");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchGrn = async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const res = await api.get("/grn");
-        setGrnList(Array.isArray(res.data) ? res.data : []);
-      } catch (err) {
-        setError(err.response?.data?.message || "Failed to load GRN records");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchGrn();
   }, []);
 
@@ -64,9 +66,9 @@ const GrnListPage = () => {
         </div>
 
         <div style={{ marginLeft: "auto" }}>
-          <Link to="/grn/add" className="btn btn-p" style={{ textDecoration: "none" }}>
+          <button type="button" className="btn btn-p" onClick={() => setShowCreateModal(true)}>
             + New GRN
-          </Link>
+          </button>
         </div>
       </div>
 
@@ -128,6 +130,16 @@ const GrnListPage = () => {
           </tbody>
         </table>
       </div>
+
+      {showCreateModal && (
+        <AddGrnModal
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={() => {
+            setShowCreateModal(false);
+            fetchGrn();
+          }}
+        />
+      )}
     </div>
   );
 };
