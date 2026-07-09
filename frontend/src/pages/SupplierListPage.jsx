@@ -46,13 +46,6 @@ const SupplierListPage = () => {
     loadRows();
   }, []);
 
-  useEffect(() => {
-    const handleOpenAdd = () => {
-      openNew();
-    };
-    window.addEventListener("fw-open-add-supplier-modal", handleOpenAdd);
-    return () => window.removeEventListener("fw-open-add-supplier-modal", handleOpenAdd);
-  }, []);
 
   useEffect(() => {
     if (!showModal && !showDetailsModal) return;
@@ -199,7 +192,7 @@ const SupplierListPage = () => {
 
   return (
     <>
-      <div className="fb">
+      <div className="fb" style={{ marginBottom: 16 }}>
         <div className="sw">
           <input
             className="si"
@@ -207,6 +200,12 @@ const SupplierListPage = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+        </div>
+
+        <div style={{ marginLeft: "auto" }}>
+          <button type="button" className="btn btn-p" onClick={openNew}>
+            + Add Supplier
+          </button>
         </div>
       </div>
 
