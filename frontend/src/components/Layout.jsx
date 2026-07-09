@@ -280,7 +280,6 @@ const pageMeta = {
 };
 
 const actionButtons = {
-  "/grn": [{ label: "+ New GRN", to: "/grn/add", className: "btn btn-p btn-sm" }],
   "/returns": [
     { label: "Record Return", to: "/returns/add", className: "btn btn-s btn-sm" },
     { label: "Record Wastage", to: "/wastage/add", className: "btn btn-p btn-sm" },

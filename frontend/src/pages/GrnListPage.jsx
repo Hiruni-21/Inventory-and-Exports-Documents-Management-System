@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import api from "../utils/api";
 
 const fmtDate = (value) => {
@@ -53,7 +53,7 @@ const GrnListPage = () => {
 
   return (
     <div>
-      <div className="fb">
+      <div className="fb" style={{ marginBottom: 16 }}>
         <div className="sw">
           <input
             className="si"
@@ -61,6 +61,12 @@ const GrnListPage = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+        </div>
+
+        <div style={{ marginLeft: "auto" }}>
+          <Link to="/grn/add" className="btn btn-p" style={{ textDecoration: "none" }}>
+            + New GRN
+          </Link>
         </div>
       </div>
 
