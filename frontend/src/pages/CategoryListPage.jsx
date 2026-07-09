@@ -95,10 +95,37 @@ const actionBtnStyle = (hovered, danger = false) => ({
   transition: "all 0.15s ease-in-out",
 });
 
+const buildNextCategoryCode = (rows, stockType) => {
+  const prefix = stockType === "packaging" ? "PKG-CAT-" : "CAT-";
+
+  const matchingRows = rows.filter((row) => {
+    if (row.stock_type) {
+      return row.stock_type === stockType;
+    }
+    const code = String(row.category_code || "").toUpperCase();
+    return code.startsWith(prefix.toUpperCase());
+  });
+
+  let maxNumber = 0;
+  matchingRows.forEach((row) => {
+    const code = String(row.category_code || "").trim();
+    const match = code.match(/(\d+)$/);
+    if (match) {
+      const num = Number(match[1]);
+      if (num > maxNumber) {
+        maxNumber = num;
+      }
+    }
+  });
+
+  return `${prefix}${String(maxNumber + 1).padStart(3, "0")}`;
+};
+
 const emptyForm = {
   category_name: "",
   description: "",
   status: "active",
+  stock_type: "produce",
 };
 
 export default function CategoryListPage() {
@@ -140,6 +167,14 @@ export default function CategoryListPage() {
     loadCategories();
   }, []);
 
+  const nextCategoryCode = useMemo(() => {
+    if (editingId) {
+      const current = rows.find((r) => r.id === editingId);
+      return current ? (current.category_code || `CAT-${String(editingId).padStart(3, "0")}`) : "";
+    }
+    return buildNextCategoryCode(rows, form.stock_type);
+  }, [rows, form.stock_type, editingId]);
+
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
 
@@ -147,6 +182,9 @@ export default function CategoryListPage() {
 
     // Filter categories by the active tab stock classification
     result = result.filter((row) => {
+      if (row.stock_type) {
+        return row.stock_type === activeTab;
+      }
       const isPkg = isPackagingCategory(row.category_name);
       return activeTab === "packaging" ? isPkg : !isPkg;
     });
@@ -155,6 +193,7 @@ export default function CategoryListPage() {
       result = result.filter((row) =>
         [
           row.id,
+          row.category_code,
           row.category_name,
           row.description,
           row.status,
@@ -164,7 +203,7 @@ export default function CategoryListPage() {
           .join(" ")
           .toLowerCase()
           .includes(q)
-      );
+          );
     }
 
     return result.sort((a, b) => Number(a.id || 0) - Number(b.id || 0));
@@ -172,7 +211,10 @@ export default function CategoryListPage() {
 
   const openNewModal = () => {
     setEditingId(null);
-    setForm(emptyForm);
+    setForm({
+      ...emptyForm,
+      stock_type: activeTab,
+    });
     setShowModal(true);
   };
 
@@ -182,6 +224,7 @@ export default function CategoryListPage() {
       category_name: textValue(row.category_name),
       description: textValue(row.description),
       status: textValue(row.status) || "active",
+      stock_type: textValue(row.stock_type) || (isPackagingCategory(row.category_name) ? "packaging" : "produce"),
     });
     setShowModal(true);
   };
@@ -211,6 +254,8 @@ export default function CategoryListPage() {
         category_name: form.category_name.trim(),
         description: form.description.trim(),
         status: form.status || "active",
+        stock_type: form.stock_type,
+        category_code: editingId ? undefined : nextCategoryCode,
       };
 
       if (editingId) {
@@ -369,7 +414,7 @@ export default function CategoryListPage() {
                           color: "var(--g700)",
                         }}
                       >
-                        {categoryCode(row.id)}
+                        {row.category_code || categoryCode(row.id)}
                       </td>
                       <td style={{ fontWeight: 700, color: "var(--g900)" }}>
                         {row.category_name}
@@ -447,6 +492,16 @@ export default function CategoryListPage() {
             <form onSubmit={handleSave}>
               <div className="md-b">
                 <div className="ff" style={{ marginBottom: 14 }}>
+                  <label className="fl">{editingId ? "Category Code" : "Generated Category Code"}</label>
+                  <input
+                    className="fc"
+                    value={nextCategoryCode}
+                    disabled
+                    style={{ background: "#F3F4F6", fontWeight: 600, color: "var(--g700)" }}
+                  />
+                </div>
+
+                <div className="ff" style={{ marginBottom: 14 }}>
                   <label className="fl">
                     Category Name <span className="rq">*</span>
                   </label>
@@ -461,13 +516,25 @@ export default function CategoryListPage() {
                 <div className="ff" style={{ marginBottom: 14 }}>
                   <label className="fl">Description</label>
                   <textarea
-                    className="fc"
-                    rows="4"
-                    value={form.description}
-                    onChange={(e) => setField("description", e.target.value)}
-                    placeholder="Short category description"
-                    style={{ resize: "vertical", paddingTop: 12 }}
+                     className="fc"
+                     rows="4"
+                     value={form.description}
+                     onChange={(e) => setField("description", e.target.value)}
+                     placeholder="Short category description"
+                     style={{ resize: "vertical", paddingTop: 12 }}
                   />
+                </div>
+
+                <div className="ff" style={{ marginBottom: 14 }}>
+                  <label className="fl">Stock Type <span className="rq">*</span></label>
+                  <select
+                    className="fc"
+                    value={form.stock_type}
+                    onChange={(e) => setField("stock_type", e.target.value)}
+                  >
+                    <option value="produce">Produce</option>
+                    <option value="packaging">Packaging</option>
+                  </select>
                 </div>
 
                 <div className="ff">
