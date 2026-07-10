@@ -188,164 +188,199 @@ const createGrn = (req, res) => {
     });
   }
 
-  const grnNumber = `GRN-${Date.now()}`;
+  const insertGrnWithRetry = (retryCount = 0) => {
+    const year = new Date().getFullYear();
+    const prefix = `GRN-${year}-`;
 
-  const grnSql = `
-    INSERT INTO grn
-    (grn_number, purchase_order_id, supplier_id, received_date, remarks, created_by)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `;
+    const seqSql = `
+      SELECT grn_number 
+      FROM grn 
+      WHERE grn_number LIKE ? 
+      ORDER BY CAST(SUBSTRING(grn_number, LENGTH(?) + 1) AS UNSIGNED) DESC 
+      LIMIT 1
+    `;
 
-  db.query(
-    grnSql,
-    [grnNumber, purchase_order_id, supplier_id, received_date, remarks, created_by],
-    (err, result) => {
-      if (err) {
-        console.error("createGrn error:", err);
-        return res.status(500).json({ message: "Database error", error: err.message });
+    db.query(seqSql, [`${prefix}%`, prefix], (seqErr, seqRows) => {
+      if (seqErr) {
+        console.error("GRN sequence query error:", seqErr);
+        return res.status(500).json({ message: "Database error", error: seqErr.message });
       }
 
-      const grnId = result.insertId;
+      let nextNum = 1;
+      if (seqRows && seqRows.length > 0) {
+        const lastNumber = seqRows[0].grn_number;
+        const suffix = lastNumber.substring(prefix.length);
+        const parsed = parseInt(suffix, 10);
+        if (!isNaN(parsed)) {
+          nextNum = parsed + 1;
+        }
+      }
 
-      const itemIds = validItems.map((i) => i.item_id);
+      const grnNumber = `${prefix}${String(nextNum).padStart(3, '0')}`;
+
+      const grnSql = `
+        INSERT INTO grn
+        (grn_number, purchase_order_id, supplier_id, received_date, remarks, created_by)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `;
 
       db.query(
-        `SELECT id, unit, COALESCE(unit_cost, 0) AS unit_cost FROM items WHERE id IN (?)`,
-        [itemIds],
-        (itemErr, itemRows) => {
-          if (itemErr) {
-            return res.status(500).json({ message: "DB error", error: itemErr.message });
+        grnSql,
+        [grnNumber, purchase_order_id, supplier_id, received_date, remarks, created_by],
+        (err, result) => {
+          if (err) {
+            if (err.code === 'ER_DUP_ENTRY' && retryCount < 5) {
+              return insertGrnWithRetry(retryCount + 1);
+            }
+            console.error("createGrn error:", err);
+            return res.status(500).json({ message: "Database error", error: err.message });
           }
 
-          const itemMap = {};
-          itemRows.forEach((r) => {
-            itemMap[r.id] = r;
-          });
+          const grnId = result.insertId;
 
-          const grnItemValues = validItems.map((item, index) => {
-            const info = itemMap[item.item_id] || {};
+          const itemIds = validItems.map((i) => i.item_id);
 
-            const varianceQty = item.delivered_quantity - item.ordered_quantity;
-            const variancePercent =
-              item.ordered_quantity > 0
-                ? (varianceQty / item.ordered_quantity) * 100
-                : 0;
+          db.query(
+            `SELECT id, unit, COALESCE(unit_cost, 0) AS unit_cost FROM items WHERE id IN (?)`,
+            [itemIds],
+            (itemErr, itemRows) => {
+              if (itemErr) {
+                return res.status(500).json({ message: "DB error", error: itemErr.message });
+              }
 
-            const batchNumber = `BATCH-${grnId}-${index + 1}`;
-            const lineTotal = item.delivered_quantity * (info.unit_cost || 0);
+              const itemMap = {};
+              itemRows.forEach((r) => {
+                itemMap[r.id] = r;
+              });
 
-            return [
-              grnId,
-              null,
-              item.item_id,
-              item.ordered_quantity,
-              item.delivered_quantity,
-              varianceQty,
-              variancePercent,
-              batchNumber,
-              null,
-              info.unit_cost || 0,
-              lineTotal,
-              remarks || null,
-            ];
-          });
+              const grnItemValues = validItems.map((item, index) => {
+                const info = itemMap[item.item_id] || {};
 
-          const grnItemSql = `
-            INSERT INTO grn_items (
-              grn_id,
-              purchase_order_item_id,
-              item_id,
-              ordered_qty,
-              received_qty,
-              variance_qty,
-              variance_percent,
-              batch_number,
-              expiry_date,
-              unit_cost,
-              line_total,
-              notes
-            ) VALUES ?
-          `;
+                const varianceQty = item.delivered_quantity - item.ordered_quantity;
+                const variancePercent =
+                  item.ordered_quantity > 0
+                    ? (varianceQty / item.ordered_quantity) * 100
+                    : 0;
 
-          db.query(grnItemSql, [grnItemValues], (itemErr) => {
-            if (itemErr) {
-              return res.status(500).json({ message: "DB error", error: itemErr.message });
-            }
+                const batchNumber = `BATCH-${grnId}-${index + 1}`;
+                const lineTotal = item.delivered_quantity * (info.unit_cost || 0);
 
-            let processed = 0;
-
-            validItems.forEach((item, index) => {
-              const batchCode = `BATCH-${grnId}-${index + 1}`;
-
-              db.query(
-                `INSERT INTO inventory_batches
-                 (item_id, grn_id, batch_code, received_quantity, available_quantity, unit, received_date, status)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, 'Available')`,
-                [
-                  item.item_id,
+                return [
                   grnId,
-                  batchCode,
+                  null,
+                  item.item_id,
+                  item.ordered_quantity,
                   item.delivered_quantity,
-                  item.delivered_quantity,
-                  itemMap[item.item_id]?.unit || "",
-                  received_date,
-                ],
-                (err) => {
-                  if (err) return;
+                  varianceQty,
+                  variancePercent,
+                  batchNumber,
+                  null,
+                  info.unit_cost || 0,
+                  lineTotal,
+                  remarks || null,
+                ];
+              });
+
+              const grnItemSql = `
+                INSERT INTO grn_items (
+                  grn_id,
+                  purchase_order_item_id,
+                  item_id,
+                  ordered_qty,
+                  received_qty,
+                  variance_qty,
+                  variance_percent,
+                  batch_number,
+                  expiry_date,
+                  unit_cost,
+                  line_total,
+                  notes
+                ) VALUES ?
+              `;
+
+              db.query(grnItemSql, [grnItemValues], (itemErr) => {
+                if (itemErr) {
+                  return res.status(500).json({ message: "DB error", error: itemErr.message });
+                }
+
+                let processed = 0;
+
+                validItems.forEach((item, index) => {
+                  const batchCode = `BATCH-${grnId}-${index + 1}`;
 
                   db.query(
-                    `INSERT INTO stock_movements
-                     (item_id, movement_type, reference_type, reference_id, quantity, notes)
-                     VALUES (?, 'IN', 'GRN', ?, ?, ?)`,
+                    `INSERT INTO inventory_batches
+                     (item_id, grn_id, batch_code, received_quantity, available_quantity, unit, received_date, status)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, 'Available')`,
                     [
                       item.item_id,
                       grnId,
+                      batchCode,
                       item.delivered_quantity,
-                      `Stock added from GRN ${grnNumber}`,
+                      item.delivered_quantity,
+                      itemMap[item.item_id]?.unit || "",
+                      received_date,
                     ],
-                    () => {
-                      refreshInventorySnapshot(item.item_id, () => {
-                        processed++;
+                    (err) => {
+                      if (err) return;
 
-                        if (processed === validItems.length) {
-                          const { sendNotification } = require("../utils/notificationHelper");
-                          
-                          // Notify Operations
-                          sendNotification({
-                            role: "ops",
-                            title: "GRN Created",
-                            message: `A new GRN (${grnNumber}) has been created.`,
-                            type: "grn_created"
-                          }).catch(err => console.error("GRN notification error:", err.message));
+                      db.query(
+                        `INSERT INTO stock_movements
+                         (item_id, movement_type, reference_type, reference_id, quantity, notes)
+                         VALUES (?, 'IN', 'GRN', ?, ?, ?)`,
+                        [
+                          item.item_id,
+                          grnId,
+                          item.delivered_quantity,
+                          `Stock added from GRN ${grnNumber}`,
+                        ],
+                        () => {
+                          refreshInventorySnapshot(item.item_id, () => {
+                            processed++;
 
-                          // Notify Manager of discrepancies if any variance exists
-                          const hasDiscrepancy = validItems.some(it => (Number(it.delivered_quantity || 0) - Number(it.ordered_quantity || 0)) !== 0);
-                          if (hasDiscrepancy) {
-                            sendNotification({
-                              role: "manager",
-                              title: "GRN Discrepancy Alert",
-                              message: `Discrepancy detected in GRN ${grnNumber}.`,
-                              type: "grn_discrepancy"
-                            }).catch(err => console.error("GRN discrepancy notification error:", err.message));
-                          }
+                            if (processed === validItems.length) {
+                              const { sendNotification } = require("../utils/notificationHelper");
+                              
+                              // Notify Operations
+                              sendNotification({
+                                role: "ops",
+                                title: "GRN Created",
+                                message: `A new GRN (${grnNumber}) has been created.`,
+                                type: "grn_created"
+                              }).catch(err => console.error("GRN notification error:", err.message));
 
-                          return res.status(201).json({
-                            message: "GRN created successfully",
-                            grnId,
-                            grnNumber,
+                              // Notify Manager of discrepancies if any variance exists
+                              const hasDiscrepancy = validItems.some(it => (Number(it.delivered_quantity || 0) - Number(it.ordered_quantity || 0)) !== 0);
+                              if (hasDiscrepancy) {
+                                sendNotification({
+                                  role: "manager",
+                                  title: "GRN Discrepancy Alert",
+                                  message: `Discrepancy detected in GRN ${grnNumber}.`,
+                                  type: "grn_discrepancy"
+                                }).catch(err => console.error("GRN discrepancy notification error:", err.message));
+                              }
+
+                              return res.status(201).json({
+                                message: "GRN created successfully",
+                                grnId,
+                                grnNumber,
+                              });
+                            }
                           });
                         }
-                      });
+                      );
                     }
                   );
-                }
-              );
-            });
-          });
+                });
+              });
+            }
+          );
         }
       );
-    }
-  );
+    });
+  };
+
+  insertGrnWithRetry();
 };
 
 module.exports = {

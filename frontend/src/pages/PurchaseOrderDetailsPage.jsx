@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import api from "../utils/api";
-
+import { useAuth } from "../context/AuthContext";
+import AddGrnModal from "../components/AddGrnModal";
 const fmtDate = (value) => {
   if (!value) return "—";
   const date = new Date(value);
@@ -43,6 +44,7 @@ const getStatusClass = (status) => {
 const PurchaseOrderDetailsPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [purchaseOrder, setPurchaseOrder] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -50,6 +52,38 @@ const PurchaseOrderDetailsPage = () => {
   const [actionMessage, setActionMessage] = useState("");
   const [actionError, setActionError] = useState("");
   const [sending, setSending] = useState(false);
+
+  const [showGrnModal, setShowGrnModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({ required_by: "", remarks: "" });
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const handleOpenEdit = () => {
+    setEditForm({
+      required_by: purchaseOrder?.expected_delivery_date 
+        ? purchaseOrder.expected_delivery_date.split('T')[0] 
+        : (purchaseOrder?.required_by ? purchaseOrder.required_by.split('T')[0] : ""),
+      remarks: purchaseOrder?.remarks || purchaseOrder?.notes || "",
+    });
+    setShowEditModal(true);
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    setSavingEdit(true);
+    setActionError("");
+    setActionMessage("");
+    try {
+      await api.patch(`/purchase-orders/${id}`, editForm);
+      setActionMessage("Purchase order updated successfully");
+      setShowEditModal(false);
+      loadPurchaseOrder();
+    } catch (err) {
+      setActionError(err.response?.data?.message || "Failed to update purchase order");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   const loadPurchaseOrder = async () => {
     setLoading(true);
@@ -159,6 +193,12 @@ const PurchaseOrderDetailsPage = () => {
         </button>
 
         <div className="fb" style={{ marginBottom: 0 }}>
+          {user?.role === 'manager' && (
+            <button type="button" className="btn btn-s" onClick={handleOpenEdit} style={{ marginRight: 8 }}>
+              Edit Details
+            </button>
+          )}
+
           {canSend ? (
             <button
               type="button"
@@ -171,9 +211,9 @@ const PurchaseOrderDetailsPage = () => {
           ) : null}
 
           {canCreateGrn ? (
-            <Link to={`/grn/add?po=${purchaseOrder.id}`} className="btn btn-p">
+            <button type="button" className="btn btn-p" onClick={() => setShowGrnModal(true)}>
               Create GRN
-            </Link>
+            </button>
           ) : null}
         </div>
       </div>
@@ -371,6 +411,49 @@ const PurchaseOrderDetailsPage = () => {
           </table>
         </div>
       </section>
+
+      {showGrnModal && (
+        <AddGrnModal
+          initialPoId={purchaseOrder.id}
+          onClose={() => setShowGrnModal(false)}
+          onSuccess={() => {
+            setShowGrnModal(false);
+            loadPurchaseOrder();
+          }}
+        />
+      )}
+
+      {showEditModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(10,40,24,.42)", backdropFilter: "blur(3px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 500, padding: 20 }} onClick={() => setShowEditModal(false)}>
+          <div style={{ width: "100%", maxWidth: 500, background: "var(--white)", borderRadius: 16, padding: "20px 24px", boxShadow: "0 18px 48px rgba(10,40,24,.24)" }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ margin: "0 0 16px", fontSize: 18, color: "var(--g900)" }}>Edit Purchase Order</h3>
+            <form onSubmit={handleEditSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "var(--text2)", marginBottom: 6 }}>Required By <span style={{ color: "var(--d)" }}>*</span></label>
+                <input
+                  type="date"
+                  required
+                  style={{ width: "100%", height: 40, padding: "0 14px", border: "1.5px solid var(--border)", borderRadius: 10, outline: "none", fontSize: 13 }}
+                  value={editForm.required_by}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, required_by: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "var(--text2)", marginBottom: 6 }}>Remarks</label>
+                <textarea
+                  style={{ width: "100%", padding: "12px 14px", border: "1.5px solid var(--border)", borderRadius: 10, outline: "none", fontSize: 13, resize: "vertical", minHeight: 80 }}
+                  value={editForm.remarks}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, remarks: e.target.value }))}
+                />
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 8 }}>
+                <button type="button" onClick={() => setShowEditModal(false)} style={{ height: 36, padding: "0 18px", borderRadius: 10, border: "1.5px solid var(--border)", background: "transparent", cursor: "pointer", fontWeight: 700, color: "var(--text2)" }}>Cancel</button>
+                <button type="submit" disabled={savingEdit} style={{ height: 36, padding: "0 18px", borderRadius: 10, border: "none", background: "var(--p)", color: "var(--white)", cursor: "pointer", fontWeight: 700 }}>{savingEdit ? "Saving..." : "Save Changes"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,13 +1,121 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../utils/api";
 
-const AddGrnModal = ({ onClose, onSuccess }) => {
+const PRIMARY_GREEN = "#166534";
+const PRIMARY_GREEN_HOVER = "#14532D";
+
+const modalOverlayStyle = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(10,40,24,.42)",
+  backdropFilter: "blur(3px)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "20px",
+  zIndex: 500,
+};
+
+const modalCardStyle = {
+  width: "100%",
+  maxWidth: "850px",
+  background: "var(--white)",
+  borderRadius: "16px",
+  boxShadow: "0 18px 48px rgba(10,40,24,.24), 0 6px 14px rgba(10,40,24,.12)",
+  overflow: "hidden",
+  border: "1px solid rgba(216,232,223,.9)",
+  display: "flex",
+  flexDirection: "column",
+  maxHeight: "90vh",
+};
+
+const modalHeaderStyle = {
+  padding: "16px 22px",
+  borderBottom: "1px solid var(--border)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  flexShrink: 0,
+};
+
+const modalBodyStyle = {
+  padding: "20px 22px 18px",
+  overflowY: "auto",
+};
+
+const modalFooterStyle = {
+  padding: "16px 22px",
+  borderTop: "1px solid var(--border)",
+  display: "flex",
+  justifyContent: "flex-end",
+  gap: "10px",
+  flexShrink: 0,
+};
+
+const labelStyle = {
+  display: "block",
+  fontSize: "10px",
+  fontWeight: 700,
+  color: "var(--text2)",
+  textTransform: "uppercase",
+  letterSpacing: ".07em",
+  marginBottom: "6px",
+};
+
+const inputStyle = {
+  width: "100%",
+  height: "40px",
+  padding: "0 14px",
+  border: "1.5px solid var(--border)",
+  borderRadius: "10px",
+  background: "var(--white)",
+  color: "var(--text)",
+  fontFamily: "'Plus Jakarta Sans', sans-serif",
+  fontSize: "12px",
+  outline: "none",
+};
+
+const textareaStyle = {
+  ...inputStyle,
+  height: "80px",
+  padding: "12px 14px",
+  resize: "vertical",
+};
+
+const footerBtnSecondary = {
+  height: "36px",
+  padding: "0 18px",
+  borderRadius: "10px",
+  border: "1.5px solid var(--border)",
+  background: "var(--white)",
+  color: "var(--g700)",
+  fontFamily: "'Plus Jakarta Sans', sans-serif",
+  fontSize: "12px",
+  fontWeight: 700,
+  cursor: "pointer",
+};
+
+const footerBtnPrimary = {
+  height: "36px",
+  padding: "0 18px",
+  borderRadius: "10px",
+  border: `1px solid ${PRIMARY_GREEN}`,
+  background: PRIMARY_GREEN,
+  color: "var(--white)",
+  fontFamily: "'Plus Jakarta Sans', sans-serif",
+  fontSize: "12px",
+  fontWeight: 700,
+  cursor: "pointer",
+  boxShadow: "none",
+};
+
+const AddGrnModal = ({ onClose, onSuccess, initialPoId = "" }) => {
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [supplierId, setSupplierId] = useState("");
   const [supplierName, setSupplierName] = useState("");
   const [items, setItems] = useState([]);
   const [form, setForm] = useState({
-    purchase_order_id: "",
+    purchase_order_id: initialPoId,
     received_date: new Date().toISOString().split("T")[0],
     remarks: "",
   });
@@ -26,11 +134,12 @@ const AddGrnModal = ({ onClose, onSuccess }) => {
 
         const rows = Array.isArray(res.data) ? res.data : [];
 
-        const sentPurchaseOrders = rows.filter(
-          (po) => String(po.status || "").toLowerCase() === "sent"
+        // Allow sent, received, closed POs depending on backend, for now matching existing filter
+        const validPurchaseOrders = rows.filter(
+          (po) => String(po.status || "").toLowerCase() === "sent" || String(po.status || "").toLowerCase() === "accepted" || String(po.status || "").toLowerCase() === "closed" || String(po.status || "").toLowerCase() === "received" || po.id === Number(initialPoId)
         );
 
-        setPurchaseOrders(sentPurchaseOrders);
+        setPurchaseOrders(validPurchaseOrders);
       } catch (err) {
         setError(err.response?.data?.message || "Failed to load purchase orders");
       } finally {
@@ -39,7 +148,7 @@ const AddGrnModal = ({ onClose, onSuccess }) => {
     };
 
     fetchPurchaseOrders();
-  }, []);
+  }, [initialPoId]);
 
   useEffect(() => {
     if (!form.purchase_order_id) return;
@@ -69,7 +178,9 @@ const AddGrnModal = ({ onClose, onSuccess }) => {
         const selectedPo = purchaseOrders.find(
           (po) => String(po.id) === String(form.purchase_order_id)
         );
-        setSupplierName(selectedPo?.supplier_name || "");
+        if (selectedPo) {
+          setSupplierName(selectedPo.supplier_name || "");
+        }
       } catch (err) {
         setError(err.response?.data?.error || err.response?.data?.message || "Failed to load PO items");
       } finally {
@@ -77,8 +188,10 @@ const AddGrnModal = ({ onClose, onSuccess }) => {
       }
     };
 
-    loadPoItems();
-  }, [form.purchase_order_id, purchaseOrders]);
+    if (purchaseOrders.length > 0 || initialPoId) {
+      loadPoItems();
+    }
+  }, [form.purchase_order_id, purchaseOrders, initialPoId]);
 
   const totalVariance = useMemo(() => {
     return items.reduce(
@@ -178,18 +291,33 @@ const AddGrnModal = ({ onClose, onSuccess }) => {
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="md md-lg" onClick={(e) => e.stopPropagation()} style={{ width: "95%", maxWidth: 850 }}>
-        <div className="md-h">
-          <h3>📥 Create Goods Receiving Note</h3>
-          <button type="button" className="md-x" onClick={onClose}>
+    <div style={modalOverlayStyle} onClick={onClose}>
+      <div style={modalCardStyle} onClick={(e) => e.stopPropagation()}>
+        <div style={modalHeaderStyle}>
+          <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "var(--g900)" }}>
+            📥 Create Goods Receiving Note
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: 8,
+              border: "1.5px solid var(--border)",
+              background: "var(--white)",
+              color: "var(--text2)",
+              fontSize: "14px",
+              cursor: "pointer",
+            }}
+          >
             ✕
           </button>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="md-b" style={{ maxHeight: "calc(85vh - 120px)", overflowY: "auto" }}>
-            <div className="ib ib-s">
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          <div style={modalBodyStyle}>
+            <div className="ib ib-s" style={{ marginBottom: 16 }}>
               <span>📦</span>
               <div>
                 Enter the actual delivered quantity for each PO line. Current total variance:{" "}
@@ -197,116 +325,111 @@ const AddGrnModal = ({ onClose, onSuccess }) => {
               </div>
             </div>
 
-            {loadingOrders ? (
-              <div className="ib ib-i">
+            {loadingOrders && (
+              <div className="ib ib-i" style={{ marginBottom: 12 }}>
                 <span>⏳</span>
                 <div>Loading purchase orders...</div>
               </div>
-            ) : null}
+            )}
 
-            {loadingItems ? (
-              <div className="ib ib-i">
+            {loadingItems && (
+              <div className="ib ib-i" style={{ marginBottom: 12 }}>
                 <span>⏳</span>
                 <div>Loading PO items...</div>
               </div>
-            ) : null}
+            )}
 
-            {error ? (
-              <div className="ib ib-d">
+            {error && (
+              <div className="ib ib-d" style={{ marginBottom: 12 }}>
                 <span>⚠️</span>
                 <div>{error}</div>
               </div>
-            ) : null}
+            )}
 
-            {success ? (
-              <div className="ib ib-s">
+            {success && (
+              <div className="ib ib-s" style={{ marginBottom: 12 }}>
                 <span>✅</span>
                 <div>{success}</div>
               </div>
-            ) : null}
+            )}
 
-            <div className="fs2">
-              <div className="fst">GRN Header</div>
-
-              <div className="fr">
-                <div className="ff">
-                  <label className="fl">Purchase Order</label>
-                  <select
-                    className="fc"
-                    name="purchase_order_id"
-                    value={form.purchase_order_id}
-                    onChange={handleHeaderChange}
-                  >
-                    <option value="">Select purchase order</option>
-                    {purchaseOrders.map((po) => (
-                      <option key={po.id} value={po.id}>
-                        {po.po_number} - {po.supplier_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="ff">
-                  <label className="fl">Received Date</label>
-                  <input
-                    className="fc"
-                    type="date"
-                    name="received_date"
-                    value={form.received_date}
-                    min={new Date().toISOString().split("T")[0]}
-                    onChange={handleHeaderChange}
-                  />
-                </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+              <div>
+                <label style={labelStyle}>Purchase Order <span className="rq">*</span></label>
+                <select
+                  style={inputStyle}
+                  name="purchase_order_id"
+                  value={form.purchase_order_id}
+                  onChange={handleHeaderChange}
+                  disabled={!!initialPoId}
+                >
+                  <option value="">Select purchase order</option>
+                  {purchaseOrders.map((po) => (
+                    <option key={po.id} value={po.id}>
+                      {po.po_number} - {po.supplier_name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              <div className="fr">
-                <div className="ff">
-                  <label className="fl">Supplier</label>
-                  <input className="fc" value={supplierName || "Will populate from PO"} readOnly />
-                </div>
-
-                <div className="ff">
-                  <label className="fl">Remarks</label>
-                  <textarea
-                    className="fc"
-                    name="remarks"
-                    value={form.remarks}
-                    onChange={handleHeaderChange}
-                    placeholder="Condition, temperature, packaging notes..."
-                  />
-                </div>
+              <div>
+                <label style={labelStyle}>Received Date <span className="rq">*</span></label>
+                <input
+                  style={inputStyle}
+                  type="date"
+                  name="received_date"
+                  value={form.received_date}
+                  min={new Date().toISOString().split("T")[0]}
+                  onChange={handleHeaderChange}
+                />
               </div>
             </div>
 
-            {items.length > 0 ? (
-              <div className="fs2">
-                <div className="fst">Received Items</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
+              <div>
+                <label style={labelStyle}>Supplier</label>
+                <input style={inputStyle} value={supplierName || "Will populate from PO"} readOnly />
+              </div>
 
-                <div style={{ overflowX: "auto" }}>
-                  <table className="it">
+              <div>
+                <label style={labelStyle}>Remarks</label>
+                <textarea
+                  style={{ ...textareaStyle, height: "40px" }}
+                  name="remarks"
+                  value={form.remarks}
+                  onChange={handleHeaderChange}
+                  placeholder="Condition, packaging notes..."
+                />
+              </div>
+            </div>
+
+            {items.length > 0 && (
+              <div>
+                <label style={labelStyle}>Received Items</label>
+                <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: 10 }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "13px" }}>
                     <thead>
-                      <tr>
-                        <th>Item</th>
-                        <th>Code</th>
-                        <th>Ordered Qty</th>
-                        <th>Delivered Qty</th>
-                        <th>Variance</th>
+                      <tr style={{ background: "var(--bg)", borderBottom: "1px solid var(--border)" }}>
+                        <th style={{ padding: "10px 14px", fontWeight: 700, color: "var(--text2)" }}>Item</th>
+                        <th style={{ padding: "10px 14px", fontWeight: 700, color: "var(--text2)" }}>Code</th>
+                        <th style={{ padding: "10px 14px", fontWeight: 700, color: "var(--text2)", textAlign: "right" }}>Ordered</th>
+                        <th style={{ padding: "10px 14px", fontWeight: 700, color: "var(--text2)", textAlign: "center" }}>Delivered</th>
+                        <th style={{ padding: "10px 14px", fontWeight: 700, color: "var(--text2)", textAlign: "right" }}>Variance</th>
                       </tr>
                     </thead>
                     <tbody>
                       {items.map((item, index) => {
-                        const variance =
-                          Number(item.delivered_quantity || 0) - Number(item.ordered_quantity || 0);
-
+                        const variance = Number(item.delivered_quantity || 0) - Number(item.ordered_quantity || 0);
                         return (
-                          <tr key={`${item.item_id}-${index}`}>
-                            <td>{item.item_name}</td>
-                            <td>{item.item_code}</td>
-                            <td>
+                          <tr key={`${item.item_id}-${index}`} style={{ borderBottom: "1px solid var(--border)" }}>
+                            <td style={{ padding: "10px 14px", fontWeight: 600, color: "var(--g900)" }}>{item.item_name}</td>
+                            <td style={{ padding: "10px 14px", color: "var(--text2)" }}>{item.item_code}</td>
+                            <td style={{ padding: "10px 14px", textAlign: "right", color: "var(--g900)" }}>
                               {item.ordered_quantity} {item.unit}
                             </td>
-                            <td>
+                            <td style={{ padding: "6px 14px", textAlign: "center" }}>
                               <input
+                                style={{ ...inputStyle, width: "100px", textAlign: "right" }}
                                 type="number"
                                 min="0"
                                 step="0.01"
@@ -316,13 +439,10 @@ const AddGrnModal = ({ onClose, onSuccess }) => {
                             </td>
                             <td
                               style={{
+                                padding: "10px 14px",
+                                textAlign: "right",
                                 fontWeight: 700,
-                                color:
-                                  variance < 0
-                                    ? "var(--d)"
-                                    : variance > 0
-                                    ? "var(--s)"
-                                    : "var(--text3)",
+                                color: variance < 0 ? "var(--d)" : variance > 0 ? "var(--s)" : "var(--text3)",
                               }}
                             >
                               {variance > 0 ? "+" : ""}
@@ -335,14 +455,26 @@ const AddGrnModal = ({ onClose, onSuccess }) => {
                   </table>
                 </div>
               </div>
-            ) : null}
+            )}
           </div>
 
-          <div className="md-f">
-            <button type="button" className="btn btn-s" onClick={onClose}>
+          <div style={modalFooterStyle}>
+            <button type="button" style={footerBtnSecondary} onClick={onClose}>
               Cancel
             </button>
-            <button type="submit" className="btn btn-p" disabled={saving}>
+            <button
+              type="submit"
+              style={footerBtnPrimary}
+              disabled={saving}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = PRIMARY_GREEN_HOVER;
+                e.currentTarget.style.borderColor = PRIMARY_GREEN_HOVER;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = PRIMARY_GREEN;
+                e.currentTarget.style.borderColor = PRIMARY_GREEN;
+              }}
+            >
               {saving ? "Saving..." : "Save GRN"}
             </button>
           </div>
