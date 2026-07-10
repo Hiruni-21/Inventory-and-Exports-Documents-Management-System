@@ -220,7 +220,7 @@ const PurchaseOrderListPage = () => {
 
                     <td>{fmtDate(po.order_date || po.created_at)}</td>
 
-                    <td>{fmtDate(po.expected_delivery_date)}</td>
+                    <td>{fmtDate(po.required_by)}</td>
 
                     <td>
                       <span className={`badge ${getBadgeClass(po.status)}`}>

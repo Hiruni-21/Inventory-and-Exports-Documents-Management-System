@@ -24,7 +24,7 @@ const AddPurchaseOrderModal = ({ onClose, onSuccess }) => {
 
   const [form, setForm] = useState({
     supplier_id: "",
-    expected_delivery_date: "",
+    required_by: "",
     remarks: "",
   });
 
@@ -147,12 +147,12 @@ const AddPurchaseOrderModal = ({ onClose, onSuccess }) => {
   };
 
   const nextStep = () => {
-    if (!form.supplier_id || !form.expected_delivery_date) {
+    if (!form.supplier_id || !form.required_by) {
       setError("Supplier and required-by date are required");
       return;
     }
 
-    if (form.expected_delivery_date < today) {
+    if (form.required_by < today) {
       setError("Required-by date cannot be in the past");
       return;
     }
@@ -185,7 +185,7 @@ const AddPurchaseOrderModal = ({ onClose, onSuccess }) => {
         unit_price: Number(line.price || 0),
       }));
 
-    if (!form.supplier_id || !form.expected_delivery_date || cleanItems.length === 0) {
+    if (!form.supplier_id || !form.required_by || cleanItems.length === 0) {
       setError("Supplier, required-by date, and at least one line item are required");
       return;
     }
@@ -195,7 +195,7 @@ const AddPurchaseOrderModal = ({ onClose, onSuccess }) => {
     try {
       await api.post("/purchase-orders", {
         supplier_id: Number(form.supplier_id),
-        expected_delivery_date: form.expected_delivery_date,
+        required_by: form.required_by,
         status: mode === "draft" ? "draft" : "pending_approval",
         priority: priority.toLowerCase(),
         remarks: [
@@ -309,9 +309,9 @@ const AddPurchaseOrderModal = ({ onClose, onSuccess }) => {
                   <input
                     className="fc"
                     type="date"
-                    name="expected_delivery_date"
+                    name="required_by"
                     min={today}
-                    value={form.expected_delivery_date}
+                    value={form.required_by}
                     onChange={handleFormChange}
                   />
                 </div>
@@ -513,7 +513,7 @@ const AddPurchaseOrderModal = ({ onClose, onSuccess }) => {
                     </div>
                     <div className="sum-r">
                       <span>Required By</span>
-                      <span>{form.expected_delivery_date || "—"}</span>
+                      <span>{form.required_by || "—"}</span>
                     </div>
                     <div className="sum-r">
                       <span>Priority</span>

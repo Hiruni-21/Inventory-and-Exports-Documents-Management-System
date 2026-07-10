@@ -88,10 +88,8 @@ const getPurchaseOrderMeta = async () => {
   const cols = await getTableColumns("purchase_orders");
 
   poMetaCache = {
-    requiredDateCol: cols.has("expected_date")
-      ? "expected_date"
-      : cols.has("required_date")
-      ? "required_date"
+    requiredDateCol: cols.has("required_by")
+      ? "required_by"
       : null,
     notesCol: cols.has("notes")
       ? "notes"

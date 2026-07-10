@@ -85,7 +85,7 @@ const buildPurchaseOrderHtml = ({ po, supplier, items, company }) => {
   const grandTotal = subtotal + taxAmount - discountAmount;
 
   const requiredBy =
-    po.expected_delivery_date || po.required_by || po.expected_date || "";
+    po.required_by || "";
 
   const poDate = po.order_date || po.created_at;
 

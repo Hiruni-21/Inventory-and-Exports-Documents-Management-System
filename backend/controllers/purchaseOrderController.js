@@ -7,8 +7,6 @@ const getAllPurchaseOrders = (req, res) => {
       po.po_number,
       po.supplier_id,
       po.order_date,
-      po.expected_delivery_date,
-      po.expected_date,
       po.required_by,
       po.payment_terms,
       po.priority,
@@ -99,7 +97,6 @@ const getPurchaseOrderById = (req, res) => {
 const createPurchaseOrder = (req, res) => {
   const {
     supplier_id,
-    expected_delivery_date,
     required_by,
     status = "draft",
     priority = "normal",
@@ -113,13 +110,13 @@ const createPurchaseOrder = (req, res) => {
     return res.status(401).json({ message: "Login required. Created by user is missing." });
   }
 
-  if (!supplier_id || !expected_delivery_date || !Array.isArray(items) || items.length === 0) {
+  if (!supplier_id || !required_by || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({
       message: "Supplier, required-by date, and at least one line item are required",
     });
   }
 
-  const selectedDate = new Date(expected_delivery_date);
+  const selectedDate = new Date(required_by);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -188,7 +185,6 @@ const createPurchaseOrder = (req, res) => {
             po_number,
             supplier_id,
             order_date,
-            expected_delivery_date,
             required_by,
             payment_terms,
             notes,
@@ -198,7 +194,7 @@ const createPurchaseOrder = (req, res) => {
             created_by,
             remarks
           )
-          VALUES (?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         db.query(
@@ -206,8 +202,7 @@ const createPurchaseOrder = (req, res) => {
           [
             poNumber,
             supplier_id,
-            expected_delivery_date,
-            expected_delivery_date,
+            required_by,
             null,
             remarks,
             finalStatus,
@@ -393,9 +388,7 @@ const sendPurchaseOrder = (req, res) => {
       po.po_number,
       po.status,
       po.order_date,
-      po.expected_delivery_date,
       po.required_by,
-      po.expected_date,
       po.notes,
       po.remarks,
       s.id AS supplier_id,
@@ -431,8 +424,7 @@ const sendPurchaseOrder = (req, res) => {
       });
     }
 
-    const requiredBy =
-      po.expected_delivery_date || po.required_by || po.expected_date || "—";
+    const requiredBy = po.required_by || "—";
 
     const messageBody = [
       `Purchase Order: ${po.po_number}`,
@@ -560,16 +552,14 @@ const updatePurchaseOrder = (req, res) => {
 
   const updateSql = `
     UPDATE purchase_orders
-    SET expected_delivery_date = ?,
-        required_by = ?,
+    SET required_by = ?,
         remarks = ?,
         notes = ?,
         updated_at = NOW()
     WHERE id = ?
   `;
 
-  // We map required_by to expected_delivery_date because the schema primarily uses expected_delivery_date for "Required By"
-  db.query(updateSql, [required_by, required_by, remarks, remarks, id], (err, result) => {
+  db.query(updateSql, [required_by, remarks, remarks, id], (err, result) => {
     if (err) {
       console.error("updatePurchaseOrder error:", err);
       return res.status(500).json({ message: "Database error", error: err.message });

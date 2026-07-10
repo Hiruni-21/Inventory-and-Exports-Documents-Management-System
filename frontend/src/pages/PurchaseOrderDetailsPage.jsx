@@ -60,9 +60,7 @@ const PurchaseOrderDetailsPage = () => {
 
   const handleOpenEdit = () => {
     setEditForm({
-      required_by: purchaseOrder?.expected_delivery_date 
-        ? purchaseOrder.expected_delivery_date.split('T')[0] 
-        : (purchaseOrder?.required_by ? purchaseOrder.required_by.split('T')[0] : ""),
+      required_by: purchaseOrder?.required_by ? purchaseOrder.required_by.split('T')[0] : "",
       remarks: purchaseOrder?.remarks || purchaseOrder?.notes || "",
     });
     setShowEditModal(true);
@@ -325,11 +323,7 @@ const PurchaseOrderDetailsPage = () => {
             <div>
               <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#6B7280" }}>Required By</span>
               <div style={{ fontSize: 15, color: "#374151", marginTop: 4 }}>
-                {fmtDate(
-                  purchaseOrder.expected_delivery_date ||
-                    purchaseOrder.required_by ||
-                    purchaseOrder.expected_date
-                )}
+                {fmtDate(purchaseOrder.required_by)}
               </div>
             </div>
             <div>
