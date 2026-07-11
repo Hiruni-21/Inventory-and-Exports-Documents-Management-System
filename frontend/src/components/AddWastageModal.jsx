@@ -2,9 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import api from "../utils/api";
 
 const AddWastageModal = ({ onClose, onSave }) => {
+  const [grns, setGrns] = useState([]);
   const [inventory, setInventory] = useState([]);
-  const [batches, setBatches] = useState([]);
+  
+  const [grnBatches, setGrnBatches] = useState([]);
+  const [inventoryBatches, setInventoryBatches] = useState([]);
+
   const [form, setForm] = useState({
+    grn_id: "",
     item_id: "",
     batch_id: "",
     quantity: "",
@@ -18,27 +23,60 @@ const AddWastageModal = ({ onClose, onSave }) => {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const loadInventory = async () => {
+    const loadInitialData = async () => {
       setLoading(true);
       setError("");
       try {
-        const res = await api.get("/inventory");
+        const [grnsRes, invRes] = await Promise.all([
+          api.get("/grn"),
+          api.get("/inventory"),
+        ]);
+        setGrns(Array.isArray(grnsRes.data) ? grnsRes.data : []);
         setInventory(
-          (Array.isArray(res.data) ? res.data : []).filter((item) => Number(item.qty_available) > 0)
+          (Array.isArray(invRes.data) ? invRes.data : []).filter(
+            (item) => Number(item.qty_available) > 0
+          )
         );
       } catch (err) {
-        setError(err.response?.data?.message || "Failed to load inventory");
+        setError(err.response?.data?.message || "Failed to load initial data");
       } finally {
         setLoading(false);
       }
     };
-
-    loadInventory();
+    loadInitialData();
   }, []);
 
+  const displayedItems = useMemo(() => {
+    if (form.grn_id) {
+      const map = new Map();
+      grnBatches.forEach((b) => {
+        if (!map.has(b.item_id)) {
+          map.set(b.item_id, {
+            item_id: b.item_id,
+            name: b.item_name || b.name,
+            code: b.item_code || b.code,
+          });
+        }
+      });
+      return Array.from(map.values());
+    }
+    return inventory.map(i => ({
+      item_id: i.item_id,
+      name: i.name || i.item_name,
+      code: i.code || i.item_code
+    }));
+  }, [form.grn_id, grnBatches, inventory]);
+
+  const displayedBatches = useMemo(() => {
+    if (form.grn_id) {
+      return grnBatches.filter((b) => String(b.item_id) === String(form.item_id));
+    }
+    return inventoryBatches;
+  }, [form.grn_id, grnBatches, inventoryBatches, form.item_id]);
+
   const selectedBatch = useMemo(
-    () => batches.find((batch) => String(batch.id) === String(form.batch_id)),
-    [batches, form.batch_id]
+    () => displayedBatches.find((batch) => String(batch.id) === String(form.batch_id)),
+    [displayedBatches, form.batch_id]
   );
 
   const availableQty = selectedBatch?.qty_remaining ?? selectedBatch?.available_quantity ?? "—";
@@ -47,24 +85,47 @@ const AddWastageModal = ({ onClose, onSave }) => {
     const { name, value } = e.target;
     const nextForm = { ...form, [name]: value };
 
-    if (name === "item_id") {
+    if (name === "grn_id") {
+      nextForm.item_id = "";
       nextForm.batch_id = "";
-      setBatches([]);
-    }
+      setGrnBatches([]);
+      setInventoryBatches([]);
+      setForm(nextForm);
 
-    setForm(nextForm);
-
-    if (name === "item_id" && value) {
-      setBatchLoading(true);
-      setError("");
-      try {
-        const res = await api.get(`/inventory/batches/${value}`);
-        setBatches(Array.isArray(res.data) ? res.data : []);
-      } catch (err) {
-        setError(err.response?.data?.message || "Failed to load item batches");
-      } finally {
-        setBatchLoading(false);
+      if (value) {
+        setBatchLoading(true);
+        setError("");
+        try {
+          const res = await api.get(`/grn/${value}/batches`);
+          setGrnBatches(Array.isArray(res.data) ? res.data : []);
+        } catch (err) {
+          setError(err.response?.data?.message || "Failed to load GRN batches");
+        } finally {
+          setBatchLoading(false);
+        }
       }
+    } else if (name === "item_id") {
+      nextForm.batch_id = "";
+      setForm(nextForm);
+
+      if (!form.grn_id) {
+        if (value) {
+          setBatchLoading(true);
+          setError("");
+          try {
+            const res = await api.get(`/inventory/batches/${value}`);
+            setInventoryBatches(Array.isArray(res.data) ? res.data : []);
+          } catch (err) {
+            setError(err.response?.data?.message || "Failed to load item batches");
+          } finally {
+            setBatchLoading(false);
+          }
+        } else {
+          setInventoryBatches([]);
+        }
+      }
+    } else {
+      setForm(nextForm);
     }
   };
 
@@ -97,8 +158,8 @@ const AddWastageModal = ({ onClose, onSave }) => {
   };
 
   return (
-    <div className="md-o">
-      <div className="md md-lg" style={{ display: "flex", flexDirection: "column" }}>
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="md md-lg" style={{ display: "flex", flexDirection: "column" }} onClick={(e) => e.stopPropagation()}>
         <div className="md-h">
           <h3>🗑 Record Wastage</h3>
           <button type="button" className="md-x" onClick={onClose}>
@@ -119,14 +180,14 @@ const AddWastageModal = ({ onClose, onSave }) => {
             {loading ? (
               <div className="ib ib-i">
                 <span>⏳</span>
-                <div>Loading inventory...</div>
+                <div>Loading data...</div>
               </div>
             ) : null}
 
             {batchLoading ? (
               <div className="ib ib-i">
                 <span>⏳</span>
-                <div>Loading item batches...</div>
+                <div>Loading batches...</div>
               </div>
             ) : null}
 
@@ -141,13 +202,27 @@ const AddWastageModal = ({ onClose, onSave }) => {
               <div className="fst">Wastage Details</div>
 
               <div className="fr">
+                <div className="ff" style={{ gridColumn: "1 / -1" }}>
+                  <label className="fl">Goods Received Note (GRN) <span style={{color: "var(--text3)", fontWeight: "normal"}}>(Optional filter)</span></label>
+                  <select className="fc" name="grn_id" value={form.grn_id} onChange={handleChange}>
+                    <option value="">-- View all available inventory --</option>
+                    {grns.map((grn) => (
+                      <option key={grn.id} value={grn.id}>
+                        {grn.grn_number} - {grn.supplier_name} - {grn.received_date?.substring(0, 10)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="fr">
                 <div className="ff">
                   <label className="fl">Item</label>
                   <select className="fc" name="item_id" value={form.item_id} onChange={handleChange}>
                     <option value="">Select item</option>
-                    {inventory.map((item) => (
+                    {displayedItems.map((item) => (
                       <option key={item.item_id} value={item.item_id}>
-                        {(item.name || item.item_name)} ({item.code || item.item_code})
+                        {item.name} ({item.code})
                       </option>
                     ))}
                   </select>
@@ -155,9 +230,9 @@ const AddWastageModal = ({ onClose, onSave }) => {
 
                 <div className="ff">
                   <label className="fl">Batch</label>
-                  <select className="fc" name="batch_id" value={form.batch_id} onChange={handleChange}>
+                  <select className="fc" name="batch_id" value={form.batch_id} onChange={handleChange} disabled={!form.item_id}>
                     <option value="">Select batch</option>
-                    {batches.map((batch) => (
+                    {displayedBatches.map((batch) => (
                       <option key={batch.id} value={batch.id}>
                         {(batch.batch_number || batch.batch_code)} - Available:{" "}
                         {batch.qty_remaining || batch.available_quantity} {batch.unit || ""}

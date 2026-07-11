@@ -11,6 +11,7 @@ const getAllGrn = (req, res) => {
       g.grn_number,
       g.received_date,
       g.created_at,
+      g.supplier_id,
       po.po_number,
       s.supplier_name,
       u.full_name AS created_by_name
@@ -131,6 +132,34 @@ const getPurchaseOrderItemsForGrn = (req, res) => {
   db.query(sql, [purchaseOrderId], (err, results) => {
     if (err) {
       console.error("getPurchaseOrderItemsForGrn error:", err);
+      return res.status(500).json({ message: "Database error", error: err.message });
+    }
+
+    res.json(results);
+  });
+};
+
+/* =========================
+   GET GRN BATCHES
+========================= */
+const getGrnBatches = (req, res) => {
+  const { id } = req.params;
+
+  const sql = `
+    SELECT
+      ib.*,
+      i.name AS item_name,
+      i.code AS item_code,
+      i.unit
+    FROM inventory_batches ib
+    JOIN items i ON ib.item_id = i.id
+    WHERE ib.grn_id = ? AND ib.available_quantity > 0
+    ORDER BY ib.id ASC
+  `;
+
+  db.query(sql, [id], (err, results) => {
+    if (err) {
+      console.error("getGrnBatches error:", err);
       return res.status(500).json({ message: "Database error", error: err.message });
     }
 
@@ -387,5 +416,6 @@ module.exports = {
   getAllGrn,
   getGrnById,
   getPurchaseOrderItemsForGrn,
+  getGrnBatches,
   createGrn,
 };

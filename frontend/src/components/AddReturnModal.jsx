@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import api from "../utils/api";
 
 const AddReturnModal = ({ onClose, onSave }) => {
-  const [suppliers, setSuppliers] = useState([]);
-  const [inventory, setInventory] = useState([]);
-  const [batches, setBatches] = useState([]);
+  const [grns, setGrns] = useState([]);
+  const [grnBatches, setGrnBatches] = useState([]);
   const [form, setForm] = useState({
+    grn_id: "",
     supplier_id: "",
     item_id: "",
     batch_id: "",
@@ -24,19 +24,10 @@ const AddReturnModal = ({ onClose, onSave }) => {
       setLoading(true);
       setError("");
       try {
-        const [suppliersRes, inventoryRes] = await Promise.all([
-          api.get("/suppliers"),
-          api.get("/inventory"),
-        ]);
-
-        setSuppliers(Array.isArray(suppliersRes.data) ? suppliersRes.data : []);
-        setInventory(
-          (Array.isArray(inventoryRes.data) ? inventoryRes.data : []).filter(
-            (item) => Number(item.qty_available) > 0
-          )
-        );
+        const res = await api.get("/grn");
+        setGrns(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
-        setError(err.response?.data?.message || "Failed to load suppliers or inventory");
+        setError(err.response?.data?.message || "Failed to load GRNs");
       } finally {
         setLoading(false);
       }
@@ -45,9 +36,32 @@ const AddReturnModal = ({ onClose, onSave }) => {
     loadData();
   }, []);
 
+  const selectedGrn = useMemo(
+    () => grns.find((g) => String(g.id) === String(form.grn_id)),
+    [grns, form.grn_id]
+  );
+
+  const uniqueItems = useMemo(() => {
+    const map = new Map();
+    grnBatches.forEach((b) => {
+      if (!map.has(b.item_id)) {
+        map.set(b.item_id, {
+          item_id: b.item_id,
+          name: b.item_name || b.name,
+          code: b.item_code || b.code,
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [grnBatches]);
+
+  const filteredBatches = useMemo(() => {
+    return grnBatches.filter((b) => String(b.item_id) === String(form.item_id));
+  }, [grnBatches, form.item_id]);
+
   const selectedBatch = useMemo(
-    () => batches.find((batch) => String(batch.id) === String(form.batch_id)),
-    [batches, form.batch_id]
+    () => filteredBatches.find((batch) => String(batch.id) === String(form.batch_id)),
+    [filteredBatches, form.batch_id]
   );
 
   const availableQty = selectedBatch?.qty_remaining ?? selectedBatch?.available_quantity ?? "—";
@@ -56,24 +70,35 @@ const AddReturnModal = ({ onClose, onSave }) => {
     const { name, value } = e.target;
     const nextForm = { ...form, [name]: value };
 
-    if (name === "item_id") {
+    if (name === "grn_id") {
+      nextForm.supplier_id = "";
+      nextForm.item_id = "";
       nextForm.batch_id = "";
-      setBatches([]);
-    }
-
-    setForm(nextForm);
-
-    if (name === "item_id" && value) {
-      setBatchLoading(true);
-      setError("");
-      try {
-        const res = await api.get(`/inventory/batches/${value}`);
-        setBatches(Array.isArray(res.data) ? res.data : []);
-      } catch (err) {
-        setError(err.response?.data?.message || "Failed to load item batches");
-      } finally {
-        setBatchLoading(false);
+      setGrnBatches([]);
+      
+      const grn = grns.find((g) => String(g.id) === String(value));
+      if (grn) {
+        nextForm.supplier_id = grn.supplier_id;
       }
+      setForm(nextForm);
+
+      if (value) {
+        setBatchLoading(true);
+        setError("");
+        try {
+          const res = await api.get(`/grn/${value}/batches`);
+          setGrnBatches(Array.isArray(res.data) ? res.data : []);
+        } catch (err) {
+          setError(err.response?.data?.message || "Failed to load GRN batches");
+        } finally {
+          setBatchLoading(false);
+        }
+      }
+    } else if (name === "item_id") {
+      nextForm.batch_id = "";
+      setForm(nextForm);
+    } else {
+      setForm(nextForm);
     }
   };
 
@@ -81,7 +106,7 @@ const AddReturnModal = ({ onClose, onSave }) => {
     e.preventDefault();
     setError("");
 
-    if (!form.supplier_id || !form.item_id || !form.batch_id || !form.quantity || !form.reason) {
+    if (!form.grn_id || !form.supplier_id || !form.item_id || !form.batch_id || !form.quantity || !form.reason) {
       setError("Please fill all required fields");
       return;
     }
@@ -107,8 +132,8 @@ const AddReturnModal = ({ onClose, onSave }) => {
   };
 
   return (
-    <div className="md-o">
-      <div className="md md-lg" style={{ display: "flex", flexDirection: "column" }}>
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="md md-lg" style={{ display: "flex", flexDirection: "column" }} onClick={(e) => e.stopPropagation()}>
         <div className="md-h">
           <h3>↩️ Record Goods Return</h3>
           <button type="button" className="md-x" onClick={onClose}>
@@ -121,22 +146,22 @@ const AddReturnModal = ({ onClose, onSave }) => {
             <div className="ib ib-i">
               <span>↩️</span>
               <div>
-                Select the exact FEFO batch to return. Available in selected batch:{" "}
-                <strong>{availableQty}</strong>
+                Select a Goods Received Note (GRN) to populate supplier and available batches.
+                Available in selected batch: <strong>{availableQty}</strong>
               </div>
             </div>
 
             {loading ? (
               <div className="ib ib-i">
                 <span>⏳</span>
-                <div>Loading suppliers and inventory...</div>
+                <div>Loading GRNs...</div>
               </div>
             ) : null}
 
             {batchLoading ? (
               <div className="ib ib-i">
                 <span>⏳</span>
-                <div>Loading item batches...</div>
+                <div>Loading GRN batches...</div>
               </div>
             ) : null}
 
@@ -152,36 +177,48 @@ const AddReturnModal = ({ onClose, onSave }) => {
 
               <div className="fr">
                 <div className="ff">
-                  <label className="fl">Supplier</label>
-                  <select className="fc" name="supplier_id" value={form.supplier_id} onChange={handleChange}>
-                    <option value="">Select supplier</option>
-                    {suppliers.map((supplier) => (
-                      <option key={supplier.id} value={supplier.id}>
-                        {supplier.supplier_name}
+                  <label className="fl">Goods Received Note (GRN)</label>
+                  <select className="fc" name="grn_id" value={form.grn_id} onChange={handleChange}>
+                    <option value="">Select GRN</option>
+                    {grns.map((grn) => (
+                      <option key={grn.id} value={grn.id}>
+                        {grn.grn_number} - {grn.supplier_name} - {grn.received_date?.substring(0, 10)}
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div className="ff">
-                  <label className="fl">Item</label>
-                  <select className="fc" name="item_id" value={form.item_id} onChange={handleChange}>
-                    <option value="">Select item</option>
-                    {inventory.map((item) => (
-                      <option key={item.item_id} value={item.item_id}>
-                        {(item.name || item.item_name)} ({item.code || item.item_code})
-                      </option>
-                    ))}
-                  </select>
+                  <label className="fl">Supplier</label>
+                  <input
+                    className="fc"
+                    type="text"
+                    value={selectedGrn?.supplier_name || ""}
+                    readOnly
+                    disabled
+                    placeholder="Auto-populated from GRN"
+                  />
                 </div>
               </div>
 
               <div className="fr">
                 <div className="ff">
+                  <label className="fl">Item</label>
+                  <select className="fc" name="item_id" value={form.item_id} onChange={handleChange} disabled={!form.grn_id}>
+                    <option value="">Select item</option>
+                    {uniqueItems.map((item) => (
+                      <option key={item.item_id} value={item.item_id}>
+                        {item.name} ({item.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="ff">
                   <label className="fl">Batch</label>
-                  <select className="fc" name="batch_id" value={form.batch_id} onChange={handleChange}>
+                  <select className="fc" name="batch_id" value={form.batch_id} onChange={handleChange} disabled={!form.item_id}>
                     <option value="">Select batch</option>
-                    {batches.map((batch) => (
+                    {filteredBatches.map((batch) => (
                       <option key={batch.id} value={batch.id}>
                         {(batch.batch_number || batch.batch_code)} - Available:{" "}
                         {batch.qty_remaining || batch.available_quantity} {batch.unit || ""}
@@ -189,7 +226,9 @@ const AddReturnModal = ({ onClose, onSave }) => {
                     ))}
                   </select>
                 </div>
+              </div>
 
+              <div className="fr">
                 <div className="ff">
                   <label className="fl">Return Quantity</label>
                   <input
@@ -203,9 +242,7 @@ const AddReturnModal = ({ onClose, onSave }) => {
                     placeholder="0.00"
                   />
                 </div>
-              </div>
 
-              <div className="fr">
                 <div className="ff">
                   <label className="fl">Reason</label>
                   <input
@@ -217,17 +254,17 @@ const AddReturnModal = ({ onClose, onSave }) => {
                     placeholder="Overripe, damage, quality issue..."
                   />
                 </div>
+              </div>
 
-                <div className="ff">
-                  <label className="fl">Notes</label>
-                  <textarea
-                    className="fc"
-                    name="notes"
-                    value={form.notes}
-                    onChange={handleChange}
-                    placeholder="Extra return notes..."
-                  />
-                </div>
+              <div className="ff">
+                <label className="fl">Notes</label>
+                <textarea
+                  className="fc"
+                  name="notes"
+                  value={form.notes}
+                  onChange={handleChange}
+                  placeholder="Extra return notes..."
+                />
               </div>
             </div>
           </div>
