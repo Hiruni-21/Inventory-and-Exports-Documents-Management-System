@@ -280,11 +280,6 @@ const pageMeta = {
 };
 
 const actionButtons = {
-  "/returns": [
-    { label: "Record Return", to: "/returns/add", className: "btn btn-s btn-sm" },
-    { label: "Record Wastage", to: "/wastage/add", className: "btn btn-p btn-sm" },
-  ],
-  "/wastage": [{ label: "Record Wastage", to: "/wastage/add", className: "btn btn-p btn-sm" }],
   "/dispatch/local": [{ label: "+ New Dispatch", eventName: "fw-open-local-dispatch-modal", className: "btn btn-p btn-sm" }],
   "/dispatch/global": [{ label: "+ New Shipment", eventName: "fw-open-global-shipment-modal", className: "btn btn-p btn-sm" }],
   "/export-documents": [{ label: "+ Create Document Set", eventName: "fw-open-export-docs-modal", className: "btn btn-p btn-sm" }],

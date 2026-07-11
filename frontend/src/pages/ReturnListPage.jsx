@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../utils/api";
+import AddReturnModal from "../components/AddReturnModal";
+import AddWastageModal from "../components/AddWastageModal";
 
 const fmtDateTime = (value) => {
   if (!value) return "—";
@@ -13,6 +15,9 @@ const ReturnListPage = () => {
   const [returnsData, setReturnsData] = useState([]);
   const [wastageData, setWastageData] = useState([]);
   const [error, setError] = useState("");
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+  const [isWastageModalOpen, setIsWastageModalOpen] = useState(false);
+  const [sendingId, setSendingId] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -30,7 +35,21 @@ const ReturnListPage = () => {
     };
 
     fetchData();
-  }, []);
+  }, [isReturnModalOpen, isWastageModalOpen]);
+
+  const handleSendNote = async (id) => {
+    setSendingId(id);
+    try {
+      await api.post(`/returns/${id}/send`);
+      setReturnsData((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, status: "sent" } : r))
+      );
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to send return note");
+    } finally {
+      setSendingId(null);
+    }
+  };
 
   const wastageLossEstimate = useMemo(() => {
     return wastageData.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
@@ -62,8 +81,11 @@ const ReturnListPage = () => {
 
       {activeTab === "returns" ? (
         <div className="tw">
-          <div className="tw-h">
+          <div className="tw-h" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <h3>Return Notes</h3>
+            <button className="btn btn-p btn-sm" onClick={() => setIsReturnModalOpen(true)}>
+              + Record Return
+            </button>
           </div>
           <table>
             <thead>
@@ -76,6 +98,8 @@ const ReturnListPage = () => {
                 <th>Qty</th>
                 <th>Reason</th>
                 <th>Recorded By</th>
+                <th>Status</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -99,11 +123,27 @@ const ReturnListPage = () => {
                     <td>{row.quantity}</td>
                     <td>{row.reason}</td>
                     <td>{row.created_by_name || "—"}</td>
+                    <td>
+                      <span className={`badge ${row.status === "sent" ? "badge-g" : "badge-y"}`}>
+                        {row.status || "draft"}
+                      </span>
+                    </td>
+                    <td>
+                      {(!row.status || row.status === "draft") && (
+                        <button
+                          className="btn btn-s btn-sm"
+                          onClick={() => handleSendNote(row.id)}
+                          disabled={sendingId === row.id}
+                        >
+                          {sendingId === row.id ? "Sending..." : "Send Note"}
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="8" style={{ textAlign: "center", color: "var(--text3)" }}>
+                  <td colSpan="10" style={{ textAlign: "center", color: "var(--text3)" }}>
                     No returns found
                   </td>
                 </tr>
@@ -122,8 +162,11 @@ const ReturnListPage = () => {
           </div>
 
           <div className="tw">
-            <div className="tw-h">
+            <div className="tw-h" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <h3>Wastage Records</h3>
+              <button className="btn btn-p btn-sm" onClick={() => setIsWastageModalOpen(true)}>
+                + Record Wastage
+              </button>
             </div>
             <table>
               <thead>
@@ -161,6 +204,20 @@ const ReturnListPage = () => {
             </table>
           </div>
         </div>
+      )}
+
+      {isReturnModalOpen && (
+        <AddReturnModal
+          onClose={() => setIsReturnModalOpen(false)}
+          onSave={() => setIsReturnModalOpen(false)}
+        />
+      )}
+
+      {isWastageModalOpen && (
+        <AddWastageModal
+          onClose={() => setIsWastageModalOpen(false)}
+          onSave={() => setIsWastageModalOpen(false)}
+        />
       )}
     </div>
   );

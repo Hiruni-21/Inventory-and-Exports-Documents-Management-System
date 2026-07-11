@@ -1,5 +1,7 @@
 const db = require("../config/db");
 const { refreshInventorySnapshot } = require("./inventoryController");
+const { generateReturnPdf } = require("../services/returnPdf.service");
+const { sendReturnEmail, buildReturnEmailHtml } = require("../services/returnEmail.service");
 
 const getAllReturns = (req, res) => {
   const sql = `
@@ -128,7 +130,89 @@ const createReturn = (req, res) => {
   });
 };
 
+const sendReturnNote = (req, res) => {
+  const { id } = req.params;
+
+  const sql = `
+    SELECT
+      r.id,
+      r.quantity,
+      r.reason,
+      r.notes,
+      r.created_at,
+      r.status,
+      s.supplier_name,
+      s.email AS supplier_email,
+      s.address,
+      s.city,
+      s.contact_number,
+      s.whatsapp_number,
+      s.supplier_code,
+      i.name AS item_name,
+      ib.batch_code,
+      u.full_name AS created_by_name
+    FROM goods_returns r
+    JOIN suppliers s ON r.supplier_id = s.id
+    JOIN items i ON r.item_id = i.id
+    JOIN inventory_batches ib ON r.batch_id = ib.id
+    LEFT JOIN users u ON r.created_by = u.id
+    WHERE r.id = ?
+  `;
+
+  db.query(sql, [id], async (err, results) => {
+    if (err) {
+      return res.status(500).json({ message: "Database error", error: err.message });
+    }
+
+    if (results.length === 0) {
+      return res.status(404).json({ message: "Return note not found" });
+    }
+
+    const returnNoteData = results[0];
+
+    if (!returnNoteData.supplier_email) {
+      return res.status(400).json({ message: "Supplier email is missing" });
+    }
+
+    try {
+      const returnNumber = `RN-${String(returnNoteData.id).padStart(4, "0")}`;
+
+      const { absPath, fileName } = await generateReturnPdf({
+        returnNote: returnNoteData,
+        supplier: returnNoteData,
+      });
+
+      const emailHtml = buildReturnEmailHtml({
+        supplierName: returnNoteData.supplier_name,
+        returnNumber,
+        reason: returnNoteData.reason,
+      });
+
+      await sendReturnEmail({
+        to: returnNoteData.supplier_email,
+        subject: `Return Note ${returnNumber} - Fresh World Exporters`,
+        html: emailHtml,
+        pdfPath: absPath,
+        pdfFileName: fileName,
+      });
+
+      const updateSql = "UPDATE goods_returns SET status = 'sent' WHERE id = ?";
+      db.query(updateSql, [id], (updateErr) => {
+        if (updateErr) {
+          return res.status(500).json({ message: "Failed to update return note status", error: updateErr.message });
+        }
+
+        res.json({ message: "Return note sent successfully" });
+      });
+    } catch (sendErr) {
+      console.error("Failed to send return note:", sendErr);
+      res.status(500).json({ message: "Failed to send return note", error: sendErr.message });
+    }
+  });
+};
+
 module.exports = {
   getAllReturns,
   createReturn,
+  sendReturnNote,
 };

@@ -13,9 +13,7 @@ const AddPurchaseOrderModal = ({ onClose, onSuccess }) => {
 
   const [suppliers, setSuppliers] = useState([]);
   const [items, setItems] = useState([]);
-  const [poNumber] = useState(
-    `PO-${new Date().getFullYear()}-${String(Date.now()).slice(-3)}`
-  );
+  const [poNumber] = useState("Auto-generated on save");
   const [paymentTerms, setPaymentTerms] = useState("Immediate cash");
   const [priority, setPriority] = useState("Normal");
   const [instructions, setInstructions] = useState("");

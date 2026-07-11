@@ -29,9 +29,6 @@ import PurchaseOrderDetailsPage from "./pages/PurchaseOrderDetailsPage";
 import GrnListPage from "./pages/GrnListPage";
 import GrnDetailsPage from "./pages/GrnDetailsPage";
 import ReturnListPage from "./pages/ReturnListPage";
-import AddReturnPage from "./pages/AddReturnPage";
-import WastageListPage from "./pages/WastageListPage";
-import AddWastagePage from "./pages/AddWastagePage";
 
 import LocalCustomersPage from "./pages/LocalCustomersPage";
 import GlobalCustomersPage from "./pages/GlobalCustomersPage";
@@ -117,9 +114,6 @@ function App() {
         <Route path="/grn/:id" element={<GrnDetailsPage />} />
 
         <Route path="/returns" element={<ReturnListPage />} />
-        <Route path="/returns/add" element={<AddReturnPage />} />
-        <Route path="/wastage" element={<WastageListPage />} />
-        <Route path="/wastage/add" element={<AddWastagePage />} />
 
         <Route path="/customers/local" element={<LocalCustomersPage />} />
         <Route path="/customers/global" element={<GlobalCustomersPage />} />
