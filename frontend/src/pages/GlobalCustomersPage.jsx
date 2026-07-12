@@ -179,7 +179,7 @@ export default function GlobalCustomersPage() {
 
   const loadCustomers = async (preferredId = null) => {
     try {
-      const res = await api.get("/customers?type=global");
+      const res = await api.get("/customers");
       const rows = Array.isArray(res.data) ? res.data.map(mapApiCustomerToUi) : [];
 
       setCustomers(rows);
@@ -267,10 +267,10 @@ export default function GlobalCustomersPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = "global-customers.csv";
+      link.download = "customers.csv";
       link.click();
       URL.revokeObjectURL(url);
-      toast.info("Global customers CSV exported.");
+      toast.info("Customers CSV exported.");
     };
 
     window.addEventListener("fw-open-global-customer-modal", handleOpenFromTopbar);
@@ -335,10 +335,34 @@ export default function GlobalCustomersPage() {
 
   const handleSaveCustomer = async (e) => {
     e.preventDefault();
+    if (!form.customerName || !form.customerName.trim()) {
+      return toast.error("Customer name is required");
+    }
 
-    const payload = {
-      customer_type: "global",
-      customer_name: form.customerName,
+    if (form.email && form.email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(form.email)) {
+        return toast.error("Please enter a valid email address");
+      }
+    }
+
+    if (!form.country) {
+      return toast.error("Country is required");
+    }
+
+    if (!form.location || !form.location.trim()) {
+      return toast.error("Location / Island is required");
+    }
+
+    if (!form.preferredAirline) {
+      return toast.error("Preferred airline is required");
+    }
+
+    if (!form.incoterms) {
+      return toast.error("Incoterms are required");
+    }
+
+    const payload = {      customer_name: form.customerName,
       group_name: form.group || "Independent",
       contact_person: form.contact,
       email: form.email,
@@ -359,11 +383,11 @@ export default function GlobalCustomersPage() {
       if (modalMode === "add") {
         const res = await api.post("/customers", payload);
         await loadCustomers(res.data?.id);
-        toast.success(`Global customer "${form.customerName}" created successfully.`);
+        toast.success(`Customer "${form.customerName}" created successfully.`);
       } else {
         await api.put(`/customers/${editingCustomerId}`, payload);
         await loadCustomers(editingCustomerId);
-        toast.success(`Global customer "${form.customerName}" saved successfully.`);
+        toast.success(`Customer "${form.customerName}" saved successfully.`);
       }
 
       closeModal();
@@ -414,27 +438,19 @@ export default function GlobalCustomersPage() {
   const openRealShipmentFlow = (customer, e = null) => {
     if (e?.stopPropagation) e.stopPropagation();
 
-    navigate(`/dispatch/global?customerId=${customer.id}`);
+    navigate(`/dispatch?customerId=${customer.id}`);
     toast.info("Customer opened in Global Dispatch.");
   };
 
   return (
     <div className="page-shell">
-      <div className="notice-banner notice-warning">
-        <Plane size={16} />
-        <span>
-          Global customers receive airline shipments. Click any row to view details,
-          shipment history and actions. No returns after departure.
-        </span>
-      </div>
-
       <div className="page-toolbar">
         <div className="toolbar-left">
           <div className="search-field">
             <Search size={16} />
             <input
               type="text"
-              placeholder="Search global customers..."
+              placeholder="Search customers..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -456,8 +472,20 @@ export default function GlobalCustomersPage() {
 
       <div className="content-card">
         <div className="card-header-row">
-          <h3>✈️ Global Customers — Export</h3>
-          <span className="count-pill">{filteredCustomers.length} customers</span>
+          <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            Customers — Export
+            <span 
+              title="Global customers receive airline shipments. Click any row to view details, shipment history and actions. No returns after departure."
+              style={{ cursor: "help", color: "#6B7D71", display: "flex", alignItems: "center", justifyContent: "center", width: 20, height: 20, borderRadius: "50%", background: "#F1F5F9", fontSize: 12, border: "1px solid #E2E8F0" }}
+            >
+              ℹ
+            </span>
+          </h3>
+          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+            <span className="count-pill">{filteredCustomers.length} customers</span>
+            <button className="btn btn-s btn-sm" onClick={() => alert("Export CSV coming soon!")}>Export CSV</button>
+            <button className="btn btn-p btn-sm" onClick={() => openAddModal()}>+ Add Customer</button>
+          </div>
         </div>
 
         <div className="table-wrap">
@@ -500,11 +528,11 @@ export default function GlobalCustomersPage() {
                       <div className="table-actions">
                         <button
                           type="button"
-                          className="btn btn-p btn-xs gc-ship-btn"
-                          title="New shipment"
+                          title="Create shipment for this customer"
+                          style={{ width: 34, height: 34, borderRadius: 14, border: "1.5px solid #CFE2D4", background: "#FFFFFF", color: "#2E8B57", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
                           onClick={(e) => openRealShipmentFlow(customer, e)}
                         >
-                          ✈️ Shipment
+                          <Plane size={16} />
                         </button>
                       </div>
                     </td>
@@ -528,7 +556,7 @@ export default function GlobalCustomersPage() {
 
           <div className={`details-panel ${showDetailsPanel ? "open" : ""}`}>
             <div className="details-panel-header">
-              <div className="details-panel-icon">✈️</div>
+              <div className="details-panel-icon"></div>
 
               <div className="details-panel-head-text">
                 <h3>{selectedCustomer.customerName}</h3>
@@ -711,7 +739,7 @@ export default function GlobalCustomersPage() {
         <div className="modal-backdrop" onClick={closeModal}>
           <div className="md md-lg" onClick={(e) => e.stopPropagation()}>
             <div className="md-h">
-              <h3>{modalMode === "add" ? "✈️ Add Global Customer" : "✏️ Edit Global Customer"}</h3>
+              <h3>{modalMode === "add" ? "Add Customer" : "✏Edit Customer"}</h3>
               <button type="button" className="md-x" onClick={closeModal}>
                 ✕
               </button>
@@ -723,7 +751,7 @@ export default function GlobalCustomersPage() {
             >
               <div className="md-b" style={{ overflowY: "auto", maxHeight: "calc(90vh - 150px)" }}>
                 <div className="ib ib-w" style={{ marginTop: "-4px", marginBottom: "14px" }}>
-                  <span>✈️</span>
+                  <span></span>
                   <div>
                     Global customers receive airline shipments. All 7 export documents required per shipment.{" "}
                     <strong>No returns after departure.</strong>
@@ -918,14 +946,14 @@ export default function GlobalCustomersPage() {
                           className={`to ${form.phytoRequired ? "on" : ""}`}
                           onClick={() => setForm((prev) => ({ ...prev, phytoRequired: true }))}
                         >
-                          ✅ Yes (standard)
+                          Yes (standard)
                         </button>
                         <button
                           type="button"
                           className={`to ${!form.phytoRequired ? "on" : ""}`}
                           onClick={() => setForm((prev) => ({ ...prev, phytoRequired: false }))}
                         >
-                          ❌ Not required
+                          Not required
                         </button>
                       </div>
                     </div>
@@ -938,7 +966,7 @@ export default function GlobalCustomersPage() {
                           className={`to ${form.coldChainRequired ? "on" : ""}`}
                           onClick={() => setForm((prev) => ({ ...prev, coldChainRequired: true }))}
                         >
-                          🧊 Yes — Thermocol boxes
+                          Yes — Thermocol boxes
                         </button>
                         <button
                           type="button"

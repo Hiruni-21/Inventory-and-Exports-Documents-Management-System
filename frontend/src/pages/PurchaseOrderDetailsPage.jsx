@@ -168,7 +168,7 @@ const PurchaseOrderDetailsPage = () => {
   if (pageError) {
     return (
       <div className="ib ib-d">
-        <span>⚠️</span>
+        <span></span>
         <div>{pageError}</div>
       </div>
     );
@@ -177,7 +177,7 @@ const PurchaseOrderDetailsPage = () => {
   if (!purchaseOrder) {
     return (
       <div className="ib ib-d">
-        <span>⚠️</span>
+        <span></span>
         <div>Purchase order not found</div>
       </div>
     );
@@ -218,35 +218,35 @@ const PurchaseOrderDetailsPage = () => {
 
       {actionMessage ? (
         <div className="ib ib-s">
-          <span>✅</span>
+          <span></span>
           <div>{actionMessage}</div>
         </div>
       ) : null}
 
       {actionError ? (
         <div className="ib ib-d">
-          <span>⚠️</span>
+          <span></span>
           <div>{actionError}</div>
         </div>
       ) : null}
 
       {status === "pending_approval" ? (
         <div className="ib ib-w">
-          <span>⚠️</span>
+          <span></span>
           <div>This purchase order is waiting for manager approval. Send button appears after approval.</div>
         </div>
       ) : null}
 
       {status === "approved" ? (
         <div className="ib ib-s">
-          <span>✅</span>
+          <span></span>
           <div>This purchase order is approved. You can now send it to the supplier.</div>
         </div>
       ) : null}
 
       {status === "sent" ? (
         <div className="ib ib-i">
-          <span>📨</span>
+          <span></span>
           <div>This purchase order has been sent to the supplier. You can create the GRN after receiving goods.</div>
         </div>
       ) : null}

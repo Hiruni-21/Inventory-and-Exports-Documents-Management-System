@@ -6,10 +6,8 @@ const getDashboardStats = (req, res) => {
   const queries = {
     items: "SELECT COUNT(*) AS total FROM items WHERE status = 'active'",
     suppliers: "SELECT COUNT(*) AS total FROM suppliers WHERE status = 'active'",
-    localCustomers:
-      "SELECT COUNT(*) AS total FROM customers WHERE customer_type = 'local' AND status = 'active'",
-    globalCustomers:
-      "SELECT COUNT(*) AS total FROM customers WHERE customer_type = 'global' AND status = 'active'",
+    customers:
+      "SELECT COUNT(*) AS total FROM customers WHERE status = 'active'",
 
     pendingApprovals:
       "SELECT COUNT(*) AS total FROM purchase_orders WHERE status IN ('pending_approval', 'draft')",
@@ -19,8 +17,8 @@ const getDashboardStats = (req, res) => {
       "SELECT COUNT(*) AS total FROM export_documents WHERE all_cleared = 0",
     activeGlobalShipments:
       "SELECT COUNT(*) AS total FROM global_dispatch WHERE status NOT IN ('delivered')",
-    localDispatchesToday:
-      "SELECT COUNT(*) AS total FROM local_dispatch WHERE DATE(dispatch_date) = CURDATE()",
+    dispatchesToday:
+      "SELECT COUNT(*) AS total FROM global_dispatch WHERE DATE(dispatch_date) = CURDATE()",
 
     returnsMonth: `
       SELECT COUNT(*) AS total

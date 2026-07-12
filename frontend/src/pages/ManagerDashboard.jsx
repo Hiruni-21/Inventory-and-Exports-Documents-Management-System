@@ -65,10 +65,8 @@ const ManagerDashboard = () => {
   const [expiry, setExpiry] = useState([]);
   const [adjustments, setAdjustments] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
-  const [localCustomers, setLocalCustomers] = useState([]);
-  const [globalCustomers, setGlobalCustomers] = useState([]);
-  const [localDispatches, setLocalDispatches] = useState([]);
-  const [globalDispatches, setGlobalDispatches] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [dispatches, setDispatches] = useState([]);
   const [exportDocs, setExportDocs] = useState([]);
   const [grnList, setGrnList] = useState([]);
   const [purchaseOrders, setPurchaseOrders] = useState([]);
@@ -84,10 +82,8 @@ const ManagerDashboard = () => {
         expiryData,
         adjustmentsData,
         suppliersData,
-        localCustomersData,
-        globalCustomersData,
-        localDispatchData,
-        globalDispatchData,
+        customersData,
+        dispatchesData,
         exportDocsData,
         grnData,
         purchaseOrdersData,
@@ -98,10 +94,8 @@ const ManagerDashboard = () => {
         getArray("/inventory/expiry", { params: { days: 14 } }),
         getArray("/stock-adjustments"),
         getArray("/suppliers"),
-        getArray("/customers", { params: { type: "local" } }),
-        getArray("/customers", { params: { type: "global" } }),
+        getArray("/customers"),
         getArray("/dispatch"),
-        getArray("/dispatch/global"),
         getArray("/export-docs"),
         getArray("/grn"),
         getArray("/purchase-orders"),
@@ -113,10 +107,8 @@ const ManagerDashboard = () => {
       setExpiry(expiryData);
       setAdjustments(adjustmentsData);
       setSuppliers(suppliersData);
-      setLocalCustomers(localCustomersData);
-      setGlobalCustomers(globalCustomersData);
-      setLocalDispatches(localDispatchData);
-      setGlobalDispatches(globalDispatchData);
+      setCustomers(customersData);
+      setDispatches(dispatchesData);
       setExportDocs(exportDocsData);
       setGrnList(grnData);
       setPurchaseOrders(purchaseOrdersData);
@@ -145,14 +137,14 @@ const ManagerDashboard = () => {
   );
 
   const totalCustomers = useMemo(
-    () => localCustomers.length + globalCustomers.length,
-    [localCustomers, globalCustomers]
+    () => customers.length,
+    [customers]
   );
 
   const activeExportShipments = useMemo(
     () =>
-      globalDispatches.filter((row) => normalizeStatus(row.status) !== "delivered").length,
-    [globalDispatches]
+      dispatches.filter((row) => normalizeStatus(row.status) !== "delivered").length,
+    [dispatches]
   );
 
   const pendingApprovals = useMemo(
@@ -208,24 +200,14 @@ const ManagerDashboard = () => {
   const todaysSchedule = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
 
-    const localRows = localDispatches
-      .filter((row) => String(row.dispatch_date || "").slice(0, 10) === today)
-      .slice(0, 2)
-      .map((row) => ({
-        key: `local-${row.id}`,
-        title: `${row.client_name || "Local Dispatch"} — ${row.delivery_window || formatDate(row.dispatch_date)}`,
-        subtitle: `${row.dispatch_number || "Dispatch"} · ${row.status || "scheduled"}`,
-        to: "/dispatch/local",
-      }));
-
-    const globalRows = globalDispatches
+    const globalRows = dispatches
       .filter((row) => String(row.dispatch_date || "").slice(0, 10) === today)
       .slice(0, 1)
       .map((row) => ({
         key: `global-${row.id}`,
         title: `${row.customer_name || "Export Shipment"} — ${row.flight_no || row.airline || "Flight pending"}`,
         subtitle: `${row.dispatch_number || "Shipment"} · ${row.status || "docs_pending"}`,
-        to: "/dispatch/global",
+        to: "/dispatch",
       }));
 
     const grnRows = grnList
@@ -238,8 +220,8 @@ const ManagerDashboard = () => {
         to: "/grn",
       }));
 
-    return [...localRows, ...globalRows, ...grnRows].slice(0, 4);
-  }, [localDispatches, globalDispatches, grnList]);
+    return [...globalRows, ...grnRows].slice(0, 4);
+  }, [dispatches, grnList]);
 
   const recentAdjustments = useMemo(() => adjustments.slice(0, 4), [adjustments]);
 
@@ -270,14 +252,9 @@ const ManagerDashboard = () => {
           </div>
 
           <div className="krow k4">
-            <div className="kc b">
-              <div className="kv">{Number(stats.localDispatch || localDispatches.length || 0)}</div>
-              <div className="kl">Local Dispatches</div>
-            </div>
-
             <div className="kc a">
-              <div className="kv">{activeExportShipments || Number(stats.globalDispatch || 0)}</div>
-              <div className="kl">Active Export Shipments</div>
+              <div className="kv">{activeExportShipments || Number(stats.activeGlobalShipments || 0)}</div>
+              <div className="kl">Active Shipments</div>
             </div>
 
             <div className="kc g">

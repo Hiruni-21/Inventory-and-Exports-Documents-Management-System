@@ -1,5 +1,18 @@
 const express = require("express");
 const router = express.Router();
+const multer = require("multer");
+const path = require("path");
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, "..", "uploads", "export_docs"));
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname));
+  },
+});
+const upload = multer({ storage });
 
 const {
   getAllExportDocuments,
@@ -7,6 +20,7 @@ const {
   getExportDocumentById,
   updateExportDocuments,
   updateExportDocumentsByDispatchId,
+  uploadDocument
 } = require("../controllers/exportDocumentController");
 
 const { verifyToken, allowRoles } = require("../middleware/authMiddleware");
@@ -18,6 +32,15 @@ router.get(
   allowRoles("manager", "supervisor", "logistics"),
   getExportDocumentShipments
 );
+
+router.post(
+  "/upload",
+  verifyToken,
+  allowRoles("manager", "supervisor", "logistics"),
+  upload.single("file"),
+  uploadDocument
+);
+
 router.put(
   "/by-dispatch/:globalDispatchId",
   verifyToken,

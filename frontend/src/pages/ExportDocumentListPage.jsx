@@ -1,185 +1,191 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useToast } from "../context/ToastContext";
 import api from "../utils/api";
+import { useToast } from "../context/ToastContext";
+import { Search } from "lucide-react";
+import dayjs from "dayjs";
 
-const DOCS = [
-  {
-    key: "commercial_invoice_status",
-    label: "Commercial Invoice",
-    issuedBy: "Fresh World Exporters",
-    required: "Always",
-  },
-  {
-    key: "packing_list_status",
-    label: "Packing List",
-    issuedBy: "Fresh World Exporters",
-    required: "Always",
-  },
-  {
-    key: "phytosanitary_certificate_status",
-    label: "Phytosanitary Certificate",
-    issuedBy: "Plant Quarantine Dept.",
-    required: "Always",
-  },
-  {
-    key: "airway_bill_status",
-    label: "Airway Bill (AWB)",
-    issuedBy: "Airline (SriLankan / Maldivian)",
-    required: "Always",
-  },
-  {
-    key: "certificate_of_origin_status",
-    label: "Certificate of Origin",
-    issuedBy: "Chamber of Commerce",
-    required: "Always",
-  },
-  {
-    key: "health_certificate_status",
-    label: "Health Certificate",
-    issuedBy: "Ministry of Health",
-    required: "Always",
-  },
-  {
-    key: "insurance_certificate_status",
-    label: "Insurance Certificate",
-    issuedBy: "Insurance Company",
-    required: "CIF only",
-  },
+const EU_COUNTRIES = [
+  "Austria", "Belgium", "Bulgaria", "Croatia", "Cyprus", "Czech Republic",
+  "Denmark", "Estonia", "Finland", "France", "Germany", "Greece", "Hungary",
+  "Ireland", "Italy", "Latvia", "Lithuania", "Luxembourg", "Malta", "Netherlands",
+  "Poland", "Portugal", "Romania", "Slovakia", "Slovenia", "Spain", "Sweden"
 ];
 
-const emptyForm = {
-  global_dispatch_id: "",
-  commercial_invoice_status: "pending",
-  packing_list_status: "pending",
-  phytosanitary_certificate_status: "pending",
-  airway_bill_status: "pending",
-  certificate_of_origin_status: "pending",
-  health_certificate_status: "pending",
-  insurance_certificate_status: "pending",
-  notes: "",
+const isEUCountry = (countryStr) => {
+  if (!countryStr) return false;
+  return EU_COUNTRIES.includes(countryStr.trim());
 };
 
-const statusBadge = (value) => {
-  if (value === "done") return "badge bg-g";
-  return "badge bg-a";
+const DOCS = [
+  { type: "commercial_invoice", label: "Commercial Invoice", issuedBy: "Exporter", required: "Yes" },
+  { type: "packing_list", label: "Packing List", issuedBy: "Exporter", required: "Yes" },
+  { type: "phytosanitary_certificate", label: "Phytosanitary Certificate", issuedBy: "NPQ", required: "Yes" },
+  { type: "airway_bill", label: "Airway Bill", issuedBy: "Airline / Freight Forwarder", required: "Yes" },
+  { type: "certificate_of_origin", label: "Certificate of Origin", issuedBy: "Chamber of Commerce", required: "Yes" },
+  { type: "health_certificate", label: "Health Certificate", issuedBy: "Dept of Health", required: "Yes" },
+  { type: "insurance_certificate", label: "Insurance Certificate", issuedBy: "Insurance Provider", required: "CIF only" },
+  { type: "gsp_form_a", label: "GSP Form A", issuedBy: "Department of Commerce, Sri Lanka", required: "EU only" },
+];
+
+const isInsuranceRequired = (shipment) => {
+  if (!shipment) return false;
+  return String(shipment.incoterm || "").toUpperCase() === "CIF";
 };
 
-const requiredBadge = (value) => {
-  if (value === "Always") return "badge bg-g";
-  return "badge bg-a";
-};
-
-const formatDate = (value) => {
-  if (!value) return "—";
-  return String(value).slice(0, 10);
-};
-
-const isInsuranceRequired = (shipmentOrIncoterm) =>
-  String(
-    typeof shipmentOrIncoterm === "string"
-      ? shipmentOrIncoterm
-      : shipmentOrIncoterm?.incoterm || ""
-  ).toUpperCase() === "CIF";
-
-const getRequiredCount = (shipmentOrIncoterm) =>
-  isInsuranceRequired(shipmentOrIncoterm) ? 7 : 6;
-
-const getDoneCount = (form, shipment) => {
-  const fields = isInsuranceRequired(shipment)
-    ? DOCS.map((doc) => doc.key)
-    : DOCS.filter((doc) => doc.key !== "insurance_certificate_status").map((doc) => doc.key);
-
-  return fields.filter((field) => form[field] === "done").length;
+const getRequiredCount = (shipment) => {
+  if (!shipment) return 6;
+  let count = isInsuranceRequired(shipment) ? 7 : 6;
+  if (isEUCountry(shipment.city)) count += 1;
+  return count;
 };
 
 const getDocSetNo = (shipment) => {
-  if (!shipment?.dispatch_number) return "";
-  return String(shipment.dispatch_number).replace(/^SHP-/, "DOC-");
+  if (!shipment) return "—";
+  return shipment.dispatch_number ? `DOC-${shipment.dispatch_number}` : "—";
+};
+
+const requiredBadge = (req) => {
+  if (req === "Yes") return "badge bg-a";
+  return "badge bg-w";
 };
 
 const getShipmentOptionLabel = (shipment) => {
-  const flight = shipment.flight_no || shipment.airline || "—";
-  return `${shipment.dispatch_number} — ${shipment.customer_name} · ${flight} · ${formatDate(
-    shipment.dispatch_date
-  )}`;
+  let parts = [];
+  if (shipment.dispatch_number) parts.push(shipment.dispatch_number);
+  if (shipment.customer_name) parts.push(shipment.customer_name);
+  if (shipment.dispatch_date) parts.push(dayjs(shipment.dispatch_date).format("MMM D"));
+  return parts.join(" — ") || `Shipment #${shipment.id}`;
 };
 
-const getDocRowStyle = (doc, status, shipment) => {
-  const insuranceOptional =
-    doc.key === "insurance_certificate_status" && !isInsuranceRequired(shipment);
+const DocumentUploadRow = ({ doc, shipment, documents = [], onUploadSuccess }) => {
+  const toast = useToast();
+  const fileInputRef = useRef();
+  
+  const insuranceOptional = doc.type === "insurance_certificate" && !isInsuranceRequired(shipment);
+  const uploadedDoc = documents.find(d => d.document_type === doc.type);
+  const isDone = !!uploadedDoc;
+  
+  const [file, setFile] = useState(null);
+  const [refNo, setRefNo] = useState("");
+  const [expiry, setExpiry] = useState("");
+  const [reason, setReason] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [isReplacing, setIsReplacing] = useState(false);
 
-  if (insuranceOptional) {
-    return {
-      background: "var(--a100)",
-      border: "1px solid rgba(232,168,56,.25)",
-    };
-  }
+  const needsExpiry = doc.type === "phytosanitary_certificate" || doc.type === "health_certificate";
+  
+  const handleUpload = async () => {
+    if (!file) return toast.error("Please select a file to upload");
+    if (!refNo.trim()) return toast.error("Reference Number is required");
+    if (isReplacing && !reason.trim()) return toast.error("Reason for change is required");
+    
+    try {
+      setUploading(true);
+      const formData = new FormData();
+      formData.append("global_dispatch_id", shipment.id);
+      formData.append("document_type", doc.type);
+      formData.append("reference_number", refNo);
+      if (expiry) formData.append("expiry_date", expiry);
+      if (isReplacing) formData.append("reason", reason);
+      formData.append("file", file);
 
-  if (status === "done") {
-    return {
-      background: "var(--ivory)",
-      border: "1px solid var(--border)",
-    };
-  }
-
-  return {
-    background: "var(--d100)",
-    border: "1px solid rgba(200,75,47,.2)",
+      await api.post("/export-docs/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      
+      toast.success(doc.label + (isReplacing ? " replaced successfully" : " uploaded successfully"));
+      setFile(null);
+      setRefNo("");
+      setExpiry("");
+      setReason("");
+      setIsReplacing(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      onUploadSuccess();
+    } catch (err) {
+      console.error(err);
+      toast.error(err?.response?.data?.message || "Upload failed");
+    } finally {
+      setUploading(false);
+    }
   };
-};
 
-const getDocNumberStyle = (doc, status, shipment) => {
-  const insuranceOptional =
-    doc.key === "insurance_certificate_status" && !isInsuranceRequired(shipment);
+  const isExpired = uploadedDoc && uploadedDoc.expiry_date && dayjs(uploadedDoc.expiry_date).isBefore(dayjs(), 'day');
 
-  if (insuranceOptional) {
-    return {
-      width: 22,
-      height: 22,
-      background: "var(--a100)",
-      borderRadius: 6,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontSize: 11,
-      fontWeight: 800,
-      color: "var(--a600)",
-      flexShrink: 0,
-      border: "1px solid rgba(232,168,56,.3)",
-    };
-  }
+  const rowStyle = isDone 
+    ? { background: "var(--s50)", border: "1px solid var(--s100)" }
+    : insuranceOptional 
+      ? { opacity: 0.5, background: "var(--bg)", border: "1px dashed var(--border)" }
+      : { background: "var(--white)", border: "1px solid var(--border)" };
 
-  if (status === "done") {
-    return {
-      width: 22,
-      height: 22,
-      background: "var(--s100)",
-      borderRadius: 6,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontSize: 11,
-      fontWeight: 800,
-      color: "var(--s)",
-      flexShrink: 0,
-    };
-  }
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "12px", borderRadius: 9, ...rowStyle }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--g900)" }}>
+          {doc.label} {insuranceOptional && <span style={{ fontSize: 10, color: "var(--text3)", marginLeft: 6 }}>(Not Required)</span>}
+        </div>
+        {isDone ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span className="badge bg-g">Done</span>
+            <button type="button" className="btn btn-s btn-xs" onClick={() => setIsReplacing(!isReplacing)}>
+              {isReplacing ? "Cancel" : "Replace"}
+            </button>
+            <a href={`${api.defaults.baseURL.replace('/api', '')}${uploadedDoc.file_path}`} target="_blank" rel="noreferrer" className="btn btn-s btn-xs">
+              View
+            </a>
+          </div>
+        ) : (
+          !insuranceOptional && (
+            <span className="badge bg-w">Pending Upload</span>
+          )
+        )}
+      </div>
 
-  return {
-    width: 22,
-    height: 22,
-    background: "var(--d100)",
-    borderRadius: 6,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: 11,
-    fontWeight: 800,
-    color: "var(--d)",
-    flexShrink: 0,
-    border: "1px solid rgba(200,75,47,.3)",
-  };
+      {isDone && !isReplacing ? (
+        <div style={{ display: "flex", gap: 16, fontSize: 12, color: "var(--text2)", background: "rgba(255,255,255,0.6)", padding: "6px 10px", borderRadius: 6 }}>
+          <div><strong>Ref:</strong> {uploadedDoc.reference_number}</div>
+          {uploadedDoc.expiry_date && (
+            <div>
+              <strong>Expiry:</strong> {dayjs(uploadedDoc.expiry_date).format("MMM D, YYYY")}
+              {isExpired && <span style={{ color: "var(--d)", fontWeight: 700, marginLeft: 6 }}>(Expired!)</span>}
+            </div>
+          )}
+          <div style={{ marginLeft: "auto" }}>
+            Uploaded by {uploadedDoc.uploaded_by_name || "Unknown"} on {dayjs(uploadedDoc.uploaded_at).format("MMM D, HH:mm")}
+          </div>
+        </div>
+      ) : (
+        (!insuranceOptional || isReplacing) && (
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+            <div className="ff" style={{ flex: 1, minWidth: 150, marginBottom: 0 }}>
+              <label className="fl" style={{ fontSize: 10 }}>File <span className="rq">*</span></label>
+              <input type="file" className="fc" style={{ padding: "4px 8px", fontSize: 12 }} onChange={(e) => setFile(e.target.files[0])} ref={fileInputRef} />
+            </div>
+            <div className="ff" style={{ flex: 1, minWidth: 120, marginBottom: 0 }}>
+              <label className="fl" style={{ fontSize: 10 }}>Ref No. <span className="rq">*</span></label>
+              <input type="text" className="fc" style={{ padding: "6px 8px", fontSize: 12 }} placeholder="e.g. INV-100" value={refNo} onChange={e => setRefNo(e.target.value)} />
+            </div>
+            {needsExpiry && (
+              <div className="ff" style={{ flex: 1, minWidth: 120, marginBottom: 0 }}>
+                <label className="fl" style={{ fontSize: 10 }}>Expiry Date</label>
+                <input type="date" className="fc" style={{ padding: "6px 8px", fontSize: 12 }} value={expiry} onChange={e => setExpiry(e.target.value)} />
+              </div>
+            )}
+            {isReplacing && (
+              <div className="ff" style={{ flex: 2, minWidth: 200, marginBottom: 0 }}>
+                <label className="fl" style={{ fontSize: 10 }}>Reason for change <span className="rq">*</span></label>
+                <input type="text" className="fc" style={{ padding: "6px 8px", fontSize: 12 }} placeholder="e.g. Wrong invoice number" value={reason} onChange={e => setReason(e.target.value)} />
+              </div>
+            )}
+            <button type="button" className="btn btn-p btn-sm" onClick={handleUpload} disabled={uploading || !file || !refNo || (isReplacing && !reason)}>
+              {uploading ? (isReplacing ? "Replacing..." : "Uploading...") : (isReplacing ? "Confirm Replace" : "Upload")}
+            </button>
+          </div>
+        )
+      )}
+
+    </div>
+  );
 };
 
 const ExportDocumentListPage = () => {
@@ -194,43 +200,28 @@ const ExportDocumentListPage = () => {
 
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  
+  const [selectedGlobalDispatchId, setSelectedGlobalDispatchId] = useState("");
+  const [activeShipmentDetails, setActiveShipmentDetails] = useState(null);
+  const [notes, setNotes] = useState("");
 
-  const [form, setForm] = useState(emptyForm);
-
-  const selectedShipment = useMemo(
-    () => shipments.find((shipment) => String(shipment.id) === String(form.global_dispatch_id)),
-    [shipments, form.global_dispatch_id]
-  );
-
-  const doneCount = useMemo(
-    () => getDoneCount(form, selectedShipment),
-    [form, selectedShipment]
-  );
-
-  const requiredCount = useMemo(
-    () => getRequiredCount(selectedShipment),
-    [selectedShipment]
+  const selectedShipmentMeta = useMemo(
+    () => shipments.find((s) => String(s.id) === String(selectedGlobalDispatchId)),
+    [shipments, selectedGlobalDispatchId]
   );
 
   const loadPage = async () => {
     try {
       setLoading(true);
-
       const [documentsRes, shipmentsRes] = await Promise.all([
         api.get("/export-docs"),
         api.get("/export-docs/shipments"),
       ]);
-
-      const documentRows = Array.isArray(documentsRes.data) ? documentsRes.data : [];
-      const shipmentRows = Array.isArray(shipmentsRes.data) ? shipmentsRes.data : [];
-
-      setRows(documentRows);
-      setShipments(shipmentRows);
+      setRows(Array.isArray(documentsRes.data) ? documentsRes.data : []);
+      setShipments(Array.isArray(shipmentsRes.data) ? shipmentsRes.data : []);
     } catch (err) {
       console.error(err);
       toast.error("Failed to load export documents");
-      setRows([]);
-      setShipments([]);
     } finally {
       setLoading(false);
     }
@@ -240,12 +231,31 @@ const ExportDocumentListPage = () => {
     loadPage();
   }, []);
 
+  const fetchDocumentDetails = async (dispatchId) => {
+    try {
+      const row = rows.find(r => String(r.global_dispatch_id) === String(dispatchId));
+      if (!row) return;
+      const res = await api.get(`/export-docs/${row.id}`);
+      setActiveShipmentDetails(res.data);
+      setNotes(res.data.notes || "");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to fetch document details");
+    }
+  };
+
+  useEffect(() => {
+    if (selectedGlobalDispatchId) {
+      fetchDocumentDetails(selectedGlobalDispatchId);
+    } else {
+      setActiveShipmentDetails(null);
+      setNotes("");
+    }
+  }, [selectedGlobalDispatchId, rows]);
+
   useEffect(() => {
     const openHandler = () => {
-      setForm((prev) => ({
-        ...emptyForm,
-        global_dispatch_id: prev.global_dispatch_id || dispatchIdFromQuery || "",
-      }));
+      setSelectedGlobalDispatchId(dispatchIdFromQuery || "");
       setShowModal(true);
     };
 
@@ -255,214 +265,140 @@ const ExportDocumentListPage = () => {
 
   useEffect(() => {
     if (!dispatchIdFromQuery || !rows.length) return;
-
-    const existing = rows.find(
-      (row) => String(row.global_dispatch_id) === String(dispatchIdFromQuery)
-    );
-
+    const existing = rows.find(row => String(row.global_dispatch_id) === String(dispatchIdFromQuery));
     if (existing) {
-      setForm({
-        global_dispatch_id: String(existing.global_dispatch_id),
-        commercial_invoice_status: existing.commercial_invoice_status || "pending",
-        packing_list_status: existing.packing_list_status || "pending",
-        phytosanitary_certificate_status: existing.phytosanitary_certificate_status || "pending",
-        airway_bill_status: existing.airway_bill_status || "pending",
-        certificate_of_origin_status: existing.certificate_of_origin_status || "pending",
-        health_certificate_status: existing.health_certificate_status || "pending",
-        insurance_certificate_status: existing.insurance_certificate_status || "pending",
-        notes: existing.notes || "",
-      });
+      setSelectedGlobalDispatchId(String(existing.global_dispatch_id));
       setShowModal(true);
     }
   }, [dispatchIdFromQuery, rows]);
 
-  useEffect(() => {
-    if (!showModal) return;
-
-    const onKeyDown = (e) => {
-      if (e.key === "Escape") closeModal();
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [showModal]);
-
   const openForRow = (row) => {
-    setForm({
-      global_dispatch_id: String(row.global_dispatch_id),
-      commercial_invoice_status: row.commercial_invoice_status || "pending",
-      packing_list_status: row.packing_list_status || "pending",
-      phytosanitary_certificate_status: row.phytosanitary_certificate_status || "pending",
-      airway_bill_status: row.airway_bill_status || "pending",
-      certificate_of_origin_status: row.certificate_of_origin_status || "pending",
-      health_certificate_status: row.health_certificate_status || "pending",
-      insurance_certificate_status: row.insurance_certificate_status || "pending",
-      notes: row.notes || "",
-    });
+    setSelectedGlobalDispatchId(String(row.global_dispatch_id));
     setShowModal(true);
   };
 
   const closeModal = () => {
     setShowModal(false);
+    setSelectedGlobalDispatchId("");
+    setActiveShipmentDetails(null);
+    setNotes("");
   };
 
-  const handleShipmentChange = (value) => {
-    const existing = rows.find((row) => String(row.global_dispatch_id) === String(value));
-
-    if (existing) {
-      setForm({
-        global_dispatch_id: String(existing.global_dispatch_id),
-        commercial_invoice_status: existing.commercial_invoice_status || "pending",
-        packing_list_status: existing.packing_list_status || "pending",
-        phytosanitary_certificate_status: existing.phytosanitary_certificate_status || "pending",
-        airway_bill_status: existing.airway_bill_status || "pending",
-        certificate_of_origin_status: existing.certificate_of_origin_status || "pending",
-        health_certificate_status: existing.health_certificate_status || "pending",
-        insurance_certificate_status: existing.insurance_certificate_status || "pending",
-        notes: existing.notes || "",
-      });
-    } else {
-      setForm({
-        ...emptyForm,
-        global_dispatch_id: value,
-      });
-    }
-  };
-
-  const setDocStatus = (field, nextValue) => {
-    if (field === "insurance_certificate_status" && !isInsuranceRequired(selectedShipment)) {
-      return;
-    }
-
-    setForm((prev) => ({
-      ...prev,
-      [field]: nextValue,
-    }));
-  };
-
-  const handleUploadPlaceholder = (docLabel) => {
-    toast.info(`${docLabel} upload UI is shown. File storage is not changed in this step.`);
-  };
-
-  const handleSave = async (e) => {
+  const handleSaveNotes = async (e) => {
     e.preventDefault();
-
-    if (!form.global_dispatch_id) {
-      toast.error("Please select a shipment first");
-      return;
-    }
+    if (!selectedGlobalDispatchId) return;
 
     try {
       setSaving(true);
-
-      const res = await api.put(`/export-docs/by-dispatch/${form.global_dispatch_id}`, form);
-
-      toast.success(res.data?.message || "Export document set updated");
-      setShowModal(false);
-      await loadPage();
+      await api.put(`/export-docs/by-dispatch/${selectedGlobalDispatchId}`, { notes });
+      toast.success("Document notes saved");
+      loadPage();
     } catch (err) {
       console.error(err);
-      toast.error(err?.response?.data?.message || "Failed to save export document set");
+      toast.error(err?.response?.data?.message || "Failed to save notes");
     } finally {
       setSaving(false);
     }
   };
 
   const noShipments = !loading && shipments.length === 0;
+  
+  const documentsList = activeShipmentDetails?.documents || [];
+  const requiredCount = getRequiredCount(selectedShipmentMeta);
+  const doneCount = activeShipmentDetails ? documentsList.length : 0;
 
   return (
     <>
-      <div className="ib ib-i">
-        <span>📄</span>
-        <div>
-          All 7 documents must be verified before a shipment can be <strong>Cleared</strong> and
-          stock deducted. Use <strong>+ Create Document Set</strong> above to upload and confirm
-          documents per shipment.
-        </div>
-      </div>
-
       <div className="content-card" style={{ marginTop: 16 }}>
         <div className="card-header-row">
-          <h3>Document Status by Shipment</h3>
+          <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            Document Status by Shipment
+            <span 
+              title="All 7 documents must be verified before a shipment can be Cleared and stock deducted. Use + Create Document Set to upload and confirm documents per shipment."
+              style={{ cursor: "help", color: "#6B7D71", display: "flex", alignItems: "center", justifyContent: "center", width: 20, height: 20, borderRadius: "50%", background: "#F1F5F9", fontSize: 12, border: "1px solid #E2E8F0" }}
+            >
+              ℹ
+            </span>
+          </h3>
+          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+            <span className="count-pill">{rows.length} document sets</span>
+            <button className="btn btn-p btn-sm" onClick={() => window.dispatchEvent(new CustomEvent("fw-open-export-docs-modal"))}>+ Create Document Set</button>
+          </div>
         </div>
 
         <div className="table-wrap">
           <table className="data-table">
             <thead>
               <tr>
-                <th>SHIPMENT</th>
-                <th>INVOICE</th>
-                <th>PACKING</th>
-                <th>PHYTO</th>
-                <th>AWB</th>
-                <th>ORIGIN</th>
-                <th>HEALTH</th>
+                <th>SHIPMENT / DATE</th>
+                <th>CUSTOMER</th>
+                <th>AIRLINE / AWB</th>
+                <th>INCOTERM</th>
+                <th>DOCS UPLOADED</th>
                 <th>INSURANCE</th>
-                <th>ALL CLEAR?</th>
+                <th>ALL CLEARED</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="9">Loading...</td>
+                  <td colSpan="7">Loading...</td>
                 </tr>
               ) : rows.length > 0 ? (
                 rows.map((row) => {
+                  const reqCount = row.insurance_required ? 7 : 6;
                   const insuranceRequired = row.insurance_required;
+                  const docsDone = row.docs_done_count || 0;
 
                   return (
                     <tr key={row.id} onClick={() => openForRow(row)} style={{ cursor: "pointer" }}>
-                      <td style={{ fontWeight: 700 }}>{row.dispatch_number}</td>
                       <td>
-                        <span className={statusBadge(row.commercial_invoice_status)}>
-                          {row.commercial_invoice_status === "done" ? "Done" : "Pending"}
-                        </span>
+                        <div style={{ fontWeight: 700, color: "var(--g900)" }}>
+                          {row.dispatch_number}
+                        </div>
+                        <div style={{ fontSize: 12, color: "var(--text3)" }}>
+                          {dayjs(row.dispatch_date).format("MMM D, YYYY")}
+                        </div>
+                      </td>
+                      <td style={{ fontWeight: 600 }}>{row.customer_name}</td>
+                      <td>
+                        <div style={{ fontSize: 13 }}>{row.airline || "—"}</div>
+                        <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 2 }}>
+                          {row.awb_number ? `AWB: ${row.awb_number}` : ""}
+                        </div>
                       </td>
                       <td>
-                        <span className={statusBadge(row.packing_list_status)}>
-                          {row.packing_list_status === "done" ? "Done" : "Pending"}
-                        </span>
+                        <span className="badge bg-g">{String(row.incoterm || "FOB").toUpperCase()}</span>
                       </td>
                       <td>
-                        <span className={statusBadge(row.phytosanitary_certificate_status)}>
-                          {row.phytosanitary_certificate_status === "done" ? "Done" : "Pending"}
-                        </span>
-                      </td>
-                      <td>
-                        <span className={statusBadge(row.airway_bill_status)}>
-                          {row.airway_bill_status === "done" ? "Done" : "Pending"}
-                        </span>
-                      </td>
-                      <td>
-                        <span className={statusBadge(row.certificate_of_origin_status)}>
-                          {row.certificate_of_origin_status === "done" ? "Done" : "Pending"}
-                        </span>
-                      </td>
-                      <td>
-                        <span className={statusBadge(row.health_certificate_status)}>
-                          {row.health_certificate_status === "done" ? "Done" : "Pending"}
+                        <span className={docsDone >= reqCount ? "badge bg-g" : "badge bg-a"}>
+                          {docsDone}/{reqCount}
                         </span>
                       </td>
                       <td>
                         {insuranceRequired ? (
-                          <span className={statusBadge(row.insurance_certificate_status)}>
-                            {row.insurance_certificate_status === "done" ? "Done" : "Pending"}
-                          </span>
+                          <span className="badge bg-w">Required</span>
                         ) : (
                           <span className="badge bg-a">CIF only</span>
                         )}
                       </td>
                       <td>
-                        <span className={row.all_cleared ? "badge bg-g" : "badge bg-a"}>
-                          {row.all_cleared ? "Yes" : "No"}
-                        </span>
+                        {row.all_cleared ? (
+                          <span className="badge bg-g">All Cleared</span>
+                        ) : docsDone === 0 ? (
+                          <span className="badge bg-w">Not Started</span>
+                        ) : (
+                          <span className="badge bg-a" title={row.pending_docs?.join(", ")}>
+                            {docsDone}/{reqCount} — {reqCount - docsDone} pending
+                          </span>
+                        )}
                       </td>
                     </tr>
                   );
                 })
               ) : (
                 <tr>
-                  <td colSpan="9">No export document records found</td>
+                  <td colSpan="7">No export document records found</td>
                 </tr>
               )}
             </tbody>
@@ -490,20 +426,17 @@ const ExportDocumentListPage = () => {
             </thead>
             <tbody>
               {DOCS.map((doc) => (
-                <tr key={doc.key}>
+                <tr key={doc.type}>
                   <td style={{ fontWeight: 700 }}>{doc.label}</td>
                   <td>
-                    {doc.key === "commercial_invoice_status" && "Price and terms of sale"}
-                    {doc.key === "packing_list_status" && "Itemized shipment contents"}
-                    {doc.key === "phytosanitary_certificate_status" &&
-                      "Confirms produce is pest/disease free"}
-                    {doc.key === "airway_bill_status" && "Air freight contract"}
-                    {doc.key === "certificate_of_origin_status" &&
-                      "Confirms goods are from Sri Lanka"}
-                    {doc.key === "health_certificate_status" &&
-                      "Confirms goods are safe to consume"}
-                    {doc.key === "insurance_certificate_status" &&
-                      "Cargo insurance certificate"}
+                    {doc.type === "commercial_invoice" && "Price and terms of sale"}
+                    {doc.type === "packing_list" && "Itemized shipment contents"}
+                    {doc.type === "phytosanitary_certificate" && "Confirms produce is pest/disease free"}
+                    {doc.type === "airway_bill" && "Air freight contract"}
+                    {doc.type === "certificate_of_origin" && "Confirms goods are from Sri Lanka"}
+                    {doc.type === "health_certificate" && "Confirms goods are safe to consume"}
+                    {doc.type === "insurance_certificate" && "Cargo insurance certificate"}
+                    {doc.type === "gsp_form_a" && "Reduces/removes EU import duty under Sri Lanka's GSP+ status"}
                   </td>
                   <td>{doc.issuedBy}</td>
                   <td>
@@ -518,51 +451,29 @@ const ExportDocumentListPage = () => {
 
       {noShipments && (
         <div className="ib ib-i" style={{ marginTop: 18 }}>
-          <span>ℹ️</span>
+          <span>ℹ</span>
           <div>Create a global shipment first, then manage its export documents.</div>
         </div>
       )}
 
       {showModal && (
-        <div
-          className="modal-backdrop"
-          onClick={closeModal}
-          style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
-        >
-          <div
-            className="md md-lg"
-            onClick={(e) => e.stopPropagation()}
-            style={{ width: "100%", maxWidth: 920, maxHeight: "92vh", display: "flex", flexDirection: "column" }}
-          >
+        <div className="modal-backdrop" onClick={closeModal} style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div className="md md-lg" onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 920, maxHeight: "92vh", display: "flex", flexDirection: "column" }}>
             <div className="md-h">
-              <h3>📄 Create / Update Export Document Set</h3>
-              <button type="button" className="md-x" onClick={closeModal}>
-                ✕
-              </button>
+              <h3>Create / Update Export Document Set</h3>
+              <button type="button" className="md-x" onClick={closeModal}>✕</button>
             </div>
 
-            <form
-              onSubmit={handleSave}
-              style={{ display: "flex", flexDirection: "column", minHeight: 0 }}
-            >
+            <form onSubmit={handleSaveNotes} style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
               <div className="md-b" style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>
-                <div className="ib ib-i">
-                  <span>📄</span>
-                  <div>
-                    All {requiredCount} documents must be marked Done before the shipment can be
-                    Cleared and stock deducted.
-                  </div>
-                </div>
-
+                
                 <div className="fr" style={{ marginTop: 16 }}>
                   <div className="ff">
-                    <label className="fl">
-                      Linked Shipment <span className="rq">*</span>
-                    </label>
+                    <label className="fl">Linked Shipment <span className="rq">*</span></label>
                     <select
                       className="fc"
-                      value={form.global_dispatch_id}
-                      onChange={(e) => handleShipmentChange(e.target.value)}
+                      value={selectedGlobalDispatchId}
+                      onChange={(e) => setSelectedGlobalDispatchId(e.target.value)}
                     >
                       <option value="">Select shipment</option>
                       {shipments.map((shipment) => (
@@ -575,161 +486,50 @@ const ExportDocumentListPage = () => {
 
                   <div className="ff">
                     <label className="fl">Doc Set No.</label>
-                    <input
-                      className="fc"
-                      value={getDocSetNo(selectedShipment)}
-                      readOnly
-                      style={{ background: "var(--ivory)" }}
-                    />
+                    <input className="fc" value={getDocSetNo(selectedShipmentMeta)} readOnly style={{ background: "var(--ivory)" }} />
                   </div>
                 </div>
 
-                <div className="fst" style={{ marginBottom: 11 }}>
-                  {requiredCount} Required Documents
-                </div>
+                {selectedGlobalDispatchId && (
+                  <>
+                    <div className="fst" style={{ marginBottom: 11 }}>
+                      {requiredCount} Required Documents
+                    </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                  {DOCS.map((doc, index) => {
-                    const insuranceOptional =
-                      doc.key === "insurance_certificate_status" &&
-                      !isInsuranceRequired(selectedShipment);
+                    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                      {DOCS.filter(doc => doc.type !== "gsp_form_a" || isEUCountry(selectedShipmentMeta?.city)).map((doc) => (
+                        <DocumentUploadRow 
+                          key={doc.type} 
+                          doc={doc} 
+                          shipment={selectedShipmentMeta} 
+                          documents={documentsList}
+                          onUploadSuccess={() => {
+                            fetchDocumentDetails(selectedGlobalDispatchId);
+                            loadPage();
+                          }} 
+                        />
+                      ))}
+                    </div>
 
-                    const status = insuranceOptional ? "pending" : form[doc.key];
-                    const rowStyle = getDocRowStyle(doc, status, selectedShipment);
-                    const numberStyle = getDocNumberStyle(doc, status, selectedShipment);
+                    <div style={{ marginTop: 14, padding: "12px 16px", background: "var(--g100)", borderRadius: 10, border: "1px solid var(--g200)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: "var(--g800)" }}>Document Progress</span>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: doneCount === requiredCount ? "var(--g700)" : "var(--d)" }}>
+                        {doneCount} / {requiredCount} complete
+                      </span>
+                    </div>
 
-                    return (
-                      <div
-                        key={doc.key}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 11,
-                          padding: "9px 13px",
-                          borderRadius: 9,
-                          ...rowStyle,
-                        }}
-                      >
-                        <div style={numberStyle}>{index + 1}</div>
-
-                        <div
-                          style={{
-                            flex: 1,
-                            fontSize: 12,
-                            fontWeight: 600,
-                            color: "var(--g900)",
-                          }}
-                        >
-                          {doc.label}{" "}
-                          {doc.key === "insurance_certificate_status" && (
-                            <span
-                              style={{
-                                fontSize: 10,
-                                color: "var(--a600)",
-                                fontWeight: 600,
-                              }}
-                            >
-                              CIF only
-                            </span>
-                          )}{" "}
-                          <span
-                            style={{
-                              fontSize: 10,
-                              color: "var(--text3)",
-                              fontWeight: 400,
-                            }}
-                          >
-                            — {doc.issuedBy}
-                          </span>
-                        </div>
-
-                        <div className="tg" style={{ gap: 5, flexShrink: 0, minWidth: 146 }}>
-                          <button
-                            type="button"
-                            className={`to ${!insuranceOptional && form[doc.key] === "done" ? "on" : ""}`}
-                            style={{ padding: "3px 10px", fontSize: 10 }}
-                            onClick={() => setDocStatus(doc.key, "done")}
-                            disabled={insuranceOptional}
-                          >
-                            ✅ Done
-                          </button>
-
-                          <button
-                            type="button"
-                            className={`to ${
-                              insuranceOptional || form[doc.key] !== "done" ? "on-r" : ""
-                            }`}
-                            style={{ padding: "3px 10px", fontSize: 10 }}
-                            onClick={() => setDocStatus(doc.key, "pending")}
-                          >
-                            ❌ Missing
-                          </button>
-                        </div>
-
-                        <button
-                          type="button"
-                          className="btn btn-s btn-xs"
-                          onClick={() => handleUploadPlaceholder(doc.label)}
-                        >
-                          📎 Upload
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div
-                  style={{
-                    marginTop: 14,
-                    padding: "12px 16px",
-                    background: "var(--g100)",
-                    borderRadius: 10,
-                    border: "1px solid var(--g200)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 600,
-                      color: "var(--g800)",
-                    }}
-                  >
-                    Document Progress
-                  </span>
-
-                  <span
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 800,
-                      color: doneCount === requiredCount ? "var(--g700)" : "var(--d)",
-                    }}
-                  >
-                    {doneCount} / {requiredCount} complete
-                  </span>
-                </div>
-
-                <div className="ff" style={{ marginTop: 14 }}>
-                  <label className="fl">Notes</label>
-                  <textarea
-                    className="fc"
-                    value={form.notes}
-                    onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
-                    placeholder="Document notes..."
-                    style={{ minHeight: 88 }}
-                  />
-                </div>
+                    <div className="ff" style={{ marginTop: 14 }}>
+                      <label className="fl">Notes</label>
+                      <textarea className="fc" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Document notes..." style={{ minHeight: 88 }} />
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="md-f">
-                <button type="button" className="btn btn-s" onClick={closeModal}>
-                  Cancel
-                </button>
-
-                <button type="submit" className="btn btn-p" disabled={saving}>
-                  {saving ? "Saving..." : "💾 Save Document Status"}
+                <button type="button" className="btn btn-s" onClick={closeModal}>Close</button>
+                <button type="submit" className="btn btn-p" disabled={saving || !selectedGlobalDispatchId}>
+                  {saving ? "Saving..." : "Save Notes"}
                 </button>
               </div>
             </form>
