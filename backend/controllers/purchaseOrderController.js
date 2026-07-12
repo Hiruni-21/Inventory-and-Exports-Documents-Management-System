@@ -67,7 +67,7 @@ const getPurchaseOrderById = (req, res) => {
     WHERE poi.purchase_order_id = ?
     ORDER BY poi.id ASC
     `;
-  
+
 
   db.query(poSql, [id], (err, poResults) => {
     if (err) {
@@ -141,198 +141,162 @@ const createPurchaseOrder = (req, res) => {
     0
   );
 
+  const poNumber = `PO-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
   const finalStatus = status === "pending_approval" ? "pending_approval" : "draft";
   const finalPriority = priority === "urgent" ? "urgent" : "normal";
 
-  const generateAndInsertPO = (retryCount = 0) => {
-    const year = new Date().getFullYear();
-    const prefix = `PO-${year}-`;
-    
-    const seqSql = `
-      SELECT po_number 
-      FROM purchase_orders 
-      WHERE po_number LIKE ? 
-      ORDER BY CAST(SUBSTRING(po_number, LENGTH(?) + 1) AS UNSIGNED) DESC 
-      LIMIT 1
+  db.beginTransaction((txErr) => {
+    if (txErr) {
+      return res.status(500).json({ message: "Transaction error", error: txErr.message });
+    }
+
+    const poSql = `
+      INSERT INTO purchase_orders
+      (
+        po_number,
+        supplier_id,
+        order_date,
+        required_by,
+        payment_terms,
+        notes,
+        status,
+        total_amount,
+        priority,
+        created_by,
+        remarks
+      )
+      VALUES (?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    
-    db.query(seqSql, [`${prefix}%`, prefix], (seqErr, seqRows) => {
-      if (seqErr) {
-        console.error("Sequence query error:", seqErr);
-        return res.status(500).json({ message: "Database error", error: seqErr.message });
-      }
 
-      let nextNum = 1;
-      if (seqRows && seqRows.length > 0) {
-        const lastNumber = seqRows[0].po_number;
-        const suffix = lastNumber.substring(prefix.length);
-        const parsed = parseInt(suffix, 10);
-        if (!isNaN(parsed)) {
-          nextNum = parsed + 1;
+    db.query(
+      poSql,
+      [
+        poNumber,
+        supplier_id,
+        required_by,
+        null,
+        remarks,
+        finalStatus,
+        totalAmount,
+        finalPriority,
+        createdBy,
+        remarks,
+      ],
+      (err, result) => {
+        if (err) {
+          console.error("createPurchaseOrder error:", err);
+          return db.rollback(() =>
+            res.status(500).json({ message: "Database error", error: err.message })
+          );
         }
-      }
 
-      const poNumber = `${prefix}${String(nextNum).padStart(3, '0')}`;
+        const purchaseOrderId = result.insertId;
 
-      db.beginTransaction((txErr) => {
-        if (txErr) {
-          return res.status(500).json({ message: "Transaction error", error: txErr.message });
-        }
+        const itemValues = cleanItems.map((item) => [
+          purchaseOrderId,
+          item.item_id,
+          item.quantity,
+          item.unit_price,
+        ]);
 
-        const poSql = `
-          INSERT INTO purchase_orders
-          (
-            po_number,
-            supplier_id,
-            order_date,
-            required_by,
-            payment_terms,
-            notes,
-            status,
-            total_amount,
-            priority,
-            created_by,
-            remarks
-          )
-          VALUES (?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?)
+        const itemSql = `
+          INSERT INTO purchase_order_items
+          (purchase_order_id, item_id, quantity, unit_price)
+          VALUES ?
         `;
 
-        db.query(
-          poSql,
-          [
-            poNumber,
-            supplier_id,
-            required_by,
-            null,
-            remarks,
-            finalStatus,
-            totalAmount,
-            finalPriority,
-            createdBy,
-            remarks,
-          ],
-          (err, result) => {
-            if (err) {
-              return db.rollback(() => {
-                if (err.code === 'ER_DUP_ENTRY' && retryCount < 5) {
-                  return generateAndInsertPO(retryCount + 1);
-                }
-                console.error("createPurchaseOrder error:", err);
-                res.status(500).json({ message: "Database error", error: err.message });
-              });
-            }
+        db.query(itemSql, [itemValues], (itemErr) => {
+          if (itemErr) {
+            console.error("createPurchaseOrder items error:", itemErr);
+            return db.rollback(() =>
+              res.status(500).json({ message: "Database error", error: itemErr.message })
+            );
+          }
 
-            const purchaseOrderId = result.insertId;
-
-            const itemValues = cleanItems.map((item) => [
-              purchaseOrderId,
-              item.item_id,
-              item.quantity,
-              item.unit_price,
-            ]);
-
-            const itemSql = `
-              INSERT INTO purchase_order_items
-              (purchase_order_id, item_id, quantity, unit_price)
-              VALUES ?
-            `;
-
-            db.query(itemSql, [itemValues], (itemErr) => {
-              if (itemErr) {
-                console.error("createPurchaseOrder items error:", itemErr);
+          if (finalStatus !== "pending_approval") {
+            return db.commit((commitErr) => {
+              if (commitErr) {
                 return db.rollback(() =>
-                  res.status(500).json({ message: "Database error", error: itemErr.message })
+                  res.status(500).json({ message: "Commit error", error: commitErr.message })
                 );
               }
 
-              if (finalStatus !== "pending_approval") {
-                return db.commit((commitErr) => {
-                  if (commitErr) {
-                    return db.rollback(() =>
-                      res.status(500).json({ message: "Commit error", error: commitErr.message })
-                    );
-                  }
-
-                  return res.status(201).json({
-                    message: "Purchase order draft created successfully",
-                    purchaseOrderId,
-                    poNumber,
-                  });
-                });
-              }
-
-              const approvalSql = `
-                INSERT INTO approval_requests
-                (
-                  module_key,
-                  entity_id,
-                  request_number,
-                  title,
-                  summary,
-                  requested_by,
-                  requested_by_name,
-                  priority,
-                  approval_status,
-                  target_table,
-                  target_pk,
-                  approve_status,
-                  reject_status,
-                  current_status,
-                  metadata_json
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-              `;
-
-              db.query(
-                approvalSql,
-                [
-                  "purchase_order",
-                  purchaseOrderId,
-                  poNumber,
-                  `Purchase Order ${poNumber}`,
-                  remarks || `Purchase order created for supplier ID ${supplier_id}`,
-                  createdBy,
-                  req.user?.name || req.user?.email || "System User",
-                  finalPriority,
-                  "pending",
-                  "purchase_orders",
-                  purchaseOrderId,
-                  "approved",
-                  "draft",
-                  "pending_approval",
-                  JSON.stringify({ totalAmount, itemCount: cleanItems.length }),
-                ],
-                (approvalErr) => {
-                  if (approvalErr) {
-                    console.error("create approval request error:", approvalErr);
-                    return db.rollback(() =>
-                      res.status(500).json({ message: "Database error", error: approvalErr.message })
-                    );
-                  }
-
-                  db.commit((commitErr) => {
-                    if (commitErr) {
-                      return db.rollback(() =>
-                        res.status(500).json({ message: "Commit error", error: commitErr.message })
-                      );
-                    }
-
-                    return res.status(201).json({
-                      message: "Purchase order submitted for approval",
-                      purchaseOrderId,
-                      poNumber,
-                    });
-                  });
-                }
-              );
+              return res.status(201).json({
+                message: "Purchase order draft created successfully",
+                purchaseOrderId,
+                poNumber,
+              });
             });
           }
-        );
-      });
-    });
-  };
 
-  generateAndInsertPO();
+          const approvalSql = `
+            INSERT INTO approval_requests
+            (
+              module_key,
+              entity_id,
+              request_number,
+              title,
+              summary,
+              requested_by,
+              requested_by_name,
+              priority,
+              approval_status,
+              target_table,
+              target_pk,
+              approve_status,
+              reject_status,
+              current_status,
+              metadata_json
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `;
+
+          db.query(
+            approvalSql,
+            [
+              "purchase_order",
+              purchaseOrderId,
+              poNumber,
+              `Purchase Order ${poNumber}`,
+              remarks || `Purchase order created for supplier ID ${supplier_id}`,
+              createdBy,
+              req.user?.name || req.user?.email || "System User",
+              finalPriority,
+              "pending",
+              "purchase_orders",
+              purchaseOrderId,
+              "approved",
+              "draft",
+              "pending_approval",
+              JSON.stringify({ totalAmount, itemCount: cleanItems.length }),
+            ],
+            (approvalErr) => {
+              if (approvalErr) {
+                console.error("create approval request error:", approvalErr);
+                return db.rollback(() =>
+                  res.status(500).json({ message: "Database error", error: approvalErr.message })
+                );
+              }
+
+              db.commit((commitErr) => {
+                if (commitErr) {
+                  return db.rollback(() =>
+                    res.status(500).json({ message: "Commit error", error: commitErr.message })
+                  );
+                }
+
+                return res.status(201).json({
+                  message: "Purchase order submitted for approval",
+                  purchaseOrderId,
+                  poNumber,
+                });
+              });
+            }
+          );
+        });
+      }
+    );
+  });
 };
 const getPurchaseItemsBySupplier = (req, res) => {
   const supplierId = Number(req.params.supplierId);
@@ -424,7 +388,8 @@ const sendPurchaseOrder = (req, res) => {
       });
     }
 
-    const requiredBy = po.required_by || "—";
+    const requiredBy =
+      po.required_by || "—";
 
     const messageBody = [
       `Purchase Order: ${po.po_number}`,
@@ -546,38 +511,10 @@ const sendPurchaseOrder = (req, res) => {
   });
 };
 
-const updatePurchaseOrder = (req, res) => {
-  const { id } = req.params;
-  const { required_by, remarks } = req.body;
-
-  const updateSql = `
-    UPDATE purchase_orders
-    SET required_by = ?,
-        remarks = ?,
-        notes = ?,
-        updated_at = NOW()
-    WHERE id = ?
-  `;
-
-  db.query(updateSql, [required_by, remarks, remarks, id], (err, result) => {
-    if (err) {
-      console.error("updatePurchaseOrder error:", err);
-      return res.status(500).json({ message: "Database error", error: err.message });
-    }
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: "Purchase order not found" });
-    }
-
-    res.json({ message: "Purchase order updated successfully" });
-  });
-};
-
 module.exports = {
-   getAllPurchaseOrders,
-   getPurchaseOrderById,
-   getPurchaseItemsBySupplier,
-   createPurchaseOrder,
-   sendPurchaseOrder,
-   updatePurchaseOrder,
+  getAllPurchaseOrders,
+  getPurchaseOrderById,
+  getPurchaseItemsBySupplier,
+  createPurchaseOrder,
+  sendPurchaseOrder,
 };

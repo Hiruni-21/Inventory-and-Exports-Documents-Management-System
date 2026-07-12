@@ -88,7 +88,7 @@ const createReturn = (req, res) => {
 
   db.getConnection((err, conn) => {
     if (err) return res.status(500).json({ message: "Database error", error: err.message });
-    
+
     conn.beginTransaction(async (txErr) => {
       if (txErr) {
         conn.release();
@@ -98,86 +98,86 @@ const createReturn = (req, res) => {
       try {
         const year = new Date().getFullYear();
         const numResult = await new Promise((resolve, reject) => {
-           conn.query(
-             "SELECT MAX(CAST(SUBSTRING_INDEX(return_number, '-', -1) AS UNSIGNED)) AS max_num FROM return_notes WHERE return_number LIKE ?", 
-             [`RN-${year}-%`], 
-             (e, r) => e ? reject(e) : resolve(r)
-           );
+          conn.query(
+            "SELECT MAX(CAST(SUBSTRING_INDEX(return_number, '-', -1) AS UNSIGNED)) AS max_num FROM return_notes WHERE return_number LIKE ?",
+            [`RN-${year}-%`],
+            (e, r) => e ? reject(e) : resolve(r)
+          );
         });
         const maxNum = numResult[0].max_num || 0;
         const nextNumStr = String(maxNum + 1).padStart(3, "0");
         const return_number = `RN-${year}-${nextNumStr}`;
 
         const rnResult = await new Promise((resolve, reject) => {
-           conn.query(
-             "INSERT INTO return_notes (return_number, supplier_id, grn_id, created_by) VALUES (?, ?, ?, ?)", 
-             [return_number, supplier_id, grn_id, created_by], 
-             (e, r) => e ? reject(e) : resolve(r)
-           );
+          conn.query(
+            "INSERT INTO return_notes (return_number, supplier_id, grn_id, created_by) VALUES (?, ?, ?, ?)",
+            [return_number, supplier_id, grn_id, created_by],
+            (e, r) => e ? reject(e) : resolve(r)
+          );
         });
         const return_note_id = rnResult.insertId;
 
         for (const item of items) {
-           const { item_id, batch_id, quantity, reason, notes } = item;
-           const returnQty = Number(quantity);
-           
-           if (returnQty <= 0) throw new Error("Return quantity must be greater than 0");
+          const { item_id, batch_id, quantity, reason, notes } = item;
+          const returnQty = Number(quantity);
 
-           const batchResults = await new Promise((resolve, reject) => {
-             conn.query(
-               "SELECT available_quantity FROM inventory_batches WHERE id = ? AND item_id = ?", 
-               [batch_id, item_id], 
-               (e, r) => e ? reject(e) : resolve(r)
-             );
-           });
-           
-           if (batchResults.length === 0) throw new Error("Inventory batch not found");
-           
-           const currentQty = Number(batchResults[0].available_quantity || 0);
-           if (returnQty > currentQty) throw new Error("Not enough stock in selected batch");
-           
-           const newQty = currentQty - returnQty;
-           const newStatus = newQty === 0 ? "Depleted" : "Available";
+          if (returnQty <= 0) throw new Error("Return quantity must be greater than 0");
 
-           await new Promise((resolve, reject) => {
-             conn.query(
-               "UPDATE inventory_batches SET available_quantity = ?, status = ? WHERE id = ?", 
-               [newQty, newStatus, batch_id], 
-               (e, r) => e ? reject(e) : resolve(r)
-             );
-           });
+          const batchResults = await new Promise((resolve, reject) => {
+            conn.query(
+              "SELECT available_quantity FROM inventory_batches WHERE id = ? AND item_id = ?",
+              [batch_id, item_id],
+              (e, r) => e ? reject(e) : resolve(r)
+            );
+          });
 
-           await new Promise((resolve, reject) => {
-             conn.query(
-               "INSERT INTO return_note_items (return_note_id, item_id, batch_id, quantity, reason, notes) VALUES (?, ?, ?, ?, ?, ?)", 
-               [return_note_id, item_id, batch_id, returnQty, reason, notes || null], 
-               (e, r) => e ? reject(e) : resolve(r)
-             );
-           });
+          if (batchResults.length === 0) throw new Error("Inventory batch not found");
 
-           await new Promise((resolve, reject) => {
-             conn.query(
-               "INSERT INTO stock_movements (item_id, movement_type, reference_type, reference_id, quantity, notes) VALUES (?, 'OUT', 'RETURN', ?, ?, ?)", 
-               [item_id, return_note_id, returnQty, notes || `Goods returned: ${reason}`], 
-               (e, r) => e ? reject(e) : resolve(r)
-             );
-           });
+          const currentQty = Number(batchResults[0].available_quantity || 0);
+          if (returnQty > currentQty) throw new Error("Not enough stock in selected batch");
+
+          const newQty = currentQty - returnQty;
+          const newStatus = newQty === 0 ? "Depleted" : "Available";
+
+          await new Promise((resolve, reject) => {
+            conn.query(
+              "UPDATE inventory_batches SET available_quantity = ?, status = ? WHERE id = ?",
+              [newQty, newStatus, batch_id],
+              (e, r) => e ? reject(e) : resolve(r)
+            );
+          });
+
+          await new Promise((resolve, reject) => {
+            conn.query(
+              "INSERT INTO return_note_items (return_note_id, item_id, batch_id, quantity, reason, notes) VALUES (?, ?, ?, ?, ?, ?)",
+              [return_note_id, item_id, batch_id, returnQty, reason, notes || null],
+              (e, r) => e ? reject(e) : resolve(r)
+            );
+          });
+
+          await new Promise((resolve, reject) => {
+            conn.query(
+              "INSERT INTO stock_movements (item_id, movement_type, reference_type, reference_id, quantity, notes) VALUES (?, 'OUT', 'RETURN', ?, ?, ?)",
+              [item_id, return_note_id, returnQty, notes || `Goods returned: ${reason}`],
+              (e, r) => e ? reject(e) : resolve(r)
+            );
+          });
         }
-        
+
         conn.commit((cErr) => {
-           if (cErr) {
-             conn.rollback(() => {
-               conn.release();
-               res.status(500).json({ message: "Commit error", error: cErr.message });
-             });
-             return;
-           }
-           
-           const uniqueItems = [...new Set(items.map(i => i.item_id))];
-           uniqueItems.forEach(id => refreshInventorySnapshot(id, () => {}));
-           
-           conn.release();
-           res.status(201).json({ message: "Return note created successfully", return_number });
+          if (cErr) {
+            conn.rollback(() => {
+              conn.release();
+              res.status(500).json({ message: "Commit error", error: cErr.message });
+            });
+            return;
+          }
+
+          const uniqueItems = [...new Set(items.map(i => i.item_id))];
+          uniqueItems.forEach(id => refreshInventorySnapshot(id, () => { }));
+
+          conn.release();
+          res.status(201).json({ message: "Return note created successfully", return_number });
         });
       } catch (innerErr) {
         conn.rollback(() => {
@@ -213,9 +213,9 @@ const getReturnNoteData = (id) => {
     db.query(rnSql, [id], (err, rnResults) => {
       if (err) return reject(err);
       if (rnResults.length === 0) return resolve(null);
-      
+
       const rnData = rnResults[0];
-      
+
       const itemsSql = `
         SELECT
           rni.quantity,
@@ -257,7 +257,7 @@ const sendReturnNote = async (req, res) => {
     const emailHtml = buildReturnEmailHtml({
       supplierName: returnNoteData.supplier_name,
       returnNumber: returnNoteData.return_number,
-      items: returnNoteData.items,
+      reason: "Multiple items returned",
     });
 
     await sendReturnEmail({
