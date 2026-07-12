@@ -1,5 +1,6 @@
 const db = require("../config/db");
 const { refreshInventorySnapshot } = require("./inventoryController");
+const { isEUCountry } = require("../utils/euCountries");
 
 const BATCH_TABLE = "batches";
 
@@ -81,9 +82,13 @@ const getGlobalDispatchSchema = async () => {
 const isInsuranceRequired = (incoterm) =>
   String(incoterm || "").toUpperCase() === "CIF";
 
-const requiredDocsCount = (incoterm) => (isInsuranceRequired(incoterm) ? 7 : 6);
+const requiredDocsCount = (incoterm, isEU) => {
+  let count = isInsuranceRequired(incoterm) ? 7 : 6;
+  if (isEU) count += 1;
+  return count;
+};
 
-const docsDoneCountFromRow = (row, incoterm) => {
+const docsDoneCountFromRow = (row, incoterm, isEU) => {
   const total =
     Number(row.commercial_invoice_status === "done") +
     Number(row.packing_list_status === "done") +
@@ -91,7 +96,8 @@ const docsDoneCountFromRow = (row, incoterm) => {
     Number(row.airway_bill_status === "done") +
     Number(row.certificate_of_origin_status === "done") +
     Number(row.health_certificate_status === "done") +
-    Number(isInsuranceRequired(incoterm) && row.insurance_certificate_status === "done");
+    Number(isInsuranceRequired(incoterm) && row.insurance_certificate_status === "done") +
+    Number(isEU && row.gsp_form_a_status === "done");
 
   return total;
 };
@@ -175,19 +181,8 @@ const getAllGlobalDispatches = async (req, res) => {
         gd.created_at,
         ${CUSTOMER_DISPLAY_SQL} AS customer_name,
         c.customer_code,
-        (
-          (COALESCE(ed.commercial_invoice_status, 'pending') = 'done') +
-          (COALESCE(ed.packing_list_status, 'pending') = 'done') +
-          (COALESCE(ed.phytosanitary_certificate_status, 'pending') = 'done') +
-          (COALESCE(ed.airway_bill_status, 'pending') = 'done') +
-          (COALESCE(ed.certificate_of_origin_status, 'pending') = 'done') +
-          (COALESCE(ed.health_certificate_status, 'pending') = 'done') +
-          (COALESCE(ed.insurance_certificate_status, 'pending') = 'done')
-        ) AS docs_done_count,
-        CASE
-          WHEN UPPER(COALESCE(gd.incoterm, '')) = 'CIF' THEN 7
-          ELSE 6
-        END AS required_docs_count,
+        COALESCE(ed.gsp_form_a_status, 'pending') AS gsp_form_a_status,
+        c.city,
         COALESCE(ed.all_cleared, 0) AS all_cleared
       FROM global_dispatch gd
       JOIN customers c ON gd.customer_id = c.id
@@ -198,8 +193,14 @@ const getAllGlobalDispatches = async (req, res) => {
 
     const normalized = rows.map((row) => {
       const parsed = parseDispatchMetaFromRemarks(row.remarks);
+      const isEU = isEUCountry(row.city);
+      const docs_done_count = docsDoneCountFromRow(row, row.incoterm, isEU);
+      const required_docs_count = requiredDocsCount(row.incoterm, isEU);
+
       return {
         ...row,
+        docs_done_count,
+        required_docs_count,
         flight_no: row.flight_no || parsed.flight_no || "",
         awb_number: row.awb_number || parsed.awb_number || "",
       };
@@ -278,12 +279,9 @@ const getGlobalDispatchById = async (req, res) => {
         COALESCE(ed.certificate_of_origin_status, 'pending') AS certificate_of_origin_status,
         COALESCE(ed.health_certificate_status, 'pending') AS health_certificate_status,
         COALESCE(ed.insurance_certificate_status, 'pending') AS insurance_certificate_status,
+        COALESCE(ed.gsp_form_a_status, 'pending') AS gsp_form_a_status,
         COALESCE(ed.all_cleared, 0) AS all_cleared,
-        COALESCE(ed.notes, '') AS export_notes,
-        CASE
-          WHEN UPPER(COALESCE(gd.incoterm, '')) = 'CIF' THEN 7
-          ELSE 6
-        END AS required_docs_count
+        COALESCE(ed.notes, '') AS export_notes
       FROM global_dispatch gd
       JOIN customers c ON gd.customer_id = c.id
       LEFT JOIN export_documents ed ON ed.global_dispatch_id = gd.id
@@ -344,9 +342,12 @@ const getGlobalDispatchById = async (req, res) => {
         certificate_of_origin_status: header.certificate_of_origin_status,
         health_certificate_status: header.health_certificate_status,
         insurance_certificate_status: header.insurance_certificate_status,
+        gsp_form_a_status: header.gsp_form_a_status,
         all_cleared: Number(header.all_cleared || 0) === 1,
         notes: header.export_notes || "",
       },
+      required_docs_count: requiredDocsCount(header.incoterm, isEUCountry(header.city)),
+      docs_done_count: docsDoneCountFromRow(header, header.incoterm, isEUCountry(header.city)),
     });
   } catch (err) {
     console.error("getGlobalDispatchById error:", err);

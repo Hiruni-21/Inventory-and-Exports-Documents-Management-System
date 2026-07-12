@@ -5,6 +5,18 @@ import { useToast } from "../context/ToastContext";
 import { Search } from "lucide-react";
 import dayjs from "dayjs";
 
+const EU_COUNTRIES = [
+  "Austria", "Belgium", "Bulgaria", "Croatia", "Cyprus", "Czech Republic",
+  "Denmark", "Estonia", "Finland", "France", "Germany", "Greece", "Hungary",
+  "Ireland", "Italy", "Latvia", "Lithuania", "Luxembourg", "Malta", "Netherlands",
+  "Poland", "Portugal", "Romania", "Slovakia", "Slovenia", "Spain", "Sweden"
+];
+
+const isEUCountry = (countryStr) => {
+  if (!countryStr) return false;
+  return EU_COUNTRIES.includes(countryStr.trim());
+};
+
 const DOCS = [
   { type: "commercial_invoice", label: "Commercial Invoice", issuedBy: "Exporter", required: "Yes" },
   { type: "packing_list", label: "Packing List", issuedBy: "Exporter", required: "Yes" },
@@ -13,6 +25,7 @@ const DOCS = [
   { type: "certificate_of_origin", label: "Certificate of Origin", issuedBy: "Chamber of Commerce", required: "Yes" },
   { type: "health_certificate", label: "Health Certificate", issuedBy: "Dept of Health", required: "Yes" },
   { type: "insurance_certificate", label: "Insurance Certificate", issuedBy: "Insurance Provider", required: "CIF only" },
+  { type: "gsp_form_a", label: "GSP Form A", issuedBy: "Department of Commerce, Sri Lanka", required: "EU only" },
 ];
 
 const isInsuranceRequired = (shipment) => {
@@ -20,7 +33,12 @@ const isInsuranceRequired = (shipment) => {
   return String(shipment.incoterm || "").toUpperCase() === "CIF";
 };
 
-const getRequiredCount = (shipment) => (isInsuranceRequired(shipment) ? 7 : 6);
+const getRequiredCount = (shipment) => {
+  if (!shipment) return 6;
+  let count = isInsuranceRequired(shipment) ? 7 : 6;
+  if (isEUCountry(shipment.city)) count += 1;
+  return count;
+};
 
 const getDocSetNo = (shipment) => {
   if (!shipment) return "—";
@@ -396,6 +414,7 @@ const ExportDocumentListPage = () => {
                     {doc.type === "certificate_of_origin" && "Confirms goods are from Sri Lanka"}
                     {doc.type === "health_certificate" && "Confirms goods are safe to consume"}
                     {doc.type === "insurance_certificate" && "Cargo insurance certificate"}
+                    {doc.type === "gsp_form_a" && "Reduces/removes EU import duty under Sri Lanka's GSP+ status"}
                   </td>
                   <td>{doc.issuedBy}</td>
                   <td>
@@ -456,7 +475,7 @@ const ExportDocumentListPage = () => {
                     </div>
 
                     <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                      {DOCS.map((doc) => (
+                      {DOCS.filter(doc => doc.type !== "gsp_form_a" || isEUCountry(selectedShipmentMeta?.city)).map((doc) => (
                         <DocumentUploadRow 
                           key={doc.type} 
                           doc={doc} 

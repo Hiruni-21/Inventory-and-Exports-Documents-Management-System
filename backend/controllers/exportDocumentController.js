@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const { isEUCountry } = require("../utils/euCountries");
 
 const CUSTOMER_DISPLAY_SQL = `
   CASE
@@ -28,8 +29,22 @@ const ensureMissingExportDocumentRows = async () => {
   `);
 };
 
-const updateAllClearedStatus = async (globalDispatchId, incoterm) => {
-  const reqDocs = String(incoterm || "").toUpperCase() === "CIF" ? 7 : 6;
+const updateAllClearedStatus = async (globalDispatchId) => {
+  const dispatchRows = await q(`
+    SELECT gd.incoterm, c.city
+    FROM global_dispatch gd
+    JOIN customers c ON c.id = gd.customer_id
+    WHERE gd.id = ?
+  `, [globalDispatchId]);
+  
+  if (!dispatchRows.length) return 0;
+  
+  const { incoterm, city } = dispatchRows[0];
+  let reqDocs = String(incoterm || "").toUpperCase() === "CIF" ? 7 : 6;
+  if (isEUCountry(city)) {
+    reqDocs += 1;
+  }
+
   const countRes = await q(`SELECT COUNT(*) as count FROM shipment_documents WHERE global_dispatch_id = ?`, [globalDispatchId]);
   const docsDoneCount = countRes[0].count;
   const allCleared = docsDoneCount >= reqDocs ? 1 : 0;
@@ -66,6 +81,7 @@ const getAllExportDocuments = async (req, res) => {
         gd.incoterm,
         gd.total_weight,
         gd.total_boxes,
+        c.city,
         ${CUSTOMER_DISPLAY_SQL} AS customer_name,
         (SELECT COUNT(*) FROM shipment_documents sd WHERE sd.global_dispatch_id = gd.id) AS docs_done_count
       FROM export_documents ed
@@ -76,10 +92,12 @@ const getAllExportDocuments = async (req, res) => {
 
     const normalized = rows.map((row) => {
       const insuranceRequired = String(row.incoterm || "").toUpperCase() === "CIF";
+      const isEU = isEUCountry(row.city); // Note: we need row.city in the query!
 
       return {
         ...row,
         insurance_required: insuranceRequired,
+        is_eu: isEU
       };
     });
 
@@ -107,6 +125,7 @@ const getExportDocumentShipments = async (req, res) => {
         gd.airline,
         gd.flight_no,
         gd.awb_number,
+        c.city,
         ${CUSTOMER_DISPLAY_SQL} AS customer_name
       FROM global_dispatch gd
       JOIN customers c ON c.id = gd.customer_id
@@ -145,6 +164,7 @@ const getExportDocumentById = async (req, res) => {
         gd.awb_number,
         gd.total_weight,
         gd.total_boxes,
+        c.city,
         ${CUSTOMER_DISPLAY_SQL} AS customer_name
       FROM export_documents ed
       JOIN global_dispatch gd ON gd.id = ed.global_dispatch_id
@@ -169,6 +189,7 @@ const getExportDocumentById = async (req, res) => {
     `, [docRow.global_dispatch_id]);
     
     docRow.documents = shipmentDocs;
+    docRow.is_eu = isEUCountry(docRow.city);
 
     res.json(docRow);
   } catch (err) {
@@ -218,7 +239,7 @@ const updateExportDocuments = async (req, res) => {
       ]
     );
 
-    const allCleared = await updateAllClearedStatus(existingRows[0].global_dispatch_id, existingRows[0].incoterm);
+    const allCleared = await updateAllClearedStatus(existingRows[0].global_dispatch_id);
 
     res.json({
       message: "Export document set updated successfully",
@@ -275,7 +296,7 @@ const updateExportDocumentsByDispatchId = async (req, res) => {
       return res.status(404).json({ message: "Export document set not found" });
     }
     
-    const allCleared = await updateAllClearedStatus(globalDispatchId, incoterm);
+    const allCleared = await updateAllClearedStatus(globalDispatchId);
 
     res.json({
       message: "Export document set updated successfully",
@@ -322,7 +343,6 @@ const uploadDocument = async (req, res) => {
         ]);
 
         const dispatchRows = await q(`SELECT incoterm FROM global_dispatch WHERE id = ?`, [global_dispatch_id]);
-        const incoterm = dispatchRows.length ? dispatchRows[0].incoterm : "FOB";
         
         await q(`
             UPDATE export_documents
@@ -331,7 +351,7 @@ const uploadDocument = async (req, res) => {
             WHERE global_dispatch_id = ?
         `, [filePath, global_dispatch_id]);
         
-        await updateAllClearedStatus(global_dispatch_id, incoterm);
+        await updateAllClearedStatus(global_dispatch_id);
 
         res.json({ message: "Document uploaded successfully", file_path: filePath });
     } catch (err) {
