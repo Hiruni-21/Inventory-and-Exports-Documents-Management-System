@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const logActivity = require("../utils/logActivity");
 
 const getAllSuppliers = (req, res) => {
   const sql = "SELECT * FROM suppliers ORDER BY id DESC";
@@ -79,6 +80,16 @@ const createSupplier = (req, res) => {
         return res.status(500).json({ message: "Database error", error: err.message });
       }
 
+      logActivity({
+        user_id: req.user?.id,
+        user_name: req.user?.full_name,
+        module: "Suppliers",
+        action: `Created Supplier ${supplier_name}`,
+        reference_type: "supplier",
+        reference_id: result.insertId,
+        ip_address: req.ip,
+      }).catch(err => console.error("Activity log error:", err));
+
       res.status(201).json({
         message: "Supplier created successfully",
         supplierId: result.insertId,
@@ -123,6 +134,16 @@ const updateSupplier = (req, res) => {
       if (err) {
         return res.status(500).json({ message: "Database error", error: err.message });
       }
+
+      logActivity({
+        user_id: req.user?.id,
+        user_name: req.user?.full_name,
+        module: "Suppliers",
+        action: `Updated Supplier ${supplier_name}`,
+        reference_type: "supplier",
+        reference_id: id,
+        ip_address: req.ip,
+      }).catch(err => console.error("Activity log error:", err));
 
       res.json({ message: "Supplier updated successfully" });
     }

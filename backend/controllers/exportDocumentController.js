@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const logActivity = require("../utils/logActivity");
 const { isEUCountry } = require("../utils/euCountries");
 
 const CUSTOMER_DISPLAY_SQL = `
@@ -260,6 +261,16 @@ const updateExportDocuments = async (req, res) => {
 
     const allCleared = await updateAllClearedStatus(existingRows[0].global_dispatch_id);
 
+    logActivity({
+      user_id: userId,
+      user_name: req.user?.full_name,
+      module: "Export Documents",
+      action: `Updated Document Set for Dispatch #${globalDispatchId}`,
+      reference_type: "global_dispatch",
+      reference_id: globalDispatchId,
+      ip_address: req.ip,
+    }).catch(err => console.error(err));
+
     res.json({
       message: "Export document set updated successfully",
       all_cleared: !!allCleared,
@@ -316,6 +327,16 @@ const updateExportDocumentsByDispatchId = async (req, res) => {
     }
     
     const allCleared = await updateAllClearedStatus(globalDispatchId);
+
+    logActivity({
+      user_id: userId,
+      user_name: req.user?.full_name,
+      module: "Export Documents",
+      action: `Updated Document Set for Dispatch #${globalDispatchId}`,
+      reference_type: "global_dispatch",
+      reference_id: globalDispatchId,
+      ip_address: req.ip,
+    }).catch(err => console.error(err));
 
     res.json({
       message: "Export document set updated successfully",

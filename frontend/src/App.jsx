@@ -47,6 +47,7 @@ import SupplierOrderDetailsPage from "./pages/SupplierOrderDetailsPage";
 import SupplierReturnDetailsPage from "./pages/SupplierReturnDetailsPage";
 import SupplierMessagesPage from "./pages/SupplierMessagesPage";
 
+import ActivityLogPage from "./pages/ActivityLogPage";
 import StockValuationPage from "./pages/StockValuationPage";
 import PhysicalStockCountPage from "./pages/PhysicalStockCountPage";
 import UserProfilePage from "./pages/UserProfilePage";
@@ -122,7 +123,7 @@ function App() {
 
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/users" element={<UserManagementPage />} />
-        <Route path="/activity" element={<ReportsPage />} />
+        <Route path="/activity" element={<ActivityLogPage />} />
 
         <Route path="/supplier/dashboard" element={<SupplierDashboardPage />} />
         <Route path="/supplier/orders" element={<SupplierOrdersPage />} />

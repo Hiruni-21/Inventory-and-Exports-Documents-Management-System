@@ -21,6 +21,7 @@ const stockAdjustmentRoutes = require("./routes/stockAdjustmentRoutes");
 const approvalRoutes = require("./routes/approvalRoutes");
 const supplierPortalRoutes = require("./routes/supplierPortalRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
+const activityRoutes = require("./routes/activityRoutes");
 
 const app = express();
 
@@ -47,6 +48,7 @@ app.use("/api/stock-adjustments", stockAdjustmentRoutes);
 app.use("/api/approvals", approvalRoutes);
 app.use("/api/supplier-portal", supplierPortalRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/activity", activityRoutes);
 
 app.get("/", (req, res) => {
   res.send("Fresh World ERP backend is running");

@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const logActivity = require("../utils/logActivity");
 const { refreshInventorySnapshot } = require("./inventoryController");
 
 /* =========================
@@ -411,11 +412,21 @@ const createGrn = (req, res) => {
                                 }).catch(err => console.error("GRN discrepancy notification error:", err.message));
                               }
 
-                              return res.status(201).json({
-                                message: "GRN created successfully",
-                                grnId,
-                                grnNumber,
-                              });
+                              return logActivity({
+                user_id: createdBy,
+                user_name: req.user?.full_name,
+                module: "Goods Receiving",
+                action: `Created GRN ${grnNumber}`,
+                reference_type: "grn",
+                reference_id: grnId,
+                ip_address: req.ip,
+              }).catch(err => console.error(err));
+
+              res.status(201).json({
+                message: "GRN created successfully",
+                grnId,
+                grnNumber,
+              });
                             }
                           });
                         }

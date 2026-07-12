@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const logActivity = require("../utils/logActivity");
 const { refreshInventorySnapshot } = require("./inventoryController");
 const { generateReturnPdf } = require("../services/returnPdf.service");
 const { sendReturnEmail, buildReturnEmailHtml } = require("../services/returnEmail.service");

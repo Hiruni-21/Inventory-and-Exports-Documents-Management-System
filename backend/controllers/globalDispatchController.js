@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const logActivity = require("../utils/logActivity");
 const { refreshInventorySnapshot } = require("./inventoryController");
 const { isEUCountry } = require("../utils/euCountries");
 
