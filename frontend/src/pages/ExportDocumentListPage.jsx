@@ -372,18 +372,19 @@ const ExportDocumentListPage = () => {
 
   return (
     <>
-      <div className="ib ib-i">
-        <span>📄</span>
-        <div>
-          All 7 documents must be verified before a shipment can be <strong>Cleared</strong> and
-          stock deducted. Use <strong>+ Create Document Set</strong> above to upload and confirm
-          documents per shipment.
-        </div>
-      </div>
+
 
       <div className="content-card" style={{ marginTop: 16 }}>
         <div className="card-header-row">
-          <h3>Document Status by Shipment</h3>
+          <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            Document Status by Shipment
+            <span 
+              title="All 7 documents must be verified before a shipment can be Cleared and stock deducted. Use + Create Document Set to upload and confirm documents per shipment."
+              style={{ cursor: "help", color: "#6B7D71", display: "flex", alignItems: "center", justifyContent: "center", width: 20, height: 20, borderRadius: "50%", background: "#F1F5F9", fontSize: 12, border: "1px solid #E2E8F0" }}
+            >
+              ℹ
+            </span>
+          </h3>
           <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
             <span className="count-pill">{rows.length} document sets</span>
             <button className="btn btn-p btn-sm" onClick={() => window.dispatchEvent(new CustomEvent("fw-open-export-docs-modal"))}>+ Create Document Set</button>

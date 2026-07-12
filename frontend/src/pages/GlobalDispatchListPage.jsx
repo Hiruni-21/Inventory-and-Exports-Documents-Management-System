@@ -535,13 +535,6 @@ export default function GlobalDispatchListPage() {
 
   return (
     <>
-      <div className="ib ib-w">
-        <span>✈️</span>
-        <div>
-          Stock deducted only when <strong>Cleared</strong> (all 7 docs verified).{" "}
-          <strong>Click any row</strong> to view shipment details and document status.
-        </div>
-      </div>
 
       <div
         className="fb"
@@ -589,7 +582,15 @@ export default function GlobalDispatchListPage() {
 
       <div className="content-card global-dispatch-card">
         <div className="card-header-row">
-          <h3>✈️ Dispatch — Export Shipments</h3>
+          <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            ✈️ Dispatch — Export Shipments
+            <span 
+              title="Stock deducted only when Cleared (all 7 docs verified). Click any row to view shipment details and document status."
+              style={{ cursor: "help", color: "#6B7D71", display: "flex", alignItems: "center", justifyContent: "center", width: 20, height: 20, borderRadius: "50%", background: "#F1F5F9", fontSize: 12, border: "1px solid #E2E8F0" }}
+            >
+              ℹ
+            </span>
+          </h3>
           <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
             <span className="count-pill">{filteredRows.length} shipments</span>
             <button className="btn btn-p btn-sm" onClick={() => setShowShipmentModal(true)}>+ New Shipment</button>

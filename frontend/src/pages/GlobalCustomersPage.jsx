@@ -444,14 +444,6 @@ export default function GlobalCustomersPage() {
 
   return (
     <div className="page-shell">
-      <div className="notice-banner notice-warning">
-        <Plane size={16} />
-        <span>
-          Global customers receive airline shipments. Click any row to view details,
-          shipment history and actions. No returns after departure.
-        </span>
-      </div>
-
       <div className="page-toolbar">
         <div className="toolbar-left">
           <div className="search-field">
@@ -480,11 +472,19 @@ export default function GlobalCustomersPage() {
 
       <div className="content-card">
         <div className="card-header-row">
-          <h3>✈️ Customers — Export</h3>
+          <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            ✈️ Customers — Export
+            <span 
+              title="Global customers receive airline shipments. Click any row to view details, shipment history and actions. No returns after departure."
+              style={{ cursor: "help", color: "#6B7D71", display: "flex", alignItems: "center", justifyContent: "center", width: 20, height: 20, borderRadius: "50%", background: "#F1F5F9", fontSize: 12, border: "1px solid #E2E8F0" }}
+            >
+              ℹ
+            </span>
+          </h3>
           <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
             <span className="count-pill">{filteredCustomers.length} customers</span>
             <button className="btn btn-s btn-sm" onClick={() => alert("Export CSV coming soon!")}>Export CSV</button>
-            <button className="btn btn-p btn-sm" onClick={() => openModal()}>+ Add Customer</button>
+            <button className="btn btn-p btn-sm" onClick={() => openAddModal()}>+ Add Customer</button>
           </div>
         </div>
 
@@ -528,11 +528,11 @@ export default function GlobalCustomersPage() {
                       <div className="table-actions">
                         <button
                           type="button"
-                          className="btn btn-p btn-xs gc-ship-btn"
-                          title="New shipment"
+                          title="Create shipment for this customer"
+                          style={{ width: 34, height: 34, borderRadius: 14, border: "1.5px solid #CFE2D4", background: "#FFFFFF", color: "#2E8B57", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
                           onClick={(e) => openRealShipmentFlow(customer, e)}
                         >
-                          ✈️ Shipment
+                          <Plane size={16} />
                         </button>
                       </div>
                     </td>
