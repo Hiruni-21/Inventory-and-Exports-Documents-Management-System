@@ -1,0 +1,11 @@
+UPDATE item_categories SET description = 'Corrugated cartons and boxes used for export shipment packing' WHERE category_code = 'CAT-018';
+UPDATE item_categories SET description = 'Foam inserts and regiform boxes for shock and temperature protection' WHERE category_code = 'CAT-019';
+UPDATE item_categories SET description = 'Protective liners used inside boxes and containers' WHERE category_code = 'CAT-020';
+UPDATE item_categories SET description = 'Export shipping labels and product identification labels' WHERE category_code = 'CAT-021';
+UPDATE item_categories SET description = 'Packing tape and wrapping materials for sealing shipments' WHERE category_code = 'CAT-022';
+UPDATE item_categories SET description = 'Gel ice packs and cooling materials for cold chain packaging' WHERE category_code = 'CAT-023';
+UPDATE item_categories SET description = 'Vacuum-sealed bags for produce packaging' WHERE category_code = 'CAT-024';
+UPDATE item_categories SET description = 'Cardboard dividers and inserts for box compartmentalization' WHERE category_code = 'CAT-025';
+UPDATE item_categories SET description = 'Reusable trays and crates for produce transport' WHERE category_code = 'CAT-026';
+UPDATE item_categories SET description = 'Non-perishable dry goods for export' WHERE category_code = 'CAT-006';
+UPDATE item_categories SET description = 'Products supplied under the Norfolk product line' WHERE category_code = 'CAT-017';

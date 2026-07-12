@@ -12,7 +12,6 @@ import SupplierDashboard from "./pages/SupplierDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 
 import SupplierListPage from "./pages/SupplierListPage";
-import AddSupplierPage from "./pages/AddSupplierPage";
 import CategoryListPage from "./pages/CategoryListPage";
 import AddCategoryPage from "./pages/AddCategoryPage";
 import ItemListPage from "./pages/ItemListPage";
@@ -26,15 +25,10 @@ import ReportsPage from "./pages/ReportsPage";
 import ManagerApprovalsPage from "./pages/ManagerApprovalsPage";
 
 import PurchaseOrderListPage from "./pages/PurchaseOrderListPage";
-import AddPurchaseOrderPage from "./pages/AddPurchaseOrderPage";
 import PurchaseOrderDetailsPage from "./pages/PurchaseOrderDetailsPage";
 import GrnListPage from "./pages/GrnListPage";
-import AddGrnPage from "./pages/AddGrnPage";
 import GrnDetailsPage from "./pages/GrnDetailsPage";
 import ReturnListPage from "./pages/ReturnListPage";
-import AddReturnPage from "./pages/AddReturnPage";
-import WastageListPage from "./pages/WastageListPage";
-import AddWastagePage from "./pages/AddWastagePage";
 
 import LocalCustomersPage from "./pages/LocalCustomersPage";
 import GlobalCustomersPage from "./pages/GlobalCustomersPage";
@@ -95,7 +89,6 @@ function App() {
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
 
         <Route path="/suppliers" element={<SupplierListPage />} />
-        <Route path="/suppliers/add" element={<AddSupplierPage />} />
 
         <Route path="/categories" element={<CategoryListPage />} />
         <Route path="/categories/add" element={<AddCategoryPage />} />
@@ -115,17 +108,12 @@ function App() {
         <Route path="/approvals" element={<ManagerApprovalsPage />} />
 
         <Route path="/purchase-orders" element={<PurchaseOrderListPage />} />
-        <Route path="/purchase-orders/add" element={<AddPurchaseOrderPage />} />
         <Route path="/purchase-orders/:id" element={<PurchaseOrderDetailsPage />} />
 
         <Route path="/grn" element={<GrnListPage />} />
-        <Route path="/grn/add" element={<AddGrnPage />} />
         <Route path="/grn/:id" element={<GrnDetailsPage />} />
 
         <Route path="/returns" element={<ReturnListPage />} />
-        <Route path="/returns/add" element={<AddReturnPage />} />
-        <Route path="/wastage" element={<WastageListPage />} />
-        <Route path="/wastage/add" element={<AddWastagePage />} />
 
         <Route path="/customers/local" element={<LocalCustomersPage />} />
         <Route path="/customers/global" element={<GlobalCustomersPage />} />

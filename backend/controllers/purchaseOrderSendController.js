@@ -36,9 +36,7 @@ const loadPurchaseOrderBundle = async (purchaseOrderId) => {
         po.po_number,
         po.supplier_id,
         po.order_date,
-        po.expected_delivery_date,
         po.required_by,
-        po.expected_date,
         po.payment_terms,
         po.notes,
         po.remarks,
@@ -173,9 +171,7 @@ const sendEmail = async (req, res) => {
     const pdfInfo = await generatePurchaseOrderPdf(bundle);
 
     const requiredBy =
-      bundle.po.expected_delivery_date ||
-      bundle.po.required_by ||
-      bundle.po.expected_date;
+      bundle.po.required_by;
 
     const subject = `Fresh World Purchase Order ${bundle.po.po_number}`;
 

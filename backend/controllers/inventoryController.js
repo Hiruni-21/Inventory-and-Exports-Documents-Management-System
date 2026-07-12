@@ -64,6 +64,7 @@ const getInventory = (req, res) => {
       i.code AS item_code,
       i.name AS item_name,
       c.category_name,
+      i.stock_type,
       i.unit,
       COALESCE(i.reorder_level, 0) AS reorder_level,
       COALESCE(inv.qty_available, 0) AS qty_available,

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
+import AddPurchaseOrderModal from "../components/AddPurchaseOrderModal";
 
 const statusClassMap = {
   draft: "bg-x",
@@ -47,22 +48,23 @@ const PurchaseOrderListPage = () => {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(true);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+
+  const fetchPurchaseOrders = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const res = await api.get("/purchase-orders");
+      setPurchaseOrders(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to load purchase orders");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchPurchaseOrders = async () => {
-      setLoading(true);
-      setError("");
-
-      try {
-        const res = await api.get("/purchase-orders");
-        setPurchaseOrders(Array.isArray(res.data) ? res.data : []);
-      } catch (err) {
-        setError(err.response?.data?.message || "Failed to load purchase orders");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchPurchaseOrders();
   }, []);
 
@@ -163,6 +165,12 @@ const PurchaseOrderListPage = () => {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+
+        <div style={{ marginLeft: 12 }}>
+          <button type="button" className="btn btn-p" onClick={() => setShowCreateModal(true)}>
+            + Create PO
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -212,7 +220,7 @@ const PurchaseOrderListPage = () => {
 
                     <td>{fmtDate(po.order_date || po.created_at)}</td>
 
-                    <td>{fmtDate(po.expected_delivery_date)}</td>
+                    <td>{fmtDate(po.required_by)}</td>
 
                     <td>
                       <span className={`badge ${getBadgeClass(po.status)}`}>
@@ -234,6 +242,16 @@ const PurchaseOrderListPage = () => {
           </table>
         </div>
       </div>
+
+      {showCreateModal && (
+        <AddPurchaseOrderModal
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={() => {
+            setShowCreateModal(false);
+            fetchPurchaseOrders();
+          }}
+        />
+      )}
     </div>
   );
 };
