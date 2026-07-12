@@ -165,6 +165,10 @@ export default function GlobalDispatchListPage() {
           customerRows.find((c) => String(c.id) === String(preselectCustomerId)) || customerRows[0];
 
         setShipmentForm(buildShipmentForm(picked));
+
+        if (preselectCustomerId) {
+          setShowShipmentModal(true);
+        }
       }
     } catch (err) {
       console.error(err);

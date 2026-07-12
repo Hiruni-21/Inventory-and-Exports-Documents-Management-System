@@ -438,7 +438,7 @@ export default function GlobalCustomersPage() {
   const openRealShipmentFlow = (customer, e = null) => {
     if (e?.stopPropagation) e.stopPropagation();
 
-    navigate(`/dispatch/global?customerId=${customer.id}`);
+    navigate(`/dispatch?customerId=${customer.id}`);
     toast.info("Customer opened in Global Dispatch.");
   };
 
