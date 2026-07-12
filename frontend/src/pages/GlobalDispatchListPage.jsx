@@ -116,6 +116,7 @@ export default function GlobalDispatchListPage() {
 
   const [showShipmentModal, setShowShipmentModal] = useState(false);
   const [savingShipment, setSavingShipment] = useState(false);
+  const [formError, setFormError] = useState("");
 
   const [selectedRowId, setSelectedRowId] = useState(null);
   const [detailsShipment, setDetailsShipment] = useState(null);
@@ -294,9 +295,10 @@ export default function GlobalDispatchListPage() {
     const selectedCustomer =
       customers.find((c) => String(c.id) === String(shipmentForm.customer_id)) || customers[0] || null;
 
-    setShowShipmentModal(false);
+    setShipmentForm(buildShipmentForm());
     setShipmentItems([{ ...emptyItemRow }]);
-    setBatchOptions({});
+    setFormError("");
+    setShowShipmentModal(false);
     setShipmentForm(buildShipmentForm(selectedCustomer));
   };
 
@@ -393,6 +395,30 @@ export default function GlobalDispatchListPage() {
 
   const handleCreateShipment = async (e) => {
     e.preventDefault();
+    setFormError("");
+
+    if (shipmentForm.dispatch_date) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const shipDate = new Date(shipmentForm.dispatch_date);
+      shipDate.setHours(0, 0, 0, 0);
+      if (shipDate < today) {
+        setFormError("Shipment Date cannot be in the past.");
+        return;
+      }
+    }
+
+    if (shipmentForm.dispatch_date && shipmentForm.departure_date) {
+      const shipDate = new Date(shipmentForm.dispatch_date);
+      shipDate.setHours(0, 0, 0, 0);
+      const depDate = new Date(shipmentForm.departure_date);
+      depDate.setHours(0, 0, 0, 0);
+      
+      if (depDate < shipDate) {
+        setFormError("Departure Date must be on or after the Shipment Date.");
+        return;
+      }
+    }
 
     const validItems = shipmentItems
       .map((row) => ({
@@ -564,7 +590,10 @@ export default function GlobalDispatchListPage() {
       <div className="content-card global-dispatch-card">
         <div className="card-header-row">
           <h3>✈️ Dispatch — Export Shipments</h3>
-          <span className="count-pill">{filteredRows.length} shipments</span>
+          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+            <span className="count-pill">{filteredRows.length} shipments</span>
+            <button className="btn btn-p btn-sm" onClick={() => setShowShipmentModal(true)}>+ New Shipment</button>
+          </div>
         </div>
 
         <div className="table-wrap">
@@ -909,6 +938,11 @@ export default function GlobalDispatchListPage() {
               onSubmit={handleCreateShipment}
               style={{ display: "flex", flexDirection: "column", minHeight: 0 }}
             >
+              {formError && (
+                <div style={{ margin: "0 24px 16px", padding: "12px", background: "#FEF2F2", color: "#B91C1C", borderRadius: "8px", border: "1px solid #FCA5A5", fontSize: "14px" }}>
+                  {formError}
+                </div>
+              )}
               <div
                 className="md-b"
                 style={{

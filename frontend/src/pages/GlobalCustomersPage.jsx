@@ -335,10 +335,34 @@ export default function GlobalCustomersPage() {
 
   const handleSaveCustomer = async (e) => {
     e.preventDefault();
+    if (!form.customerName || !form.customerName.trim()) {
+      return toast.error("Customer name is required");
+    }
 
-    const payload = {
+    if (form.email && form.email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(form.email)) {
+        return toast.error("Please enter a valid email address");
+      }
+    }
 
-      customer_name: form.customerName,
+    if (!form.country) {
+      return toast.error("Country is required");
+    }
+
+    if (!form.location || !form.location.trim()) {
+      return toast.error("Location / Island is required");
+    }
+
+    if (!form.preferredAirline) {
+      return toast.error("Preferred airline is required");
+    }
+
+    if (!form.incoterms) {
+      return toast.error("Incoterms are required");
+    }
+
+    const payload = {      customer_name: form.customerName,
       group_name: form.group || "Independent",
       contact_person: form.contact,
       email: form.email,
@@ -457,7 +481,11 @@ export default function GlobalCustomersPage() {
       <div className="content-card">
         <div className="card-header-row">
           <h3>✈️ Customers — Export</h3>
-          <span className="count-pill">{filteredCustomers.length} customers</span>
+          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+            <span className="count-pill">{filteredCustomers.length} customers</span>
+            <button className="btn btn-s btn-sm" onClick={() => alert("Export CSV coming soon!")}>Export CSV</button>
+            <button className="btn btn-p btn-sm" onClick={() => openModal()}>+ Add Customer</button>
+          </div>
         </div>
 
         <div className="table-wrap">

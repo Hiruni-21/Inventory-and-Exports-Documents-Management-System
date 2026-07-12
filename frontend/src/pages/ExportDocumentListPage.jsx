@@ -384,6 +384,10 @@ const ExportDocumentListPage = () => {
       <div className="content-card" style={{ marginTop: 16 }}>
         <div className="card-header-row">
           <h3>Document Status by Shipment</h3>
+          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+            <span className="count-pill">{rows.length} document sets</span>
+            <button className="btn btn-p btn-sm" onClick={() => window.dispatchEvent(new CustomEvent("fw-open-export-docs-modal"))}>+ Create Document Set</button>
+          </div>
         </div>
 
         <div className="table-wrap">

@@ -273,13 +273,6 @@ const pageMeta = {
 };
 
 const actionButtons = {
-  "/dispatch": [{ label: "+ New Shipment", eventName: "fw-open-global-shipment-modal", className: "btn btn-p btn-sm" }],
-  "/export-documents": [{ label: "+ Create Document Set", eventName: "fw-open-export-docs-modal", className: "btn btn-p btn-sm" }],
-
-  "/customers": [
-    { label: "+ Add Customer", eventName: "fw-open-global-customer-modal", className: "btn btn-p btn-sm" },
-    { label: "Export CSV", eventName: "fw-export-global-customers", className: "btn btn-s btn-sm" },
-  ],
 };
 
 const normalizeRole = (role) => {
