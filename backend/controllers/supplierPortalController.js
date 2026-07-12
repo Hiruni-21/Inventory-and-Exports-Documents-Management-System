@@ -465,57 +465,52 @@ const getSupplierReturns = async (req, res) => {
     const supplierId = Number(req.user?.supplier_id || 0);
     if (!supplierId) return res.json([]);
 
-    const returnMeta = await getGoodsReturnMeta();
-
-    const reasonSelect = returnMeta.reasonCol
-      ? `r.${returnMeta.reasonCol} AS reason`
-      : `NULL AS reason`;
-
-    const notesSelect = returnMeta.notesCol
-      ? `r.${returnMeta.notesCol} AS notes`
-      : `NULL AS notes`;
-
-    const deductionSelect = returnMeta.deductionCol
-      ? `COALESCE(r.${returnMeta.deductionCol}, 0) AS deduction_amount`
-      : `0 AS deduction_amount`;
-
-    const linkedPoJoin = returnMeta.poIdCol
-      ? `LEFT JOIN purchase_orders po ON po.id = r.${returnMeta.poIdCol}`
-      : ``;
-
-    const linkedPoSelect = returnMeta.poIdCol
-      ? `po.po_number AS linked_po_number`
-      : `NULL AS linked_po_number`;
-
     const rows = await q(
       `
       SELECT
-        r.id,
-        CONCAT('RN-', LPAD(r.id, 3, '0')) AS return_number,
-        r.created_at,
-        r.${returnMeta.qtyCol} AS quantity,
-        ${reasonSelect},
-        ${notesSelect},
-        ${deductionSelect},
-        i.name AS item_name,
-        i.code AS item_code,
-        ib.batch_code,
-        ${linkedPoSelect},
+        rn.id,
+        rn.return_number,
+        rn.created_at,
+        rn.status,
         srr.response_status AS supplier_response_status,
         srr.feedback_notes AS supplier_response_notes,
-        srr.responded_at AS supplier_responded_at
-      FROM goods_returns r
-      JOIN items i ON r.item_id = i.id
-      LEFT JOIN inventory_batches ib ON r.batch_id = ib.id
-      ${linkedPoJoin}
+        srr.responded_at AS supplier_responded_at,
+        (SELECT COALESCE(SUM(quantity), 0) FROM return_note_items WHERE return_note_id = rn.id) as total_quantity
+      FROM return_notes rn
       LEFT JOIN supplier_return_responses srr
-        ON srr.goods_return_id = r.id
-       AND srr.supplier_id = r.supplier_id
-      WHERE r.supplier_id = ?
-      ORDER BY r.id DESC
+        ON srr.return_note_id = rn.id
+       AND srr.supplier_id = rn.supplier_id
+      WHERE rn.supplier_id = ?
+      ORDER BY rn.id DESC
       `,
       [supplierId]
     );
+
+    if (rows.length > 0) {
+      const itemSql = `
+        SELECT 
+          rni.return_note_id,
+          rni.quantity,
+          rni.reason,
+          rni.notes,
+          i.name AS item_name,
+          i.code AS item_code,
+          ib.batch_code
+        FROM return_note_items rni
+        JOIN items i ON rni.item_id = i.id
+        JOIN inventory_batches ib ON rni.batch_id = ib.id
+        WHERE rni.return_note_id IN (?)
+      `;
+      const itemResults = await q(itemSql, [rows.map(r => r.id)]);
+      const itemsByRn = {};
+      itemResults.forEach(item => {
+        if (!itemsByRn[item.return_note_id]) itemsByRn[item.return_note_id] = [];
+        itemsByRn[item.return_note_id].push(item);
+      });
+      rows.forEach(rn => {
+        rn.items = itemsByRn[rn.id] || [];
+      });
+    }
 
     res.json(rows);
   } catch (err) {
@@ -538,54 +533,22 @@ const getSupplierReturnById = async (req, res) => {
       return res.status(403).json({ message: "Supplier account is not linked properly" });
     }
 
-    const returnMeta = await getGoodsReturnMeta();
-
-    const reasonSelect = returnMeta.reasonCol
-      ? `r.${returnMeta.reasonCol} AS reason`
-      : `NULL AS reason`;
-
-    const notesSelect = returnMeta.notesCol
-      ? `r.${returnMeta.notesCol} AS notes`
-      : `NULL AS notes`;
-
-    const deductionSelect = returnMeta.deductionCol
-      ? `COALESCE(r.${returnMeta.deductionCol}, 0) AS deduction_amount`
-      : `0 AS deduction_amount`;
-
-    const linkedPoJoin = returnMeta.poIdCol
-      ? `LEFT JOIN purchase_orders po ON po.id = r.${returnMeta.poIdCol}`
-      : ``;
-
-    const linkedPoSelect = returnMeta.poIdCol
-      ? `po.po_number AS linked_po_number`
-      : `NULL AS linked_po_number`;
-
     const rows = await q(
       `
       SELECT
-        r.id,
-        CONCAT('RN-', LPAD(r.id, 3, '0')) AS return_number,
-        r.created_at,
-        r.${returnMeta.qtyCol} AS quantity,
-        ${reasonSelect},
-        ${notesSelect},
-        ${deductionSelect},
-        i.name AS item_name,
-        i.code AS item_code,
-        ib.batch_code,
-        ${linkedPoSelect},
+        rn.id,
+        rn.return_number,
+        rn.created_at,
+        rn.status,
         srr.response_status AS supplier_response_status,
         srr.feedback_notes AS supplier_response_notes,
         srr.responded_at AS supplier_responded_at
-      FROM goods_returns r
-      JOIN items i ON r.item_id = i.id
-      LEFT JOIN inventory_batches ib ON r.batch_id = ib.id
-      ${linkedPoJoin}
+      FROM return_notes rn
       LEFT JOIN supplier_return_responses srr
-        ON srr.goods_return_id = r.id
-       AND srr.supplier_id = r.supplier_id
-      WHERE r.id = ?
-        AND r.supplier_id = ?
+        ON srr.return_note_id = rn.id
+       AND srr.supplier_id = rn.supplier_id
+      WHERE rn.id = ?
+        AND rn.supplier_id = ?
       LIMIT 1
       `,
       [id, supplierId]
@@ -595,7 +558,26 @@ const getSupplierReturnById = async (req, res) => {
       return res.status(404).json({ message: "Return note not found" });
     }
 
-    res.json(rows[0]);
+    const returnData = rows[0];
+
+    const itemSql = `
+      SELECT 
+        rni.return_note_id,
+        rni.quantity,
+        rni.reason,
+        rni.notes,
+        i.name AS item_name,
+        i.code AS item_code,
+        ib.batch_code
+      FROM return_note_items rni
+      JOIN items i ON rni.item_id = i.id
+      JOIN inventory_batches ib ON rni.batch_id = ib.id
+      WHERE rni.return_note_id = ?
+    `;
+    const itemResults = await q(itemSql, [id]);
+    returnData.items = itemResults;
+
+    res.json(returnData);
   } catch (err) {
     console.error("getSupplierReturnById error:", err);
     res.status(500).json({
@@ -624,7 +606,7 @@ const respondToSupplierReturn = async (req, res) => {
     const rows = await q(
       `
       SELECT id
-      FROM goods_returns
+      FROM return_notes
       WHERE id = ?
         AND supplier_id = ?
       LIMIT 1
@@ -639,7 +621,7 @@ const respondToSupplierReturn = async (req, res) => {
     await q(
       `
       INSERT INTO supplier_return_responses
-        (goods_return_id, supplier_id, response_status, feedback_notes, responded_at)
+        (return_note_id, supplier_id, response_status, feedback_notes, responded_at)
       VALUES (?, ?, ?, ?, NOW())
       ON DUPLICATE KEY UPDATE
         response_status = VALUES(response_status),
@@ -681,16 +663,16 @@ const getSupplierMessages = async (req, res) => {
         sm.created_at,
         CASE
           WHEN sm.linked_kind = 'order' THEN po.po_number
-          WHEN sm.linked_kind = 'return' THEN CONCAT('RN-', LPAD(gr.id, 3, '0'))
+          WHEN sm.linked_kind = 'return' THEN rn.return_number
           ELSE NULL
         END AS linked_label
       FROM supplier_messages sm
       LEFT JOIN purchase_orders po
         ON sm.linked_kind = 'order'
        AND sm.linked_record_id = po.id
-      LEFT JOIN goods_returns gr
+      LEFT JOIN return_notes rn
         ON sm.linked_kind = 'return'
-       AND sm.linked_record_id = gr.id
+       AND sm.linked_record_id = rn.id
       WHERE sm.supplier_id = ?
       ORDER BY sm.id DESC
       `,

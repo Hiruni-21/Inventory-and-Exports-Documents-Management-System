@@ -99,7 +99,7 @@ const getGrnById = (req, res) => {
           ib.received_quantity,
           COALESCE(SUM(r.quantity), 0) AS returned_quantity
         FROM inventory_batches ib
-        LEFT JOIN goods_returns r ON r.batch_id = ib.id
+        LEFT JOIN return_note_items r ON r.batch_id = ib.id
         WHERE ib.grn_id = ?
         GROUP BY ib.id, ib.batch_code, ib.item_id, ib.received_quantity
       `;

@@ -12,7 +12,7 @@ const escapeHtml = (value) =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
-const buildReturnEmailHtml = ({ supplierName, returnNumber, reason }) => {
+const buildReturnEmailHtml = ({ supplierName, returnNumber, items = [] }) => {
   const companyName = process.env.COMPANY_NAME || "Fresh World Exporters";
   const companyPhone = process.env.COMPANY_PHONE || "";
   const companyEmail = process.env.COMPANY_EMAIL || "";
@@ -41,16 +41,26 @@ const buildReturnEmailHtml = ({ supplierName, returnNumber, reason }) => {
 
               <table style="width:100%;border-collapse:collapse;margin:18px 0;background:#f8f7f2;border-radius:12px;overflow:hidden;">
                 <tr>
-                  <td style="padding:12px 14px;font-weight:bold;border-bottom:1px solid #d8e8df;">RN Number</td>
-                  <td style="padding:12px 14px;border-bottom:1px solid #d8e8df;">${escapeHtml(returnNumber)}</td>
+                  <td style="padding:12px 14px;font-weight:bold;border-bottom:1px solid #d8e8df;">Return No.</td>
+                  <td style="padding:12px 14px;border-bottom:1px solid #d8e8df;" colspan="3">${escapeHtml(returnNumber)}</td>
                 </tr>
                 <tr>
-                  <td style="padding:12px 14px;font-weight:bold;border-bottom:1px solid #d8e8df;">Reason</td>
-                  <td style="padding:12px 14px;border-bottom:1px solid #d8e8df;">${escapeHtml(reason)}</td>
+                  <td style="padding:12px 14px;font-weight:bold;border-bottom:1px solid #d8e8df;background:#e5ece8;">Item Name</td>
+                  <td style="padding:12px 14px;font-weight:bold;border-bottom:1px solid #d8e8df;background:#e5ece8;">Batch</td>
+                  <td style="padding:12px 14px;font-weight:bold;border-bottom:1px solid #d8e8df;background:#e5ece8;">Quantity</td>
+                  <td style="padding:12px 14px;font-weight:bold;border-bottom:1px solid #d8e8df;background:#e5ece8;">Reason</td>
                 </tr>
+                ${items.map(item => `
+                  <tr>
+                    <td style="padding:12px 14px;border-bottom:1px solid #d8e8df;">${escapeHtml(item.item_name)}</td>
+                    <td style="padding:12px 14px;border-bottom:1px solid #d8e8df;">${escapeHtml(item.batch_code)}</td>
+                    <td style="padding:12px 14px;border-bottom:1px solid #d8e8df;">${escapeHtml(item.quantity)}</td>
+                    <td style="padding:12px 14px;border-bottom:1px solid #d8e8df;">${escapeHtml(item.reason)}</td>
+                  </tr>
+                `).join("")}
                 <tr>
                   <td style="padding:12px 14px;font-weight:bold;">Company</td>
-                  <td style="padding:12px 14px;">${escapeHtml(companyName)}</td>
+                  <td style="padding:12px 14px;" colspan="3">${escapeHtml(companyName)}</td>
                 </tr>
               </table>
 

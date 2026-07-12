@@ -14,3 +14,7 @@ logs
 .DS_Store
 Thumbs.db
 coverage/
+# Test artifacts (Puppeteer screenshots, ad-hoc scripts)
+backend/*.png
+backend/test_ui.js
+update_return_list.js

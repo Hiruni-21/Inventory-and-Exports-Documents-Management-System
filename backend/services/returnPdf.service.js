@@ -62,7 +62,7 @@ const getLogoDataUri = () => {
 
 const buildReturnHtml = ({ returnNote, supplier, company }) => {
   const logoDataUri = getLogoDataUri();
-  const returnNumber = `RN-${String(returnNote.id).padStart(4, "0")}`;
+  const returnNumber = returnNote.return_number || `RN-${String(returnNote.id).padStart(4, "0")}`;
 
   return `
 <!DOCTYPE html>
@@ -427,12 +427,17 @@ const buildReturnHtml = ({ returnNote, supplier, company }) => {
           </tr>
         </thead>
         <tbody>
+          ${(returnNote.items || [])
+            .map(
+              (item) => `
           <tr>
-            <td><strong>${escapeHtml(returnNote.item_name)}</strong></td>
-            <td>${escapeHtml(returnNote.batch_code)}</td>
-            <td>${escapeHtml(returnNote.quantity)}</td>
-            <td>${escapeHtml(returnNote.reason)}</td>
-          </tr>
+            <td><strong>${escapeHtml(item.item_name)}</strong></td>
+            <td>${escapeHtml(item.batch_code)}</td>
+            <td>${escapeHtml(item.quantity)}</td>
+            <td>${escapeHtml(item.reason)}</td>
+          </tr>`
+            )
+            .join("")}
         </tbody>
       </table>
     </div>
@@ -481,7 +486,7 @@ const generateReturnPdf = async (bundle) => {
   const outputDir = path.join(process.cwd(), "uploads", "returns");
   ensureDir(outputDir);
 
-  const returnNumber = `RN-${String(returnNote.id).padStart(4, "0")}`;
+  const returnNumber = returnNote.return_number || `RN-${String(returnNote.id).padStart(4, "0")}`;
   const fileName = `${fileSafe(returnNumber)}-${Date.now()}.pdf`;
   const absPath = path.join(outputDir, fileName);
   const publicPath = `/uploads/returns/${fileName}`;

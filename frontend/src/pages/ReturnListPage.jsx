@@ -3,6 +3,98 @@ import api from "../utils/api";
 import AddReturnModal from "../components/AddReturnModal";
 import AddWastageModal from "../components/AddWastageModal";
 
+const ReturnRow = ({ row, handleSendNote, sendingId, handleViewPdf }) => {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <>
+      <tr>
+        <td>
+          <button className="btn btn-s btn-sm" onClick={() => setExpanded(!expanded)} style={{ padding: "4px 8px" }}>
+            {expanded ? "▼" : "▶"}
+          </button>
+        </td>
+        <td
+          style={{
+            fontFamily: "monospace",
+            fontSize: 11,
+            fontWeight: 700,
+            color: "var(--d)",
+          }}
+        >
+          {row.return_number || `RN-${String(row.id).padStart(4, "0")}`}
+        </td>
+        <td>{row.supplier_name}</td>
+        <td>{fmtDateTime(row.created_at)}</td>
+        <td>{row.total_quantity}</td>
+        <td>{row.created_by_name || "—"}</td>
+        <td>
+          <span className={`badge ${row.status === "sent" ? "badge-g" : "badge-y"}`}>
+            {row.status || "draft"}
+          </span>
+        </td>
+        <td>
+          <div style={{ display: "flex", gap: "8px" }}>
+            {(!row.status || row.status === "draft") ? (
+              <button
+                className="btn btn-s btn-sm"
+                onClick={() => handleSendNote(row.id)}
+                disabled={sendingId === row.id}
+              >
+                {sendingId === row.id ? "Sending..." : "Send Note"}
+              </button>
+            ) : (
+              <>
+                <button
+                  className="btn btn-s btn-sm"
+                  onClick={() => handleViewPdf(row.id)}
+                >
+                  View
+                </button>
+                <button
+                  className="btn btn-s btn-sm"
+                  onClick={() => handleSendNote(row.id)}
+                  disabled={sendingId === row.id}
+                >
+                  {sendingId === row.id ? "Sending..." : "Resend"}
+                </button>
+              </>
+            )}
+          </div>
+        </td>
+      </tr>
+      {expanded && row.items && row.items.length > 0 && (
+        <tr style={{ background: "#f8fafc" }}>
+          <td colSpan="8" style={{ padding: "16px 32px" }}>
+            <table style={{ width: "100%", background: "#fff", border: "1px solid #e2e8f0", borderRadius: "8px", overflow: "hidden" }}>
+              <thead style={{ background: "#f1f5f9" }}>
+                <tr>
+                  <th style={{ padding: "8px" }}>Item Name</th>
+                  <th style={{ padding: "8px" }}>Batch</th>
+                  <th style={{ padding: "8px" }}>Return Qty</th>
+                  <th style={{ padding: "8px" }}>Reason</th>
+                  <th style={{ padding: "8px" }}>Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {row.items.map((item, idx) => (
+                  <tr key={idx} style={{ borderTop: "1px solid #e2e8f0" }}>
+                    <td style={{ padding: "8px", fontWeight: 600 }}>{item.item_name}</td>
+                    <td style={{ padding: "8px" }}>{item.batch_code}</td>
+                    <td style={{ padding: "8px" }}>{item.quantity}</td>
+                    <td style={{ padding: "8px" }}>{item.reason}</td>
+                    <td style={{ padding: "8px" }}>{item.notes || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+};
+
+
 const fmtDateTime = (value) => {
   if (!value) return "—";
   const date = new Date(value);
@@ -97,14 +189,11 @@ const ReturnListPage = () => {
           <table>
             <thead>
               <tr>
+                <th style={{ width: 40 }}></th>
                 <th>Return No.</th>
                 <th>Supplier</th>
                 <th>Date</th>
-                <th>Item</th>
-                <th>Batch</th>
-                <th>Qty</th>
-                <th>Item Coverage</th>
-                <th>Reason</th>
+                <th>Total Qty</th>
                 <th>Recorded By</th>
                 <th>Status</th>
                 <th>Actions</th>
@@ -113,72 +202,11 @@ const ReturnListPage = () => {
             <tbody>
               {returnsData.length ? (
                 returnsData.map((row) => (
-                  <tr key={row.id}>
-                    <td
-                      style={{
-                        fontFamily: "monospace",
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: "var(--d)",
-                      }}
-                    >
-                      RN-{String(row.id).padStart(4, "0")}
-                    </td>
-                    <td>{row.supplier_name}</td>
-                    <td>{fmtDateTime(row.created_at)}</td>
-                    <td style={{ fontWeight: 600 }}>{row.item_name}</td>
-                    <td>{row.batch_code}</td>
-                    <td>{row.quantity}</td>
-                    <td>
-                      {(() => {
-                        const rec = Number(row.total_received_for_item || 0);
-                        const ret = Number(row.total_returned_for_item || 0);
-                        if (ret <= 0) return <span className="badge" style={{background: "#F3F4F6", color: "#6B7280"}}>Not Returned</span>;
-                        if (ret < rec) return <span className="badge badge-y">Partial ({ret} of {rec})</span>;
-                        return <span className="badge badge-g">Fully Returned</span>;
-                      })()}
-                    </td>
-                    <td>{row.reason}</td>
-                    <td>{row.created_by_name || "—"}</td>
-                    <td>
-                      <span className={`badge ${row.status === "sent" ? "badge-g" : "badge-y"}`}>
-                        {row.status || "draft"}
-                      </span>
-                    </td>
-                    <td>
-                      <div style={{ display: "flex", gap: "8px" }}>
-                        {(!row.status || row.status === "draft") ? (
-                          <button
-                            className="btn btn-s btn-sm"
-                            onClick={() => handleSendNote(row.id)}
-                            disabled={sendingId === row.id}
-                          >
-                            {sendingId === row.id ? "Sending..." : "Send Note"}
-                          </button>
-                        ) : (
-                          <>
-                            <button
-                              className="btn btn-s btn-sm"
-                              onClick={() => handleViewPdf(row.id)}
-                            >
-                              View
-                            </button>
-                            <button
-                              className="btn btn-s btn-sm"
-                              onClick={() => handleSendNote(row.id)}
-                              disabled={sendingId === row.id}
-                            >
-                              {sendingId === row.id ? "Sending..." : "Resend"}
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                  <ReturnRow key={row.id} row={row} handleSendNote={handleSendNote} sendingId={sendingId} handleViewPdf={handleViewPdf} />
                 ))
               ) : (
                 <tr>
-                  <td colSpan="11" style={{ textAlign: "center", color: "var(--text3)" }}>
+                  <td colSpan="8" style={{ textAlign: "center", color: "var(--text3)" }}>
                     No returns found
                   </td>
                 </tr>
