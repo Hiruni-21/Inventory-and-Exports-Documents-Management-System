@@ -1,0 +1,3756 @@
+diff --git a/backend/controllers/customerController.js b/backend/controllers/customerController.js
+index 487717c..4f478b2 100644
+--- a/backend/controllers/customerController.js
++++ b/backend/controllers/customerController.js
+@@ -14,8 +14,8 @@ const normalizeAirlinePreference = (value) => {
+   return "UL";
+ };
+ 
+-const buildNextCustomerCode = (type, existingRows) => {
+-  const prefix = type === "global" ? "FW-CLT-G" : "FW-CLT-L";
++const buildNextCustomerCode = (existingRows) => {
++  const prefix = "FW-CLT-G";
+ 
+   const maxNum = (existingRows || []).reduce((max, row) => {
+     const code = String(row.customer_code || "");
+@@ -55,7 +55,6 @@ const customerSelectSql = (schema) => `
+   SELECT
+     c.id,
+     c.customer_code,
+-    c.customer_type,
+     c.customer_name,
+     ${schema.hasGroupName ? "c.group_name" : "NULL AS group_name"},
+     c.contact_person,
+@@ -75,43 +74,28 @@ const customerSelectSql = (schema) => `
+     c.cold_chain_required,
+     c.status,
+     c.created_at,
+-    CASE
+-      WHEN c.customer_type = 'global' THEN COALESCE(gs.shipment_count, 0)
+-      ELSE COALESCE(ls.dispatch_count, 0)
+-    END AS shipment_count
++    COALESCE(gs.shipment_count, 0) AS shipment_count
+   FROM customers c
+   LEFT JOIN (
+     SELECT customer_id, COUNT(*) AS shipment_count
+     FROM global_dispatch
+     GROUP BY customer_id
+   ) gs ON gs.customer_id = c.id
+-  LEFT JOIN (
+-    SELECT customer_id, COUNT(*) AS dispatch_count
+-    FROM local_dispatch
+-    GROUP BY customer_id
+-  ) ls ON ls.customer_id = c.id
+ `;
+ 
+ const normalizeCustomerRow = (row) => ({
+   ...row,
+   whatsapp: row.whatsapp_number || "",
+-  orders_count: row.customer_type === "local" ? Number(row.shipment_count || 0) : 0,
+-  shipments_count: row.customer_type === "global" ? Number(row.shipment_count || 0) : 0,
++  shipments_count: Number(row.shipment_count || 0),
+ });
+ 
+ const getCustomers = async (req, res) => {
+   try {
+-    const { type } = req.query;
+     const schema = await getCustomerSchema();
+ 
+     let sql = customerSelectSql(schema);
+     const params = [];
+ 
+-    if (type) {
+-      sql += ` WHERE LOWER(c.customer_type) = LOWER(?)`;
+-      params.push(type);
+-    }
+-
+     sql += ` ORDER BY c.customer_name ASC`;
+ 
+     const rows = await q(sql, params);
+@@ -124,7 +108,6 @@ const getCustomers = async (req, res) => {
+     });
+   }
+ };
+-
+ const getCustomerById = async (req, res) => {
+   try {
+     const { id } = req.params;
+@@ -145,13 +128,6 @@ const getCustomerById = async (req, res) => {
+ 
+     const customer = normalizeCustomerRow(rows[0]);
+ 
+-    if (customer.customer_type !== "global") {
+-      return res.json({
+-        ...customer,
+-        recent_shipments: [],
+-      });
+-    }
+-
+     const recentShipments = await q(
+       `
+       SELECT
+@@ -225,7 +201,6 @@ const createCustomer = async (req, res) => {
+ 
+     const {
+       customer_code,
+-      customer_type,
+       customer_name,
+       group_name,
+       contact_person,
+@@ -247,9 +222,9 @@ const createCustomer = async (req, res) => {
+       status,
+     } = req.body;
+ 
+-    if (!customer_type || !customer_name) {
++    if (!customer_name) {
+       return res.status(400).json({
+-        message: "Customer type and customer name are required",
++        message: "Customer name is required",
+       });
+     }
+ 
+@@ -259,15 +234,13 @@ const createCustomer = async (req, res) => {
+ 
+     if (!finalCode) {
+       const codeRows = await q(
+-        `SELECT customer_code FROM customers WHERE customer_type = ? ORDER BY id ASC`,
+-        [customer_type]
++        `SELECT customer_code FROM customers ORDER BY id ASC`
+       );
+-      finalCode = buildNextCustomerCode(customer_type, codeRows);
++      finalCode = buildNextCustomerCode(codeRows);
+     }
+ 
+     const columns = [
+       "customer_code",
+-      "customer_type",
+       "customer_name",
+       "contact_person",
+       "phone",
+@@ -289,7 +262,6 @@ const createCustomer = async (req, res) => {
+ 
+     const values = [
+       finalCode,
+-      customer_type,
+       customer_name,
+       contact_person || null,
+       phone || null,
+@@ -302,8 +274,8 @@ const createCustomer = async (req, res) => {
+       driver_preference || null,
+       notes || null,
+       location_island || null,
+-      customer_type === "global" ? normalizeAirlinePreference(airline_preference) : null,
+-      customer_type === "global" ? (incoterm || "CIF") : null,
++      normalizeAirlinePreference(airline_preference),
++      incoterm || "CIF",
+       cold_chain_required ? 1 : 0,
+       status || "active",
+       userId,
+@@ -451,20 +423,13 @@ const deleteCustomer = async (req, res) => {
+     const rows = await q(
+       `
+       SELECT
+-        c.customer_type,
+-        COALESCE(gs.shipment_count, 0) AS global_count,
+-        COALESCE(ls.dispatch_count, 0) AS local_count
++        COALESCE(gs.shipment_count, 0) AS global_count
+       FROM customers c
+       LEFT JOIN (
+         SELECT customer_id, COUNT(*) AS shipment_count
+         FROM global_dispatch
+         GROUP BY customer_id
+       ) gs ON gs.customer_id = c.id
+-      LEFT JOIN (
+-        SELECT customer_id, COUNT(*) AS dispatch_count
+-        FROM local_dispatch
+-        GROUP BY customer_id
+-      ) ls ON ls.customer_id = c.id
+       WHERE c.id = ?
+       LIMIT 1
+       `,
+@@ -476,8 +441,7 @@ const deleteCustomer = async (req, res) => {
+     }
+ 
+     const row = rows[0];
+-    const hasLinkedRecords =
+-      Number(row.global_count || 0) > 0 || Number(row.local_count || 0) > 0;
++    const hasLinkedRecords = Number(row.global_count || 0) > 0;
+ 
+     if (hasLinkedRecords) {
+       return res.status(400).json({
+diff --git a/backend/controllers/dashboardController.js b/backend/controllers/dashboardController.js
+index ac59f54..0b5e860 100644
+--- a/backend/controllers/dashboardController.js
++++ b/backend/controllers/dashboardController.js
+@@ -6,10 +6,8 @@ const getDashboardStats = (req, res) => {
+   const queries = {
+     items: "SELECT COUNT(*) AS total FROM items WHERE status = 'active'",
+     suppliers: "SELECT COUNT(*) AS total FROM suppliers WHERE status = 'active'",
+-    localCustomers:
+-      "SELECT COUNT(*) AS total FROM customers WHERE customer_type = 'local' AND status = 'active'",
+-    globalCustomers:
+-      "SELECT COUNT(*) AS total FROM customers WHERE customer_type = 'global' AND status = 'active'",
++    customers:
++      "SELECT COUNT(*) AS total FROM customers WHERE status = 'active'",
+ 
+     pendingApprovals:
+       "SELECT COUNT(*) AS total FROM purchase_orders WHERE status IN ('pending_approval', 'draft')",
+@@ -19,8 +17,8 @@ const getDashboardStats = (req, res) => {
+       "SELECT COUNT(*) AS total FROM export_documents WHERE all_cleared = 0",
+     activeGlobalShipments:
+       "SELECT COUNT(*) AS total FROM global_dispatch WHERE status NOT IN ('delivered')",
+-    localDispatchesToday:
+-      "SELECT COUNT(*) AS total FROM local_dispatch WHERE DATE(dispatch_date) = CURDATE()",
++    dispatchesToday:
++      "SELECT COUNT(*) AS total FROM global_dispatch WHERE DATE(dispatch_date) = CURDATE()",
+ 
+     returnsMonth: `
+       SELECT COUNT(*) AS total
+diff --git a/backend/controllers/dispatchController.js b/backend/controllers/dispatchController.js
+deleted file mode 100644
+index f79ec1f..0000000
+--- a/backend/controllers/dispatchController.js
++++ /dev/null
+@@ -1,765 +0,0 @@
+-const db = require("../config/db");
+-
+-/*
+-  If your system uses the old batch table, change this to "batches".
+-  Leave it as "inventory_batches" if your current inventory pages already work with that.
+-*/
+-const BATCH_TABLE = "batches";
+-const BATCH_CODE_COL = BATCH_TABLE === "batches" ? "batch_number" : "batch_code";
+-const BATCH_QTY_COL =
+-  BATCH_TABLE === "batches" ? "qty_remaining" : "available_quantity";
+-const BATCH_RECEIVED_COL =
+-  BATCH_TABLE === "batches" ? "qty_received" : "received_quantity";
+-const BATCH_ACTIVE_STATUS = BATCH_TABLE === "batches" ? "active" : "Available";
+-const BATCH_DEPLETED_STATUS = BATCH_TABLE === "batches" ? "depleted" : "Depleted";
+-
+-const CUSTOMER_DISPLAY_SQL = `
+-  CASE
+-    WHEN c.city IS NOT NULL AND TRIM(c.city) <> ''
+-      THEN CONCAT(c.customer_name, ' — ', c.city)
+-    ELSE c.customer_name
+-  END
+-`;
+-
+-const buildRunningNumber = (prefix) => {
+-  const last6 = String(Date.now()).slice(-6);
+-  return `${prefix}${last6}`;
+-};
+-
+-const rollbackWithError = (res, err, message = "Database error") => {
+-  console.error(message, err);
+-  return res.status(500).json({
+-    message,
+-    error: err.message,
+-  });
+-};
+-
+-const refreshInventorySnapshot = (itemId, callback = () => {}) => {
+-  const totalsSql = `
+-    SELECT
+-      COALESCE(SUM(${BATCH_RECEIVED_COL}), 0) AS qty_on_hand,
+-      COALESCE(SUM(${BATCH_QTY_COL}), 0) AS qty_available
+-    FROM ${BATCH_TABLE}
+-    WHERE item_id = ?
+-  `;
+-
+-  const itemSql = `
+-    SELECT COALESCE(unit_cost, 0) AS unit_cost
+-    FROM items
+-    WHERE id = ?
+-    LIMIT 1
+-  `;
+-
+-  db.query(totalsSql, [itemId], (totalsErr, totalsRows) => {
+-    if (totalsErr) return callback(totalsErr);
+-
+-    db.query(itemSql, [itemId], (itemErr, itemRows) => {
+-      if (itemErr) return callback(itemErr);
+-
+-      const qtyOnHand = Number(totalsRows?.[0]?.qty_on_hand || 0);
+-      const qtyAvailable = Number(totalsRows?.[0]?.qty_available || 0);
+-      const unitCost = Number(itemRows?.[0]?.unit_cost || 0);
+-      const totalValue = qtyAvailable * unitCost;
+-
+-      const upsertSql = `
+-        INSERT INTO inventory
+-          (item_id, qty_on_hand, qty_reserved, qty_available, avg_unit_cost, total_value, last_movement_at, updated_at)
+-        VALUES (?, ?, 0, ?, ?, ?, NOW(), NOW())
+-        ON DUPLICATE KEY UPDATE
+-          qty_on_hand = VALUES(qty_on_hand),
+-          qty_reserved = 0,
+-          qty_available = VALUES(qty_available),
+-          avg_unit_cost = VALUES(avg_unit_cost),
+-          total_value = VALUES(total_value),
+-          last_movement_at = NOW(),
+-          updated_at = NOW()
+-      `;
+-
+-      db.query(
+-        upsertSql,
+-        [itemId, qtyOnHand, qtyAvailable, unitCost, totalValue],
+-        (upsertErr) => {
+-          if (!upsertErr) {
+-            const { triggerLowStockCheck } = require("../utils/notificationHelper");
+-            triggerLowStockCheck(itemId);
+-          }
+-          callback(upsertErr);
+-        }
+-      );
+-    });
+-  });
+-};
+-
+-const resolveLocalCustomer = ({ customer_id, client_name }, callback) => {
+-  if (customer_id) {
+-    const byIdSql = `
+-      SELECT
+-        id,
+-        customer_name,
+-        city,
+-        delivery_window
+-      FROM customers
+-      WHERE id = ?
+-        AND customer_type = 'local'
+-      LIMIT 1
+-    `;
+-
+-    db.query(byIdSql, [customer_id], (err, rows) => {
+-      if (err) return callback(err);
+-
+-      if (!rows.length) {
+-        return callback(new Error("Selected local customer not found"));
+-      }
+-
+-      return callback(null, rows[0]);
+-    });
+-
+-    return;
+-  }
+-
+-  if (!client_name) {
+-    return callback(new Error("Customer is required"));
+-  }
+-
+-  const byNameSql = `
+-    SELECT
+-      id,
+-      customer_name,
+-      city,
+-      delivery_window
+-    FROM customers
+-    WHERE customer_type = 'local'
+-      AND (
+-        customer_name = ?
+-        OR CONCAT(customer_name, ' — ', city) = ?
+-        OR CONCAT(customer_name, ' - ', city) = ?
+-      )
+-    LIMIT 1
+-  `;
+-
+-  db.query(byNameSql, [client_name, client_name, client_name], (err, rows) => {
+-    if (err) return callback(err);
+-
+-    if (!rows.length) {
+-      return callback(new Error("Selected local customer not found"));
+-    }
+-
+-    return callback(null, rows[0]);
+-  });
+-};
+-
+-const getAllDispatches = (req, res) => {
+-  const sql = `
+-    SELECT
+-      ld.id,
+-      ld.dispatch_number,
+-      ld.delivery_note_number,
+-      ld.dispatch_date,
+-      ld.delivery_date,
+-      ld.status,
+-      ld.stock_deducted,
+-      ld.driver_name,
+-      ld.vehicle_number,
+-      ld.delivery_window,
+-      ld.notes AS remarks,
+-      ld.created_at,
+-      ld.delivered_at,
+-      ${CUSTOMER_DISPLAY_SQL} AS client_name,
+-      u.full_name AS created_by_name,
+-      COALESCE(agg.item_count, 0) AS item_count,
+-      COALESCE(agg.total_weight, 0) AS total_weight
+-    FROM local_dispatch ld
+-    JOIN customers c ON ld.customer_id = c.id
+-    LEFT JOIN users u ON ld.created_by = u.id
+-    LEFT JOIN (
+-      SELECT
+-        local_dispatch_id,
+-        COUNT(*) AS item_count,
+-        COALESCE(SUM(qty), 0) AS total_weight
+-      FROM local_dispatch_items
+-      GROUP BY local_dispatch_id
+-    ) agg ON agg.local_dispatch_id = ld.id
+-    ORDER BY ld.dispatch_date DESC, ld.id DESC
+-  `;
+-
+-  db.query(sql, (err, results) => {
+-    if (err) {
+-      console.error("getAllDispatches error:", err);
+-      return res.status(500).json({
+-        message: "Database error",
+-        error: err.message,
+-      });
+-    }
+-
+-    res.json(results);
+-  });
+-};
+-
+-const getDispatchById = (req, res) => {
+-  const { id } = req.params;
+-
+-  const headerSql = `
+-    SELECT
+-      ld.id,
+-      ld.dispatch_number,
+-      ld.delivery_note_number,
+-      ld.dispatch_date,
+-      ld.delivery_date,
+-      ld.status,
+-      ld.stock_deducted,
+-      ld.driver_name,
+-      ld.vehicle_number,
+-      ld.delivery_window,
+-      ld.notes AS remarks,
+-      ld.created_at,
+-      ld.delivered_at,
+-      ${CUSTOMER_DISPLAY_SQL} AS client_name,
+-      c.customer_name,
+-      c.city,
+-      c.contact_person,
+-      c.phone,
+-      c.email,
+-      u.full_name AS created_by_name,
+-      du.full_name AS delivered_by_name,
+-      COALESCE(agg.item_count, 0) AS item_count,
+-      COALESCE(agg.total_weight, 0) AS total_weight
+-    FROM local_dispatch ld
+-    JOIN customers c ON ld.customer_id = c.id
+-    LEFT JOIN users u ON ld.created_by = u.id
+-    LEFT JOIN users du ON ld.delivered_by = du.id
+-    LEFT JOIN (
+-      SELECT
+-        local_dispatch_id,
+-        COUNT(*) AS item_count,
+-        COALESCE(SUM(qty), 0) AS total_weight
+-      FROM local_dispatch_items
+-      GROUP BY local_dispatch_id
+-    ) agg ON agg.local_dispatch_id = ld.id
+-    WHERE ld.id = ?
+-    LIMIT 1
+-  `;
+-
+-  const itemsSql = `
+-    SELECT
+-      ldi.id,
+-      ldi.local_dispatch_id AS dispatch_id,
+-      ldi.item_id,
+-      ldi.batch_id,
+-      ldi.qty AS quantity,
+-      ldi.unit,
+-      ldi.unit_price,
+-      ldi.line_total,
+-      ldi.notes,
+-      i.code AS item_code,
+-      i.name AS item_name,
+-      b.${BATCH_CODE_COL} AS batch_code,
+-      b.expiry_date
+-    FROM local_dispatch_items ldi
+-    JOIN items i ON ldi.item_id = i.id
+-    LEFT JOIN ${BATCH_TABLE} b ON ldi.batch_id = b.id
+-    WHERE ldi.local_dispatch_id = ?
+-    ORDER BY ldi.id ASC
+-  `;
+-
+-  db.query(headerSql, [id], (err, headerRows) => {
+-    if (err) {
+-      console.error("getDispatchById header error:", err);
+-      return res.status(500).json({
+-        message: "Database error",
+-        error: err.message,
+-      });
+-    }
+-
+-    if (!headerRows.length) {
+-      return res.status(404).json({ message: "Dispatch not found" });
+-    }
+-
+-    db.query(itemsSql, [id], (itemErr, itemRows) => {
+-      if (itemErr) {
+-        console.error("getDispatchById items error:", itemErr);
+-        return res.status(500).json({
+-          message: "Database error",
+-          error: itemErr.message,
+-        });
+-      }
+-
+-      res.json({
+-        ...headerRows[0],
+-        items: itemRows,
+-      });
+-    });
+-  });
+-};
+-
+-const createDispatch = (req, res) => {
+-  const {
+-    customer_id,
+-    client_name,
+-    dispatch_date,
+-    delivery_date,
+-    driver_name,
+-    vehicle_number,
+-    delivery_window,
+-    remarks,
+-    notes,
+-    items,
+-  } = req.body;
+-
+-  const created_by = req.user?.id || null;
+-
+-  if (!dispatch_date || !Array.isArray(items) || items.length === 0) {
+-    return res.status(400).json({
+-      message: "Dispatch date and at least one item are required",
+-    });
+-  }
+-
+-  const cleanedItems = items
+-    .map((item) => ({
+-      item_id: Number(item.item_id),
+-      batch_id: item.batch_id ? Number(item.batch_id) : null,
+-      qty: Number(item.quantity ?? item.qty ?? 0),
+-      notes: item.notes || null,
+-    }))
+-    .filter((item) => item.item_id && item.qty > 0);
+-
+-  if (!cleanedItems.length) {
+-    return res.status(400).json({
+-      message: "At least one valid dispatch line is required",
+-    });
+-  }
+-
+-  resolveLocalCustomer({ customer_id, client_name }, (customerErr, customer) => {
+-    if (customerErr) {
+-      return res.status(400).json({ message: customerErr.message });
+-    }
+-
+-    const dispatchNumber = buildRunningNumber("DSP-L-");
+-    const deliveryNoteNumber = buildRunningNumber("DN-L-");
+-
+-    const insertHeaderSql = `
+-      INSERT INTO local_dispatch
+-        (
+-          dispatch_number,
+-          delivery_note_number,
+-          customer_id,
+-          dispatch_date,
+-          delivery_date,
+-          status,
+-          stock_deducted,
+-          driver_name,
+-          vehicle_number,
+-          delivery_window,
+-          notes,
+-          created_by
+-        )
+-      VALUES (?, ?, ?, ?, ?, 'scheduled', 0, ?, ?, ?, ?, ?)
+-    `;
+-
+-    db.beginTransaction((txErr) => {
+-      if (txErr) {
+-        return rollbackWithError(res, txErr, "Failed to start transaction");
+-      }
+-
+-      db.query(
+-        insertHeaderSql,
+-        [
+-          dispatchNumber,
+-          deliveryNoteNumber,
+-          customer.id,
+-          dispatch_date,
+-          delivery_date || null,
+-          driver_name || null,
+-          vehicle_number || null,
+-          delivery_window || customer.delivery_window || null,
+-          remarks || notes || null,
+-          created_by,
+-        ],
+-        (headerErr, headerResult) => {
+-          if (headerErr) {
+-            return db.rollback(() =>
+-              rollbackWithError(res, headerErr, "Failed to create local dispatch")
+-            );
+-          }
+-
+-          const dispatchId = headerResult.insertId;
+-
+-          const insertNextItem = (index) => {
+-            if (index >= cleanedItems.length) {
+-              return db.commit((commitErr) => {
+-                if (commitErr) {
+-                  return db.rollback(() =>
+-                    rollbackWithError(res, commitErr, "Failed to commit local dispatch")
+-                  );
+-                }
+-
+-                const { sendNotification } = require("../utils/notificationHelper");
+-                
+-                // Notify Supervisor
+-                sendNotification({
+-                  role: "supervisor",
+-                  title: "Dispatch Ready for Review",
+-                  message: `Local dispatch ${dispatchNumber} is ready for review.`,
+-                  type: "dispatch_ready"
+-                }).catch(err => console.error("Local dispatch ready notification error:", err.message));
+-
+-                // Notify Logistics
+-                sendNotification({
+-                  role: "logistics",
+-                  title: "New Dispatch Assigned",
+-                  message: `Local dispatch ${dispatchNumber} has been assigned.`,
+-                  type: "dispatch_assigned"
+-                }).catch(err => console.error("Local dispatch assigned notification error:", err.message));
+-
+-                return res.status(201).json({
+-                  message: "Dispatch created successfully",
+-                  dispatchId,
+-                  dispatchNumber,
+-                  deliveryNoteNumber,
+-                });
+-              });
+-            }
+-
+-            const row = cleanedItems[index];
+-
+-            const itemSql = `
+-              SELECT
+-                id,
+-                unit,
+-                COALESCE(unit_cost, 0) AS unit_cost
+-              FROM items
+-              WHERE id = ?
+-              LIMIT 1
+-            `;
+-
+-            db.query(itemSql, [row.item_id], (itemErr, itemRows) => {
+-              if (itemErr) {
+-                return db.rollback(() =>
+-                  rollbackWithError(res, itemErr, "Failed to load item details")
+-                );
+-              }
+-
+-              if (!itemRows.length) {
+-                return db.rollback(() =>
+-                  res.status(404).json({ message: `Item ${row.item_id} not found` })
+-                );
+-              }
+-
+-              const itemInfo = itemRows[0];
+-              const unitPrice = Number(itemInfo.unit_cost || 0);
+-              const lineTotal = Number(row.qty) * unitPrice;
+-
+-              const continueInsert = () => {
+-                const insertItemSql = `
+-                  INSERT INTO local_dispatch_items
+-                    (
+-                      local_dispatch_id,
+-                      item_id,
+-                      batch_id,
+-                      qty,
+-                      unit,
+-                      unit_price,
+-                      line_total,
+-                      notes
+-                    )
+-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+-                `;
+-
+-                db.query(
+-                  insertItemSql,
+-                  [
+-                    dispatchId,
+-                    row.item_id,
+-                    row.batch_id,
+-                    row.qty,
+-                    itemInfo.unit || "kg",
+-                    unitPrice,
+-                    lineTotal,
+-                    row.notes,
+-                  ],
+-                  (insertErr) => {
+-                    if (insertErr) {
+-                      return db.rollback(() =>
+-                        rollbackWithError(res, insertErr, "Failed to insert dispatch item")
+-                      );
+-                    }
+-
+-                    insertNextItem(index + 1);
+-                  }
+-                );
+-              };
+-
+-              if (!row.batch_id) {
+-                return continueInsert();
+-              }
+-
+-              const batchSql = `
+-                SELECT
+-                  id,
+-                  item_id,
+-                  ${BATCH_CODE_COL} AS batch_code,
+-                  COALESCE(${BATCH_QTY_COL}, 0) AS qty_available
+-                FROM ${BATCH_TABLE}
+-                WHERE id = ?
+-                  AND item_id = ?
+-                LIMIT 1
+-              `;
+-
+-              db.query(batchSql, [row.batch_id, row.item_id], (batchErr, batchRows) => {
+-                if (batchErr) {
+-                  return db.rollback(() =>
+-                    rollbackWithError(res, batchErr, "Failed to validate batch")
+-                  );
+-                }
+-
+-                if (!batchRows.length) {
+-                  return db.rollback(() =>
+-                    res.status(404).json({
+-                      message: `Selected batch not found for item ${row.item_id}`,
+-                    })
+-                  );
+-                }
+-
+-                const batch = batchRows[0];
+-
+-                if (Number(row.qty) > Number(batch.qty_available || 0)) {
+-                  return db.rollback(() =>
+-                    res.status(400).json({
+-                      message: `Not enough stock in batch ${batch.batch_code}`,
+-                    })
+-                  );
+-                }
+-
+-                continueInsert();
+-              });
+-            });
+-          };
+-
+-          insertNextItem(0);
+-        }
+-      );
+-    });
+-  });
+-};
+-
+-const markDispatchDelivered = (req, res) => {
+-  const { id } = req.params;
+-  const delivered_by = req.user?.id || null;
+-
+-  const headerSql = `
+-    SELECT
+-      ld.id,
+-      ld.dispatch_number,
+-      ld.status,
+-      ld.stock_deducted,
+-      ${CUSTOMER_DISPLAY_SQL} AS client_name
+-    FROM local_dispatch ld
+-    JOIN customers c ON ld.customer_id = c.id
+-    WHERE ld.id = ?
+-    LIMIT 1
+-  `;
+-
+-  const itemsSql = `
+-    SELECT
+-      ldi.id,
+-      ldi.item_id,
+-      ldi.batch_id,
+-      ldi.qty
+-    FROM local_dispatch_items ldi
+-    WHERE ldi.local_dispatch_id = ?
+-    ORDER BY ldi.id ASC
+-  `;
+-
+-  db.query(headerSql, [id], (headerErr, headerRows) => {
+-    if (headerErr) {
+-      return rollbackWithError(res, headerErr, "Failed to load local dispatch");
+-    }
+-
+-    if (!headerRows.length) {
+-      return res.status(404).json({ message: "Dispatch not found" });
+-    }
+-
+-    const dispatchRow = headerRows[0];
+-
+-    if (
+-      String(dispatchRow.status || "").toLowerCase() === "delivered" ||
+-      Number(dispatchRow.stock_deducted || 0) === 1
+-    ) {
+-      return res.status(400).json({ message: "Dispatch is already delivered" });
+-    }
+-
+-    db.query(itemsSql, [id], (itemsErr, itemRows) => {
+-      if (itemsErr) {
+-        return rollbackWithError(res, itemsErr, "Failed to load dispatch items");
+-      }
+-
+-      if (!itemRows.length) {
+-        return res.status(400).json({ message: "Dispatch has no items" });
+-      }
+-
+-      db.beginTransaction((txErr) => {
+-        if (txErr) {
+-          return rollbackWithError(res, txErr, "Failed to start transaction");
+-        }
+-
+-        const processNext = (index) => {
+-          if (index >= itemRows.length) {
+-            const updateHeaderSql = `
+-              UPDATE local_dispatch
+-              SET
+-                status = 'delivered',
+-                stock_deducted = 1,
+-                delivered_by = ?,
+-                delivered_at = NOW(),
+-                delivery_date = COALESCE(delivery_date, CURDATE())
+-              WHERE id = ?
+-            `;
+-
+-            return db.query(updateHeaderSql, [delivered_by, id], (updateErr) => {
+-              if (updateErr) {
+-                return db.rollback(() =>
+-                  rollbackWithError(res, updateErr, "Failed to update dispatch status")
+-                );
+-              }
+-
+-              return db.commit((commitErr) => {
+-                if (commitErr) {
+-                  return db.rollback(() =>
+-                    rollbackWithError(res, commitErr, "Failed to commit delivered dispatch")
+-                  );
+-                }
+-
+-                const { sendNotification } = require("../utils/notificationHelper");
+-                sendNotification({
+-                  role: "logistics",
+-                  title: "Dispatch Status Changed",
+-                  message: `Local dispatch ${dispatchRow.dispatch_number} status has been updated to delivered.`,
+-                  type: "dispatch_status"
+-                }).catch(err => console.error("Local dispatch delivery notification error:", err.message));
+-
+-                return res.json({
+-                  message: "Dispatch marked delivered and stock deducted successfully",
+-                });
+-              });
+-            });
+-          }
+-
+-          const row = itemRows[index];
+-
+-          if (!row.batch_id) {
+-            return db.rollback(() =>
+-              res.status(400).json({
+-                message: "A dispatch item is missing its FEFO batch",
+-              })
+-            );
+-          }
+-
+-          const batchSql = `
+-            SELECT
+-              id,
+-              item_id,
+-              ${BATCH_CODE_COL} AS batch_code,
+-              COALESCE(${BATCH_QTY_COL}, 0) AS qty_available
+-            FROM ${BATCH_TABLE}
+-            WHERE id = ?
+-              AND item_id = ?
+-            LIMIT 1
+-          `;
+-
+-          db.query(batchSql, [row.batch_id, row.item_id], (batchErr, batchRows) => {
+-            if (batchErr) {
+-              return db.rollback(() =>
+-                rollbackWithError(res, batchErr, "Failed to load batch for delivery")
+-              );
+-            }
+-
+-            if (!batchRows.length) {
+-              return db.rollback(() =>
+-                res.status(404).json({
+-                  message: `Batch not found for item ${row.item_id}`,
+-                })
+-              );
+-            }
+-
+-            const batch = batchRows[0];
+-            const currentQty = Number(batch.qty_available || 0);
+-            const deductQty = Number(row.qty || 0);
+-
+-            if (deductQty > currentQty) {
+-              return db.rollback(() =>
+-                res.status(400).json({
+-                  message: `Not enough stock in batch ${batch.batch_code}`,
+-                })
+-              );
+-            }
+-
+-            const nextQty = currentQty - deductQty;
+-            const nextStatus =
+-              nextQty <= 0 ? BATCH_DEPLETED_STATUS : BATCH_ACTIVE_STATUS;
+-
+-            const updateBatchSql = `
+-              UPDATE ${BATCH_TABLE}
+-              SET
+-                ${BATCH_QTY_COL} = ?,
+-                status = ?
+-              WHERE id = ?
+-            `;
+-
+-            db.query(updateBatchSql, [nextQty, nextStatus, row.batch_id], (updateErr) => {
+-              if (updateErr) {
+-                return db.rollback(() =>
+-                  rollbackWithError(res, updateErr, "Failed to update batch stock")
+-                );
+-              }
+-
+-              const movementSql = `
+-                INSERT INTO stock_movements
+-                  (item_id, movement_type, reference_type, reference_id, quantity, notes)
+-                VALUES (?, 'OUT', 'DISPATCH', ?, ?, ?)
+-              `;
+-
+-              db.query(
+-                movementSql,
+-                [
+-                  row.item_id,
+-                  id,
+-                  deductQty,
+-                  `Local dispatch delivered to ${dispatchRow.client_name}`,
+-                ],
+-                (movementErr) => {
+-                  if (movementErr) {
+-                    return db.rollback(() =>
+-                      rollbackWithError(res, movementErr, "Failed to create stock movement")
+-                    );
+-                  }
+-
+-                  refreshInventorySnapshot(row.item_id, (refreshErr) => {
+-                    if (refreshErr) {
+-                      return db.rollback(() =>
+-                        rollbackWithError(
+-                          res,
+-                          refreshErr,
+-                          "Failed to refresh inventory snapshot"
+-                        )
+-                      );
+-                    }
+-
+-                    processNext(index + 1);
+-                  });
+-                }
+-              );
+-            });
+-          });
+-        };
+-
+-        processNext(0);
+-      });
+-    });
+-  });
+-};
+-
+-module.exports = {
+-  getAllDispatches,
+-  getDispatchById,
+-  createDispatch,
+-  markDispatchDelivered,
+-};
+\ No newline at end of file
+diff --git a/backend/controllers/globalDispatchController.js b/backend/controllers/globalDispatchController.js
+index 4113f1b..bd6ac92 100644
+--- a/backend/controllers/globalDispatchController.js
++++ b/backend/controllers/globalDispatchController.js
+@@ -408,7 +408,7 @@ const createGlobalDispatch = async (req, res) => {
+       `
+       SELECT id
+       FROM customers
+-      WHERE id = ? AND customer_type = 'global'
++      WHERE id = ?
+       LIMIT 1
+       `,
+       [Number(customer_id)]
+diff --git a/backend/routes/dispatchRoutes.js b/backend/routes/dispatchRoutes.js
+deleted file mode 100644
+index 68512ca..0000000
+--- a/backend/routes/dispatchRoutes.js
++++ /dev/null
+@@ -1,23 +0,0 @@
+-const express = require("express");
+-const router = express.Router();
+-
+-const {
+-  getAllDispatches,
+-  getDispatchById,
+-  createDispatch,
+-  markDispatchDelivered,
+-} = require("../controllers/dispatchController");
+-
+-const { verifyToken, allowRoles } = require("../middleware/authMiddleware");
+-
+-router.get("/", verifyToken, allowRoles("manager", "supervisor", "logistics"), getAllDispatches);
+-router.get("/:id", verifyToken, allowRoles("manager", "supervisor", "logistics"), getDispatchById);
+-router.post("/", verifyToken, allowRoles("manager", "supervisor", "logistics"), createDispatch);
+-router.put(
+-  "/:id/delivered",
+-  verifyToken,
+-  allowRoles("manager", "supervisor", "logistics"),
+-  markDispatchDelivered
+-);
+-
+-module.exports = router;
+\ No newline at end of file
+diff --git a/backend/server.js b/backend/server.js
+index e1d9a1f..53c9adc 100644
+--- a/backend/server.js
++++ b/backend/server.js
+@@ -14,7 +14,6 @@ const purchaseOrderRoutes = require("./routes/purchaseOrderRoutes");
+ const grnRoutes = require("./routes/grnRoutes");
+ const returnRoutes = require("./routes/returnRoutes");
+ const wastageRoutes = require("./routes/wastageRoutes");
+-const dispatchRoutes = require("./routes/dispatchRoutes");
+ const globalDispatchRoutes = require("./routes/globalDispatchRoutes");
+ const exportDocumentRoutes = require("./routes/exportDocumentRoutes");
+ const customerRoutes = require("./routes/customerRoutes");
+@@ -42,7 +41,6 @@ app.use("/api/grn", grnRoutes);
+ app.use("/api/returns", returnRoutes);
+ app.use("/api/wastage", wastageRoutes);
+ app.use("/api/dispatch/global", globalDispatchRoutes);
+-app.use("/api/dispatch", dispatchRoutes);
+ app.use("/api/export-docs", exportDocumentRoutes);
+ app.use("/api/customers", customerRoutes);
+ app.use("/api/stock-adjustments", stockAdjustmentRoutes);
+diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
+index 95f13f4..91099a7 100644
+--- a/frontend/src/App.jsx
++++ b/frontend/src/App.jsx
+@@ -30,12 +30,7 @@ import GrnListPage from "./pages/GrnListPage";
+ import GrnDetailsPage from "./pages/GrnDetailsPage";
+ import ReturnListPage from "./pages/ReturnListPage";
+ 
+-import LocalCustomersPage from "./pages/LocalCustomersPage";
+ import GlobalCustomersPage from "./pages/GlobalCustomersPage";
+-import DispatchListPage from "./pages/DispatchListPage";
+-import AddDispatchPage from "./pages/AddDispatchPage";
+-import DispatchDetailsPage from "./pages/DispatchDetailsPage";
+-import DispatchPrintPage from "./pages/DispatchPrintPage";
+ import GlobalDispatchListPage from "./pages/GlobalDispatchListPage";
+ import AddGlobalDispatchPage from "./pages/AddGlobalDispatchPage";
+ 
+@@ -115,16 +110,10 @@ function App() {
+ 
+         <Route path="/returns" element={<ReturnListPage />} />
+ 
+-        <Route path="/customers/local" element={<LocalCustomersPage />} />
+-        <Route path="/customers/global" element={<GlobalCustomersPage />} />
++        <Route path="/customers" element={<GlobalCustomersPage />} />
+ 
+-        <Route path="/dispatch/local" element={<DispatchListPage />} />
+-        <Route path="/dispatch/local/add" element={<AddDispatchPage />} />
+-        <Route path="/dispatch/:id" element={<DispatchDetailsPage />} />
+-        <Route path="/dispatch/print/:id" element={<DispatchPrintPage />} />
+-
+-        <Route path="/dispatch/global" element={<GlobalDispatchListPage />} />
+-        <Route path="/dispatch/global/add" element={<AddGlobalDispatchPage />} />
++        <Route path="/dispatch" element={<GlobalDispatchListPage />} />
++        <Route path="/dispatch/add" element={<AddGlobalDispatchPage />} />
+ 
+         <Route path="/export-documents" element={<ExportDocumentListPage />} />
+         <Route path="/export-documents/add" element={<AddExportDocumentPage />} />
+diff --git a/frontend/src/components/Layout.jsx b/frontend/src/components/Layout.jsx
+index 36cb48b..08ed435 100644
+--- a/frontend/src/components/Layout.jsx
++++ b/frontend/src/components/Layout.jsx
+@@ -83,7 +83,8 @@ const notificationsByRole = {
+     { type: "Notify Ops", message: "Low stock items need to be escalated.", time: "45 min", unread: true },
+   ],
+   logistics: [
+-    { type: "Dispatch", message: "3 local dispatches are scheduled for today.", time: "Just now", unread: true },
++    // TODO: Pull real pending/scheduled global dispatch data from backend instead of mock data
++    { type: "Dispatch", message: "3 export shipments are scheduled for today.", time: "Just now", unread: true },
+     { type: "Export", message: "One export shipment is waiting for document completion.", time: "1 hour", unread: true },
+   ],
+   supplier: [
+@@ -128,10 +129,8 @@ const navByRole = {
+     {
+       label: "CLIENTS & DISPATCH",
+       items: [
+-        { to: "/customers/local", text: "Local Customers", icon: <IconHome /> },
+-        { to: "/customers/global", text: "Global Customers", icon: <IconPlane /> },
+-        { to: "/dispatch/local", text: "Local Dispatch", icon: <IconBox /> },
+-        { to: "/dispatch/global", text: "Global Dispatch", icon: <IconPlane /> },
++        { to: "/customers", text: "Customers", icon: <IconPlane /> },
++        { to: "/dispatch", text: "Dispatch", icon: <IconPlane /> },
+         { to: "/export-documents", text: "Export Documents", icon: <IconFile /> },
+       ],
+     },
+@@ -172,10 +171,8 @@ const navByRole = {
+     {
+       label: "CLIENTS & DISPATCH",
+       items: [
+-        { to: "/customers/local", text: "Local Customers", icon: <IconHome /> },
+-        { to: "/customers/global", text: "Global Customers", icon: <IconPlane /> },
+-        { to: "/dispatch/local", text: "Local Dispatch", icon: <IconBox /> },
+-        { to: "/dispatch/global", text: "Global Dispatch", icon: <IconPlane /> },
++        { to: "/customers", text: "Customers", icon: <IconPlane /> },
++        { to: "/dispatch", text: "Dispatch", icon: <IconPlane /> },
+         { to: "/export-documents", text: "Export Documents", icon: <IconFile /> },
+       ],
+     },
+@@ -218,10 +215,8 @@ const navByRole = {
+     {
+       label: "CLIENTS & DISPATCH",
+       items: [
+-        { to: "/customers/local", text: "Local Customers", icon: <IconHome /> },
+-        { to: "/customers/global", text: "Global Customers", icon: <IconPlane /> },
+-        { to: "/dispatch/local", text: "Local Dispatch", icon: <IconBox /> },
+-        { to: "/dispatch/global", text: "Global Dispatch", icon: <IconPlane /> },
++        { to: "/customers", text: "Customers", icon: <IconPlane /> },
++        { to: "/dispatch", text: "Dispatch", icon: <IconPlane /> },
+         { to: "/export-documents", text: "Export Documents", icon: <IconFile /> },
+       ],
+     },
+@@ -262,11 +257,9 @@ const pageMeta = {
+   "/returns/add": { title: "Returns & Wastage", subtitle: "Record return" },
+   "/wastage": { title: "Returns & Wastage", subtitle: "Wastage records" },
+   "/wastage/add": { title: "Returns & Wastage", subtitle: "Record wastage" },
+-  "/customers/local": { title: "Local Customers", subtitle: "Sri Lanka customers" },
+-  "/customers/global": { title: "Global Customers", subtitle: "Export customers" },
+-  "/dispatch/local": { title: "Local Dispatch", subtitle: "Lorry deliveries · Sri Lanka" },
+-  "/dispatch/global": { title: "Global Dispatch", subtitle: "Export shipments · Maldives & international" },
+-  "/dispatch/global/add": { title: "Dispatch", subtitle: "Create dispatch" },
++  "/customers": { title: "Customers", subtitle: "Export customers" },
++  "/dispatch": { title: "Dispatch", subtitle: "Export shipments · Maldives & international" },
++  "/dispatch/add": { title: "Dispatch", subtitle: "Create dispatch" },
+   "/export-documents": { title: "Export Documents", subtitle: "Shipment document sets" },
+   "/export-documents/add": { title: "Export Documents", subtitle: "Create export document" },
+   "/reports": { title: "Reports & Analytics", subtitle: "Operational reporting" },
+@@ -280,15 +273,10 @@ const pageMeta = {
+ };
+ 
+ const actionButtons = {
+-  "/dispatch/local": [{ label: "+ New Dispatch", eventName: "fw-open-local-dispatch-modal", className: "btn btn-p btn-sm" }],
+-  "/dispatch/global": [{ label: "+ New Shipment", eventName: "fw-open-global-shipment-modal", className: "btn btn-p btn-sm" }],
++  "/dispatch": [{ label: "+ New Shipment", eventName: "fw-open-global-shipment-modal", className: "btn btn-p btn-sm" }],
+   "/export-documents": [{ label: "+ Create Document Set", eventName: "fw-open-export-docs-modal", className: "btn btn-p btn-sm" }],
+ 
+-  "/customers/local": [
+-    { label: "+ Add Customer", eventName: "fw-open-local-customer-modal", className: "btn btn-p btn-sm" },
+-    { label: "Export CSV", eventName: "fw-export-local-customers", className: "btn btn-s btn-sm" },
+-  ],
+-  "/customers/global": [
++  "/customers": [
+     { label: "+ Add Customer", eventName: "fw-open-global-customer-modal", className: "btn btn-p btn-sm" },
+     { label: "Export CSV", eventName: "fw-export-global-customers", className: "btn btn-s btn-sm" },
+   ],
+diff --git a/frontend/src/pages/AddDispatchPage.jsx b/frontend/src/pages/AddDispatchPage.jsx
+deleted file mode 100644
+index 59531ea..0000000
+--- a/frontend/src/pages/AddDispatchPage.jsx
++++ /dev/null
+@@ -1,24 +0,0 @@
+-import { useEffect } from "react";
+-import { useNavigate, useSearchParams } from "react-router-dom";
+-
+-export default function AddDispatchPage() {
+-  const navigate = useNavigate();
+-  const [searchParams] = useSearchParams();
+-
+-  useEffect(() => {
+-    const customer = searchParams.get("customer");
+-    const nextUrl = customer
+-      ? `/dispatch/local?customer=${encodeURIComponent(customer)}`
+-      : "/dispatch/local";
+-
+-    navigate(nextUrl, { replace: true });
+-
+-    const timer = window.setTimeout(() => {
+-      window.dispatchEvent(new CustomEvent("fw-open-local-dispatch-modal"));
+-    }, 80);
+-
+-    return () => window.clearTimeout(timer);
+-  }, [navigate, searchParams]);
+-
+-  return null;
+-}
+\ No newline at end of file
+diff --git a/frontend/src/pages/DispatchDetailsPage.jsx b/frontend/src/pages/DispatchDetailsPage.jsx
+deleted file mode 100644
+index a8509d6..0000000
+--- a/frontend/src/pages/DispatchDetailsPage.jsx
++++ /dev/null
+@@ -1,157 +0,0 @@
+-import { useEffect, useMemo, useState } from "react";
+-import { Link, useParams } from "react-router-dom";
+-import api from "../utils/api";
+-
+-const fmtDate = (value) => {
+-  if (!value) return "—";
+-  const date = new Date(value);
+-  if (Number.isNaN(date.getTime())) return value;
+-  return date.toLocaleDateString("en-CA");
+-};
+-
+-const fmtDateTime = (value) => {
+-  if (!value) return "—";
+-  const date = new Date(value);
+-  if (Number.isNaN(date.getTime())) return value;
+-  return date.toLocaleString();
+-};
+-
+-const DispatchDetailsPage = () => {
+-  const { id } = useParams();
+-  const [dispatchRecord, setDispatchRecord] = useState(null);
+-  const [error, setError] = useState("");
+-
+-  useEffect(() => {
+-    const fetchDetails = async () => {
+-      try {
+-        const res = await api.get(`/dispatch/${id}`);
+-        setDispatchRecord(res.data);
+-      } catch {
+-        setError("Failed to load dispatch details");
+-      }
+-    };
+-
+-    fetchDetails();
+-  }, [id]);
+-
+-  const totalQty = useMemo(() => {
+-    return (dispatchRecord?.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+-  }, [dispatchRecord]);
+-
+-  if (error) {
+-    return (
+-      <div className="ib ib-d">
+-        <span>⚠️</span>
+-        <div>{error}</div>
+-      </div>
+-    );
+-  }
+-
+-  if (!dispatchRecord) {
+-    return (
+-      <div className="ib ib-i">
+-        <span>⏳</span>
+-        <div>Loading dispatch details...</div>
+-      </div>
+-    );
+-  }
+-
+-  return (
+-    <div>
+-      <div className="fb">
+-        <div className="ib ib-s" style={{ marginBottom: 0 }}>
+-          <span>🚚</span>
+-          <div>
+-            Dispatch created successfully. Inventory was deducted from the selected source batches.
+-          </div>
+-        </div>
+-
+-        <Link to={`/dispatch/print/${id}`} className="btn btn-p btn-sm" target="_blank">
+-          🖨 Print
+-        </Link>
+-      </div>
+-
+-      <div className="cc">
+-        <h3>Dispatch Details</h3>
+-        <p>Dispatch header and line breakdown</p>
+-
+-        <div className="fr">
+-          <div>
+-            <div className="sum-r">
+-              <span>Dispatch Number</span>
+-              <span>{dispatchRecord.dispatch_number}</span>
+-            </div>
+-            <div className="sum-r">
+-              <span>Customer</span>
+-              <span>{dispatchRecord.client_name}</span>
+-            </div>
+-            <div className="sum-r">
+-              <span>Dispatch Date</span>
+-              <span>{fmtDate(dispatchRecord.dispatch_date)}</span>
+-            </div>
+-          </div>
+-
+-          <div>
+-            <div className="sum-r">
+-              <span>Created By</span>
+-              <span>{dispatchRecord.created_by_name || "—"}</span>
+-            </div>
+-            <div className="sum-r">
+-              <span>Created At</span>
+-              <span>{fmtDateTime(dispatchRecord.created_at)}</span>
+-            </div>
+-            <div className="sum-r">
+-              <span>Total Quantity</span>
+-              <span>{totalQty.toFixed(2)}</span>
+-            </div>
+-          </div>
+-        </div>
+-
+-        <div style={{ marginTop: 16 }}>
+-          <strong>Remarks:</strong> {dispatchRecord.remarks || "—"}
+-        </div>
+-      </div>
+-
+-      <div className="tw">
+-        <div className="tw-h">
+-          <h3>Dispatch Items</h3>
+-        </div>
+-
+-        <table>
+-          <thead>
+-            <tr>
+-              <th>ID</th>
+-              <th>Item Code</th>
+-              <th>Item Name</th>
+-              <th>Batch</th>
+-              <th>Unit</th>
+-              <th>Quantity</th>
+-            </tr>
+-          </thead>
+-          <tbody>
+-            {dispatchRecord.items?.length > 0 ? (
+-              dispatchRecord.items.map((item) => (
+-                <tr key={item.id}>
+-                  <td>{item.id}</td>
+-                  <td style={{ fontFamily: "monospace", fontSize: 11 }}>{item.item_code}</td>
+-                  <td style={{ fontWeight: 600 }}>{item.item_name}</td>
+-                  <td>{item.batch_code}</td>
+-                  <td>{item.unit}</td>
+-                  <td>{item.quantity}</td>
+-                </tr>
+-              ))
+-            ) : (
+-              <tr>
+-                <td colSpan="6" style={{ textAlign: "center", color: "var(--text3)" }}>
+-                  No items found
+-                </td>
+-              </tr>
+-            )}
+-          </tbody>
+-        </table>
+-      </div>
+-    </div>
+-  );
+-};
+-
+-export default DispatchDetailsPage;
+\ No newline at end of file
+diff --git a/frontend/src/pages/DispatchListPage.jsx b/frontend/src/pages/DispatchListPage.jsx
+deleted file mode 100644
+index 37f10d2..0000000
+--- a/frontend/src/pages/DispatchListPage.jsx
++++ /dev/null
+@@ -1,1095 +0,0 @@
+-import { useCallback, useEffect, useMemo, useState } from "react";
+-import { useNavigate, useSearchParams } from "react-router-dom";
+-import { useToast } from "../context/ToastContext";
+-import api from "../utils/api";
+-
+-
+-const normalizeText = (value) =>
+-  String(value || "")
+-    .replace(/[—–]/g, "-")
+-    .replace(/\s+/g, " ")
+-    .trim()
+-    .toLowerCase();
+-
+-const buildCustomerLabel = (customer) => {
+-  const name = customer.customer_name || customer.customerName || "";
+-  const city = customer.city || "";
+-  return city ? `${name} — ${city}` : name;
+-};
+-
+-const mapApiCustomerOption = (customer) => ({
+-  id: customer.id,
+-  label: buildCustomerLabel(customer),
+-  customerName: customer.customer_name || customer.customerName || "",
+-  city: customer.city || "",
+-  preferredDriver: customer.driver_preference || customer.preferredDriver || "",
+-  deliveryWindow: customer.delivery_window || customer.deliveryWindow || "",
+-});
+-
+-const findCustomerOption = (customerOptions, rawValue) => {
+-  const target = normalizeText(rawValue);
+-  if (!target) return null;
+-
+-  return (
+-    customerOptions.find((customer) => normalizeText(customer.label) === target) ||
+-    customerOptions.find((customer) => normalizeText(customer.customerName) === target) ||
+-    customerOptions.find((customer) =>
+-      normalizeText(`${customer.customerName} - ${customer.city}`) === target
+-    ) ||
+-    null
+-  );
+-};
+-
+-const buildInitialForm = (customerLabel = "", customerOptions = []) => {
+-  const found = findCustomerOption(customerOptions, customerLabel);
+-
+-  return {
+-    customer_id: found?.id ? String(found.id) : "",
+-    client_name: found?.label || customerLabel || "",
+-    dispatch_date: new Date().toISOString().slice(0, 10),
+-    driver_name: found?.preferredDriver || "",
+-    vehicle_number: "",
+-    delivery_window: found?.deliveryWindow || "05:00 – 07:00 AM",
+-    remarks: "",
+-    docs: { ...emptyDocs },
+-  };
+-};
+-
+-const emptyItemRow = {
+-  item_id: "",
+-  batch_id: "",
+-  quantity: "",
+-  packaging: "Cardboard Box",
+-};
+-
+-const emptyDocs = {
+-  delivery_note: true,
+-  local_invoice: false,
+-  goods_dispatch_note: false,
+-};
+-
+-const styles = {
+-  modalShell: {
+-    width: "100%",
+-    maxWidth: "970px",
+-    maxHeight: "86vh",
+-    display: "flex",
+-    flexDirection: "column",
+-    overflow: "hidden",
+-    borderRadius: "16px",
+-  },
+-  modalForm: {
+-    display: "flex",
+-    flexDirection: "column",
+-    flex: 1,
+-    minHeight: 0,
+-  },
+-  modalBody: {
+-    flex: 1,
+-    minHeight: 0,
+-    overflowY: "auto",
+-    paddingBottom: "14px",
+-  },
+-  modalFooter: {
+-    flexShrink: 0,
+-    display: "flex",
+-    justifyContent: "flex-end",
+-    alignItems: "center",
+-    gap: "10px",
+-    padding: "14px 24px 18px",
+-    borderTop: "1px solid var(--border)",
+-    background: "var(--white)",
+-  },
+-  modalCancel: {
+-    height: "38px",
+-    minWidth: "84px",
+-    padding: "0 18px",
+-    borderRadius: "10px",
+-    border: "1.5px solid var(--border)",
+-    background: "#fff",
+-    color: "var(--g700)",
+-    fontFamily: "'Plus Jakarta Sans', sans-serif",
+-    fontSize: "12px",
+-    fontWeight: 700,
+-    lineHeight: 1,
+-    display: "inline-flex",
+-    alignItems: "center",
+-    justifyContent: "center",
+-    whiteSpace: "nowrap",
+-    cursor: "pointer",
+-  },
+-  modalSubmit: {
+-    height: "38px",
+-    minWidth: "200px",
+-    padding: "0 20px",
+-    borderRadius: "10px",
+-    border: "none",
+-    background: "var(--g800)",
+-    color: "#fff",
+-    fontFamily: "'Plus Jakarta Sans', sans-serif",
+-    fontSize: "12px",
+-    fontWeight: 700,
+-    lineHeight: 1,
+-    display: "inline-flex",
+-    alignItems: "center",
+-    justifyContent: "center",
+-    whiteSpace: "nowrap",
+-    cursor: "pointer",
+-  },
+-  panelFooter: {
+-    display: "flex",
+-    alignItems: "center",
+-    gap: "10px",
+-    padding: "14px 18px 16px",
+-    borderTop: "1px solid var(--border)",
+-    background: "var(--white)",
+-  },
+-  panelMainGreen: {
+-    flex: "1 1 auto",
+-    height: "38px",
+-    padding: "0 18px",
+-    borderRadius: "11px",
+-    border: "none",
+-    background: "var(--g600)",
+-    color: "#fff",
+-    fontFamily: "'Plus Jakarta Sans', sans-serif",
+-    fontSize: "12px",
+-    fontWeight: 700,
+-    lineHeight: 1,
+-    display: "inline-flex",
+-    alignItems: "center",
+-    justifyContent: "center",
+-    whiteSpace: "nowrap",
+-    cursor: "pointer",
+-  },
+-  panelMainOutline: {
+-    flex: "1 1 auto",
+-    height: "38px",
+-    padding: "0 18px",
+-    borderRadius: "11px",
+-    border: "1.5px solid var(--border)",
+-    background: "#fff",
+-    color: "var(--g700)",
+-    fontFamily: "'Plus Jakarta Sans', sans-serif",
+-    fontSize: "12px",
+-    fontWeight: 700,
+-    lineHeight: 1,
+-    display: "inline-flex",
+-    alignItems: "center",
+-    justifyContent: "center",
+-    whiteSpace: "nowrap",
+-    cursor: "pointer",
+-  },
+-  panelSide: {
+-    flex: "0 0 auto",
+-    minWidth: "108px",
+-    height: "38px",
+-    padding: "0 16px",
+-    borderRadius: "11px",
+-    border: "1.5px solid var(--border)",
+-    background: "#fff",
+-    color: "var(--g700)",
+-    fontFamily: "'Plus Jakarta Sans', sans-serif",
+-    fontSize: "12px",
+-    fontWeight: 700,
+-    lineHeight: 1,
+-    display: "inline-flex",
+-    alignItems: "center",
+-    justifyContent: "center",
+-    whiteSpace: "nowrap",
+-    cursor: "pointer",
+-  },
+-};
+-
+-const formatDate = (value) => {
+-  if (!value) return "—";
+-  return String(value).slice(0, 10);
+-};
+-
+-const getWindowStart = (value) => {
+-  if (!value) return "—";
+-  if (value.includes("–")) return value.split("–")[0].trim();
+-  if (value.includes("-")) return value.split("-")[0].trim();
+-  return value;
+-};
+-
+-const normalizeStatus = (value) => {
+-  const v = String(value || "").toLowerCase();
+-  if (v === "delivered") return "Delivered";
+-  if (v === "out_for_delivery") return "Out for Delivery";
+-  return "Scheduled";
+-};
+-
+-const badgeClass = (value) => {
+-  const v = String(value || "").toLowerCase();
+-  if (v === "delivered") return "badge bg-g";
+-  if (v === "out_for_delivery") return "badge bg-a";
+-  return "badge bg-b";
+-};
+-
+-const getDaysLeft = (expiryDate) => {
+-  if (!expiryDate) return null;
+-  const today = new Date();
+-  const expiry = new Date(expiryDate);
+-  today.setHours(0, 0, 0, 0);
+-  expiry.setHours(0, 0, 0, 0);
+-  return Math.round((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+-};
+-
+-const renderFefoBadge = (expiryDate) => {
+-  const daysLeft = getDaysLeft(expiryDate);
+-  if (daysLeft === null) return <span className="badge bg-g">OK</span>;
+-  if (daysLeft <= 2) return <span className="badge bg-r">Exp {daysLeft}d</span>;
+-  if (daysLeft <= 7) return <span className="badge bg-a">Exp {daysLeft}d</span>;
+-  return <span className="badge bg-g">OK</span>;
+-};
+-
+-const batchOptionLabel = (batch) => {
+-  const batchCode = batch.batch_code || batch.batch_number || "—";
+-  const qty =
+-    batch.qty_remaining ??
+-    batch.available_quantity ??
+-    batch.available_qty ??
+-    batch.received_quantity ??
+-    0;
+-
+-  const daysLeft = getDaysLeft(batch.expiry_date);
+-
+-  if (daysLeft !== null && daysLeft <= 2) {
+-    return `${batchCode} (${qty}kg, exp ${daysLeft}d ⚠️)`;
+-  }
+-
+-  if (daysLeft !== null) {
+-    return `${batchCode} (${qty}kg, exp ${daysLeft}d)`;
+-  }
+-
+-  return `${batchCode} (${qty}kg)`;
+-};
+-
+-export default function DispatchListPage() {
+-  const navigate = useNavigate();
+-  const [searchParams] = useSearchParams();
+-  const toast = useToast();
+-
+-  const [rows, setRows] = useState([]);
+-  const [loading, setLoading] = useState(true);
+-  const [tab, setTab] = useState("All");
+-
+-  const [showModal, setShowModal] = useState(false);
+-  const [saving, setSaving] = useState(false);
+-
+-  const [inventory, setInventory] = useState([]);
+-  const [batchOptions, setBatchOptions] = useState({});
+-  const [localCustomers, setLocalCustomers] = useState([]);
+-  const [form, setForm] = useState(buildInitialForm(""));
+-  const [itemRows, setItemRows] = useState([{ ...emptyItemRow }]);
+-
+-  const [showDetailsPanel, setShowDetailsPanel] = useState(false);
+-  const [selectedRowId, setSelectedRowId] = useState(null);
+-  const [selectedDispatch, setSelectedDispatch] = useState(null);
+-  const [panelLoading, setPanelLoading] = useState(false);
+-
+-  const loadDispatches = useCallback(async () => {
+-    try {
+-      setLoading(true);
+-      const res = await api.get("/dispatch");
+-      setRows(Array.isArray(res.data) ? res.data : []);
+-    } catch (err) {
+-      console.error(err);
+-      toast.error("Failed to load local dispatch records");
+-      setRows([]);
+-    } finally {
+-      setLoading(false);
+-    }
+-  }, [toast]);
+-
+-  const loadInventory = useCallback(async () => {
+-    try {
+-      const res = await api.get("/inventory");
+-      const availableItems = (Array.isArray(res.data) ? res.data : []).filter(
+-        (item) => Number(item.qty_available || item.total_available_quantity || 0) > 0
+-      );
+-      setInventory(availableItems);
+-    } catch (err) {
+-      console.error(err);
+-      toast.error("Failed to load inventory");
+-    }
+-  }, [toast]);
+-const loadLocalCustomers = useCallback(async () => {
+-  try {
+-    const res = await api.get("/customers?type=local");
+-    const customerRows = Array.isArray(res.data) ? res.data.map(mapApiCustomerOption) : [];
+-    setLocalCustomers(customerRows);
+-  } catch (err) {
+-    console.error(err);
+-    toast.error("Failed to load local customers");
+-    setLocalCustomers([]);
+-  }
+-}, [toast]);
+-
+-
+-  useEffect(() => {
+-    loadDispatches();
+-    loadInventory();
+-    loadLocalCustomers();
+-  }, [loadDispatches, loadInventory, loadLocalCustomers]);
+-
+-  useEffect(() => {
+-    const openModalFromTopbar = () => {
+-      const customerFromQuery = searchParams.get("customer") || "";
+-      setForm(buildInitialForm(customerFromQuery, localCustomers));
+-      setItemRows([{ ...emptyItemRow }]);
+-      setBatchOptions({});
+-      setShowModal(true);
+-    };
+-
+-    window.addEventListener("fw-open-local-dispatch-modal", openModalFromTopbar);
+-    return () =>
+-      window.removeEventListener("fw-open-local-dispatch-modal", openModalFromTopbar);
+-  }, [localCustomers, searchParams]);
+-
+-  useEffect(() => {
+-    const onKeyDown = (e) => {
+-      if (e.key === "Escape") {
+-        setShowModal(false);
+-        setShowDetailsPanel(false);
+-      }
+-    };
+-
+-    window.addEventListener("keydown", onKeyDown);
+-    return () => window.removeEventListener("keydown", onKeyDown);
+-  }, []);
+-useEffect(() => {
+-  const customerFromQuery = searchParams.get("customer") || "";
+-  if (!customerFromQuery || !localCustomers.length) return;
+-
+-  const found = findCustomerOption(localCustomers, customerFromQuery);
+-  if (!found) return;
+-
+-  setForm((prev) => ({
+-    ...prev,
+-    customer_id: String(found.id),
+-    client_name: found.label,
+-    driver_name: prev.driver_name || found.preferredDriver || "",
+-    delivery_window: prev.delivery_window || found.deliveryWindow || "05:00 – 07:00 AM",
+-  }));
+-}, [localCustomers, searchParams]);
+-
+-
+-  const todayString = useMemo(() => new Date().toISOString().slice(0, 10), []);
+-
+-  const todayCount = useMemo(
+-    () => rows.filter((row) => formatDate(row.dispatch_date) === todayString).length,
+-    [rows, todayString]
+-  );
+-
+-  const scheduledCount = useMemo(
+-    () => rows.filter((row) => String(row.status || "").toLowerCase() === "scheduled").length,
+-    [rows]
+-  );
+-
+-  const deliveredCount = useMemo(
+-    () => rows.filter((row) => String(row.status || "").toLowerCase() === "delivered").length,
+-    [rows]
+-  );
+-
+-  const filteredRows = useMemo(() => {
+-    let list = rows;
+-
+-    if (tab === "Today") {
+-      list = rows.filter((row) => formatDate(row.dispatch_date) === todayString);
+-    } else if (tab === "Scheduled") {
+-      list = rows.filter((row) => String(row.status || "").toLowerCase() === "scheduled");
+-    } else if (tab === "Delivered") {
+-      list = rows.filter((row) => String(row.status || "").toLowerCase() === "delivered");
+-    }
+-
+-    return [...list].sort((a, b) => {
+-      const dateA = new Date(a.dispatch_date || 0).getTime();
+-      const dateB = new Date(b.dispatch_date || 0).getTime();
+-
+-      if (dateB !== dateA) return dateB - dateA;
+-
+-      return String(b.dispatch_number || "").localeCompare(
+-        String(a.dispatch_number || ""),
+-        undefined,
+-        { numeric: true, sensitivity: "base" }
+-      );
+-    });
+-  }, [rows, tab, todayString]);
+-  
+-  const totalDraftWeight = useMemo(
+-    () => itemRows.reduce((sum, row) => sum + Number(row.quantity || 0), 0),
+-    [itemRows]
+-  );
+-
+-  const openDetails = async (dispatchId) => {
+-    try {
+-      setSelectedRowId(dispatchId);
+-      setShowDetailsPanel(true);
+-      setPanelLoading(true);
+-      const res = await api.get(`/dispatch/${dispatchId}`);
+-      setSelectedDispatch(res.data || null);
+-    } catch (err) {
+-      console.error(err);
+-      toast.error("Failed to load dispatch details");
+-      setSelectedDispatch(null);
+-      setShowDetailsPanel(false);
+-      setSelectedRowId(null);
+-    } finally {
+-      setPanelLoading(false);
+-    }
+-  };
+-
+-  const closeDetails = () => {
+-    setShowDetailsPanel(false);
+-    setSelectedRowId(null);
+-    setSelectedDispatch(null);
+-  };
+-
+-  const closeModal = () => {
+-    setShowModal(false);
+-    setForm(buildInitialForm(searchParams.get("customer") || "", localCustomers));
+-    setItemRows([{ ...emptyItemRow }]);
+-    setBatchOptions({});
+-  };
+-
+-  const handleFormChange = (e) => {
+-    const { name, value } = e.target;
+-
+-    if (name === "customer_id") {
+-      const found = localCustomers.find((customer) => String(customer.id) === String(value));
+-
+-      setForm((prev) => ({
+-        ...prev,
+-        customer_id: value,
+-        client_name: found?.label || "",
+-        driver_name: found?.preferredDriver || prev.driver_name,
+-        delivery_window: found?.deliveryWindow || prev.delivery_window,
+-      }));
+-      return;
+-    }
+-
+-    setForm((prev) => ({ ...prev, [name]: value }));
+-  };
+-
+-  const toggleDocument = (name) => {
+-    setForm((prev) => ({
+-      ...prev,
+-      docs: { ...prev.docs, [name]: !prev.docs[name] },
+-    }));
+-  };
+-
+-  const loadBatchesForItem = async (itemId) => {
+-    try {
+-      const res = await api.get(`/inventory/batches/${itemId}`);
+-      return Array.isArray(res.data) ? res.data : [];
+-    } catch (err) {
+-      console.error(err);
+-      toast.error("Failed to load FEFO batches");
+-      return [];
+-    }
+-  };
+-
+-  const handleItemChange = async (index, field, value) => {
+-    const updatedRows = [...itemRows];
+-    updatedRows[index][field] = value;
+-
+-    if (field === "item_id") {
+-      updatedRows[index].batch_id = "";
+-      setItemRows(updatedRows);
+-
+-      if (!value) {
+-        setBatchOptions((prev) => ({ ...prev, [index]: [] }));
+-        return;
+-      }
+-
+-      const batches = await loadBatchesForItem(value);
+-      setBatchOptions((prev) => ({ ...prev, [index]: batches }));
+-
+-      if (batches.length > 0) {
+-        updatedRows[index].batch_id = String(batches[0].id);
+-      }
+-
+-      setItemRows([...updatedRows]);
+-      return;
+-    }
+-
+-    setItemRows(updatedRows);
+-  };
+-
+-  const addItemRow = () => setItemRows((prev) => [...prev, { ...emptyItemRow }]);
+-
+-  const removeItemRow = (index) => {
+-    setItemRows((prev) => (prev.length === 1 ? prev : prev.filter((_, i) => i !== index)));
+-  };
+-
+-  const handleCreateDispatch = async (e) => {
+-    e.preventDefault();
+-
+-    const cleanItems = itemRows
+-      .map((row) => ({
+-        item_id: Number(row.item_id),
+-        batch_id: Number(row.batch_id),
+-        quantity: Number(row.quantity || 0),
+-      }))
+-      .filter((row) => row.item_id && row.batch_id && row.quantity > 0);
+-
+-    if (!form.client_name || !form.dispatch_date || cleanItems.length === 0) {
+-      toast.error("Customer, dispatch date, and at least one item are required");
+-      return;
+-    }
+-
+-    try {
+-      setSaving(true);
+-
+-      const res = await api.post("/dispatch", {
+-        customer_id: form.customer_id ? Number(form.customer_id) : null,
+-        client_name: form.client_name,
+-        dispatch_date: form.dispatch_date,
+-        driver_name: form.driver_name,
+-        vehicle_number: form.vehicle_number,
+-        delivery_window: form.delivery_window,
+-        remarks: form.remarks,
+-        items: cleanItems,
+-      });
+-
+-      const dispatchId = res?.data?.dispatchId;
+-      const dispatchNumber = res?.data?.dispatchNumber || "Dispatch";
+-
+-      toast.success(`${dispatchNumber} created successfully`);
+-      closeModal();
+-      await loadDispatches();
+-
+-      if (dispatchId) {
+-        await openDetails(dispatchId);
+-      }
+-    } catch (err) {
+-      console.error(err);
+-      toast.error(err?.response?.data?.message || "Failed to create dispatch");
+-    } finally {
+-      setSaving(false);
+-    }
+-  };
+-
+-  const markDelivered = async (dispatchId, e) => {
+-    if (e) e.stopPropagation();
+-
+-    try {
+-      await api.put(`/dispatch/${dispatchId}/delivered`);
+-      toast.success("Dispatch marked Delivered. Stock deducted.");
+-      await loadDispatches();
+-
+-      if (selectedDispatch?.id === dispatchId) {
+-        await openDetails(dispatchId);
+-      }
+-    } catch (err) {
+-      console.error(err);
+-      toast.error(err?.response?.data?.message || "Failed to mark delivered");
+-    }
+-  };
+-
+-  const printDispatch = (dispatchId, e) => {
+-    if (e) e.stopPropagation();
+-    window.open(`/dispatch/print/${dispatchId}`, "_blank");
+-  };
+-
+-  return (
+-    <>
+-      <div className="ib ib-s">
+-        <span>📦</span>
+-        <div>
+-          Stock deducted automatically when marked Delivered. <strong>Click any row</strong> to
+-          view items dispatched, driver details and actions.
+-        </div>
+-      </div>
+-
+-      <div className="fb" style={{ marginTop: 16 }}>
+-        <button className={`ft ${tab === "All" ? "on" : ""}`} onClick={() => setTab("All")}>
+-          All
+-        </button>
+-        <button className={`ft ${tab === "Today" ? "on" : ""}`} onClick={() => setTab("Today")}>
+-          Today ({todayCount})
+-        </button>
+-        <button className={`ft ${tab === "Scheduled" ? "on" : ""}`} onClick={() => setTab("Scheduled")}>
+-          Scheduled ({scheduledCount})
+-        </button>
+-        <button className={`ft ${tab === "Delivered" ? "on" : ""}`} onClick={() => setTab("Delivered")}>
+-          Delivered ({deliveredCount})
+-        </button>
+-      </div>
+-
+-      <div className="tw dispatch-local-tw">
+-        <div className="tw-h">
+-          <h3>Local Dispatch Records</h3>
+-        </div>
+-
+-        <table>
+-          <thead>
+-            <tr>
+-              <th>DISPATCH NO.</th>
+-              <th>CUSTOMER</th>
+-              <th>DATE</th>
+-              <th>TIME</th>
+-              <th>DRIVER</th>
+-              <th>ITEMS</th>
+-              <th>WEIGHT</th>
+-              <th>STATUS</th>
+-              <th>ACTION</th>
+-            </tr>
+-          </thead>
+-
+-          <tbody>
+-            {loading ? (
+-              <tr>
+-                <td colSpan="9">Loading...</td>
+-              </tr>
+-            ) : filteredRows.length ? (
+-              filteredRows.map((row) => (
+-                <tr
+-                  key={row.id}
+-                  onClick={() => openDetails(row.id)}
+-                  className={selectedRowId === row.id ? "details-row-active" : ""}
+-                  style={{ cursor: "pointer" }}
+-                >
+-                  <td className="ld-dispatch-no">{row.dispatch_number}</td>
+-                  <td className="ld-customer">{row.client_name}</td>
+-                  <td className="ld-date">{formatDate(row.dispatch_date)}</td>
+-                  <td className="ld-time">{getWindowStart(row.delivery_window)}</td>
+-                  <td className="ld-driver">{row.driver_name || "—"}</td>
+-                  <td>
+-                    <span className="badge bg-x">{row.item_count || 0}</span>
+-                  </td>
+-                  <td className="ld-weight">{Number(row.total_weight || 0)} kg</td>
+-                  <td>
+-                    <span className={badgeClass(row.status)}>{normalizeStatus(row.status)}</span>
+-                  </td>
+-                  <td onClick={(e) => e.stopPropagation()}>
+-                    {String(row.status || "").toLowerCase() === "scheduled" ? (
+-                      <button
+-                        type="button"
+-                        className="btn btn-p btn-xs"
+-                        style={{ background: "var(--s)", border: "none" }}
+-                        onClick={(e) => markDelivered(row.id, e)}
+-                      >
+-                        ✅ Delivered
+-                      </button>
+-                    ) : (
+-                      <button
+-                        type="button"
+-                        className="ab"
+-                        title="Print DN"
+-                        onClick={(e) => printDispatch(row.id, e)}
+-                      >
+-                        🖨️
+-                      </button>
+-                    )}
+-                  </td>
+-                </tr>
+-              ))
+-            ) : (
+-              <tr>
+-                <td colSpan="9">No local dispatch records found</td>
+-              </tr>
+-            )}
+-          </tbody>
+-        </table>
+-      </div>
+-
+-      {showDetailsPanel && (
+-        <>
+-          <div className="details-panel-overlay" onClick={closeDetails}></div>
+-
+-          <aside className="details-panel open">
+-            <div className="details-panel-header">
+-              <div className="details-panel-icon">🚚</div>
+-
+-              <div className="details-panel-head-text">
+-                <h3>{selectedDispatch?.dispatch_number || "Local Dispatch"}</h3>
+-                <p>
+-                  {selectedDispatch
+-                    ? `${selectedDispatch.client_name} · ${formatDate(
+-                        selectedDispatch.dispatch_date
+-                      )} · ${getWindowStart(selectedDispatch.delivery_window)}`
+-                    : "Loading..."}
+-                </p>
+-              </div>
+-
+-              <button type="button" className="details-panel-close" onClick={closeDetails}>
+-                ✕
+-              </button>
+-            </div>
+-
+-            <div className="details-panel-body">
+-              {panelLoading || !selectedDispatch ? (
+-                <div className="ib ib-i">
+-                  <span>⏳</span>
+-                  <div>Loading dispatch details...</div>
+-                </div>
+-              ) : (
+-                <>
+-                  <div className="details-panel-grid">
+-                    <div className="details-stat-card">
+-                      <label>DISPATCH NO.</label>
+-                      <span className="ld-panel-dispatch-no">{selectedDispatch.dispatch_number}</span>
+-                    </div>
+-
+-                    <div className="details-stat-card">
+-                      <label>STATUS</label>
+-                      <span className="ld-panel-status-text">• {normalizeStatus(selectedDispatch.status)}</span>
+-                    </div>
+-
+-                    <div className="details-stat-card">
+-                      <label>CUSTOMER</label>
+-                      <span className="ld-panel-customer">{selectedDispatch.client_name}</span>
+-                    </div>
+-
+-                    <div className="details-stat-card">
+-                      <label>DATE</label>
+-                      <span>{formatDate(selectedDispatch.dispatch_date)}</span>
+-                    </div>
+-
+-                    <div className="details-stat-card">
+-                      <label>DEPARTURE TIME</label>
+-                      <span>{getWindowStart(selectedDispatch.delivery_window)}</span>
+-                    </div>
+-
+-                    <div className="details-stat-card">
+-                      <label>DRIVER</label>
+-                      <span>{selectedDispatch.driver_name || "—"}</span>
+-                    </div>
+-
+-                    <div className="details-stat-card">
+-                      <label>ITEM COUNT</label>
+-                      <span className="ld-panel-strong">{selectedDispatch.item_count || 0}</span>
+-                    </div>
+-
+-                    <div className="details-stat-card">
+-                      <label>TOTAL WEIGHT</label>
+-                      <span className="ld-panel-strong">{Number(selectedDispatch.total_weight || 0)} kg</span>
+-                    </div>
+-                  </div>
+-
+-                  <div className="fst ld-panel-section-title" style={{ marginTop: 18 }}>
+-                    Items Dispatched
+-                  </div>
+-
+-                  <table className="it ld-panel-mini-table">
+-                    <thead>
+-                      <tr>
+-                        <th>ITEM</th>
+-                        <th>BATCH</th>
+-                        <th>QTY</th>
+-                        <th>FEFO</th>
+-                      </tr>
+-                    </thead>
+-                    <tbody>
+-                      {(selectedDispatch.items || []).map((item) => (
+-                        <tr key={item.id}>
+-                          <td className="ld-panel-item-name">{item.item_name}</td>
+-                          <td className="ld-panel-batch">{item.batch_code || "—"}</td>
+-                          <td>
+-                            {item.quantity} {item.unit || ""}
+-                          </td>
+-                          <td>{renderFefoBadge(item.expiry_date)}</td>
+-                        </tr>
+-                      ))}
+-                    </tbody>
+-                  </table>
+-                </>
+-              )}
+-            </div>
+-
+-            <div style={styles.panelFooter}>
+-              {selectedDispatch &&
+-              String(selectedDispatch.status || "").toLowerCase() === "scheduled" ? (
+-                <>
+-                  <button
+-                    type="button"
+-                    style={styles.panelMainGreen}
+-                    onClick={() => markDelivered(selectedDispatch.id)}
+-                  >
+-                    ✅ Mark Delivered
+-                  </button>
+-
+-                  <button
+-                    type="button"
+-                    style={styles.panelSide}
+-                    onClick={() => printDispatch(selectedDispatch.id)}
+-                  >
+-                    🖨️ Print DN
+-                  </button>
+-                </>
+-              ) : (
+-                <>
+-                  <button
+-                    type="button"
+-                    style={styles.panelMainGreen}
+-                    onClick={() => {
+-                      if (selectedDispatch?.id) {
+-                        markDelivered(selectedDispatch.id);
+-                      }
+-                    }}
+-                  >
+-                    ✅ Mark Delivered
+-                  </button>
+-
+-                  <button
+-                    type="button"
+-                    style={styles.panelSide}
+-                    onClick={() => {
+-                      if (selectedDispatch?.id) {
+-                        printDispatch(selectedDispatch.id);
+-                      }
+-                    }}
+-                  >
+-                    🖨️ Print DN
+-                  </button>
+-                </>
+-              )}
+-            </div>
+-          </aside>
+-        </>
+-      )}
+-
+-      {showModal && (
+-        <div className="modal-backdrop" onClick={closeModal}>
+-          <div
+-            className="md md-lg local-dispatch-modal-shell"
+-            style={styles.modalShell}
+-            onClick={(e) => e.stopPropagation()}
+-          >
+-            <div className="md-h">
+-              <h3>🚚 New Local Dispatch</h3>
+-              <button type="button" className="md-x" onClick={closeModal}>
+-                ✕
+-              </button>
+-            </div>
+-
+-            <form onSubmit={handleCreateDispatch} style={styles.modalForm}>
+-              <div className="md-b local-dispatch-modal-body" style={styles.modalBody}>
+-                <div className="ib ib-s">
+-                  <span>📍</span>
+-                  <div>
+-                    Stock deducted when marked Delivered. FEFO batch applied. Delivery Note
+-                    auto-generated. Returns possible.
+-                  </div>
+-                </div>
+-
+-                <div className="fr">
+-                  <div className="ff">
+-                    <label className="fl">
+-                      Customer <span className="rq">*</span>
+-                    </label>
+-                    <select
+-                      className="fc"
+-                      name="customer_id"
+-                      value={form.customer_id}
+-                      onChange={handleFormChange}
+-                    >
+-                      <option value="">Select customer</option>
+-                      {localCustomers.map((customer) => (
+-                        <option key={customer.id} value={customer.id}>
+-                          {customer.label}
+-                        </option>
+-                      ))}
+-                    </select>
+-                  </div>
+-
+-                  <div className="ff">
+-                    <label className="fl">
+-                      Dispatch Date <span className="rq">*</span>
+-                    </label>
+-                    <input
+-                      className="fc"
+-                      type="date"
+-                      name="dispatch_date"
+-                      value={form.dispatch_date}
+-                      onChange={handleFormChange}
+-                    />
+-                  </div>
+-                </div>
+-
+-                <div className="fr3">
+-                  <div className="ff">
+-                    <label className="fl">Driver</label>
+-                    <input
+-                      className="fc"
+-                      name="driver_name"
+-                      value={form.driver_name}
+-                      onChange={handleFormChange}
+-                      placeholder="e.g. Nuwan"
+-                    />
+-                  </div>
+-
+-                  <div className="ff">
+-                    <label className="fl">Vehicle No.</label>
+-                    <input
+-                      className="fc"
+-                      name="vehicle_number"
+-                      value={form.vehicle_number}
+-                      onChange={handleFormChange}
+-                      placeholder="WP CAS-XXXX"
+-                    />
+-                  </div>
+-
+-                  <div className="ff">
+-                    <label className="fl">Delivery Window</label>
+-                    <input
+-                      className="fc"
+-                      name="delivery_window"
+-                      value={form.delivery_window}
+-                      onChange={handleFormChange}
+-                      placeholder="05:00 – 07:00 AM"
+-                    />
+-                  </div>
+-                </div>
+-
+-                <div className="fs2">
+-                  <div className="fst">Items — FEFO Auto-Selected</div>
+-
+-                  <table className="it">
+-                    <thead>
+-                      <tr>
+-                        <th>ITEM</th>
+-                        <th>BATCH (FEFO)</th>
+-                        <th>QTY</th>
+-                        <th>PACKAGING</th>
+-                        <th></th>
+-                      </tr>
+-                    </thead>
+-                    <tbody>
+-                      {itemRows.map((row, index) => (
+-                        <tr key={index}>
+-                          <td>
+-                            <select
+-                              value={row.item_id}
+-                              onChange={(e) => handleItemChange(index, "item_id", e.target.value)}
+-                            >
+-                              <option value="">Select item</option>
+-                              {inventory.map((item) => (
+-                                <option key={item.item_id || item.id} value={item.item_id || item.id}>
+-                                  {item.item_name || item.name}
+-                                </option>
+-                              ))}
+-                            </select>
+-                          </td>
+-
+-                          <td>
+-                            <select
+-                              value={row.batch_id}
+-                              onChange={(e) => handleItemChange(index, "batch_id", e.target.value)}
+-                            >
+-                              <option value="">Select batch</option>
+-                              {(batchOptions[index] || []).map((batch) => (
+-                                <option key={batch.id} value={batch.id}>
+-                                  {batchOptionLabel(batch)}
+-                                </option>
+-                              ))}
+-                            </select>
+-                          </td>
+-
+-                          <td>
+-                            <input
+-                              type="number"
+-                              min="0"
+-                              step="0.01"
+-                              value={row.quantity}
+-                              onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
+-                            />
+-                          </td>
+-
+-                          <td>
+-                            <select
+-                              value={row.packaging}
+-                              onChange={(e) => handleItemChange(index, "packaging", e.target.value)}
+-                            >
+-                              <option value="Cardboard Box">Cardboard Box</option>
+-                              <option value="Crate">Crate</option>
+-                              <option value="Thermocol Box">Thermocol Box</option>
+-                            </select>
+-                          </td>
+-
+-                          <td>
+-                            <button type="button" className="ab d" onClick={() => removeItemRow(index)}>
+-                              ✕
+-                            </button>
+-                          </td>
+-                        </tr>
+-                      ))}
+-                    </tbody>
+-                  </table>
+-
+-                  <button type="button" className="add-r" onClick={addItemRow}>
+-                    ＋ Add Item
+-                  </button>
+-                </div>
+-
+-                <div className="ff local-dispatch-docs-block">
+-                  <label className="fl">Documents to Generate</label>
+-
+-                  <ul className="ck-l">
+-                    <li>
+-                      <input
+-                        type="checkbox"
+-                        checked={form.docs.delivery_note}
+-                        onChange={() => toggleDocument("delivery_note")}
+-                      />
+-                      <span>Delivery Note (DN)</span>
+-                    </li>
+-
+-                    <li>
+-                      <input
+-                        type="checkbox"
+-                        checked={form.docs.local_invoice}
+-                        onChange={() => toggleDocument("local_invoice")}
+-                      />
+-                      <span>Local Invoice</span>
+-                    </li>
+-
+-                    <li>
+-                      <input
+-                        type="checkbox"
+-                        checked={form.docs.goods_dispatch_note}
+-                        onChange={() => toggleDocument("goods_dispatch_note")}
+-                      />
+-                      <span>Goods Dispatch Note</span>
+-                    </li>
+-                  </ul>
+-                </div>
+-
+-                <div className="ff">
+-                  <label className="fl">Remarks</label>
+-                  <textarea
+-                    className="fc"
+-                    name="remarks"
+-                    value={form.remarks}
+-                    onChange={handleFormChange}
+-                    placeholder="Delivery notes..."
+-                  />
+-                </div>
+-
+-                <div className="ib ib-i local-dispatch-draft-weight">
+-                  <span>🚚</span>
+-                  <div>
+-                    Draft total weight: <strong>{totalDraftWeight.toFixed(2)} kg</strong>
+-                  </div>
+-                </div>
+-              </div>
+-
+-              <div style={styles.modalFooter}>
+-                <button type="button" style={styles.modalCancel} onClick={closeModal}>
+-                  Cancel
+-                </button>
+-
+-                <button type="submit" style={styles.modalSubmit} disabled={saving}>
+-                  {saving ? "Saving..." : "Create Dispatch + Print DN"}
+-                </button>
+-              </div>
+-            </form>
+-          </div>
+-        </div>
+-      )}
+-    </>
+-  );
+-}
+\ No newline at end of file
+diff --git a/frontend/src/pages/DispatchPrintPage.jsx b/frontend/src/pages/DispatchPrintPage.jsx
+deleted file mode 100644
+index c48cd03..0000000
+--- a/frontend/src/pages/DispatchPrintPage.jsx
++++ /dev/null
+@@ -1,122 +0,0 @@
+-import { useEffect, useMemo, useState } from "react";
+-import { useParams } from "react-router-dom";
+-import api from "../utils/api";
+-
+-const formatDate = (value) => {
+-  if (!value) return "—";
+-  return String(value).slice(0, 10);
+-};
+-
+-const getWindowStart = (value) => {
+-  if (!value) return "—";
+-  if (value.includes("–")) return value.split("–")[0].trim();
+-  if (value.includes("-")) return value.split("-")[0].trim();
+-  return value;
+-};
+-
+-export default function DispatchPrintPage() {
+-  const { id } = useParams();
+-  const [dispatchRecord, setDispatchRecord] = useState(null);
+-  const [error, setError] = useState("");
+-
+-  useEffect(() => {
+-    const loadDispatch = async () => {
+-      try {
+-        const res = await api.get(`/dispatch/${id}`);
+-        setDispatchRecord(res.data);
+-      } catch (err) {
+-        console.error(err);
+-        setError("Failed to load dispatch details");
+-      }
+-    };
+-
+-    loadDispatch();
+-  }, [id]);
+-
+-  useEffect(() => {
+-    if (dispatchRecord) {
+-      const timer = window.setTimeout(() => window.print(), 500);
+-      return () => window.clearTimeout(timer);
+-    }
+-  }, [dispatchRecord]);
+-
+-  const totalWeight = useMemo(() => {
+-    return (dispatchRecord?.items || []).reduce(
+-      (sum, row) => sum + Number(row.quantity || 0),
+-      0
+-    );
+-  }, [dispatchRecord]);
+-
+-  if (error) return <div className="print-page">{error}</div>;
+-  if (!dispatchRecord) return <div className="print-page">Loading...</div>;
+-
+-  return (
+-    <div className="print-page">
+-      <div className="print-header">
+-        <h1>Fresh World Exporters</h1>
+-        <h2>Delivery Note (DN)</h2>
+-      </div>
+-
+-      <div className="print-section">
+-        <p><strong>Dispatch Number:</strong> {dispatchRecord.dispatch_number}</p>
+-        <p><strong>Delivery Note:</strong> {dispatchRecord.delivery_note_number || "-"}</p>
+-        <p><strong>Customer:</strong> {dispatchRecord.client_name}</p>
+-        <p><strong>Dispatch Date:</strong> {formatDate(dispatchRecord.dispatch_date)}</p>
+-        <p><strong>Departure Time:</strong> {getWindowStart(dispatchRecord.delivery_window)}</p>
+-        <p><strong>Driver:</strong> {dispatchRecord.driver_name || "-"}</p>
+-        <p><strong>Vehicle:</strong> {dispatchRecord.vehicle_number || "-"}</p>
+-        <p><strong>Status:</strong> {dispatchRecord.status || "-"}</p>
+-        <p><strong>Remarks:</strong> {dispatchRecord.remarks || "-"}</p>
+-      </div>
+-
+-      <div className="print-section">
+-        <h3>Items</h3>
+-        <table className="print-table">
+-          <thead>
+-            <tr>
+-              <th>#</th>
+-              <th>Item Code</th>
+-              <th>Item Name</th>
+-              <th>Batch</th>
+-              <th>Unit</th>
+-              <th>Quantity</th>
+-            </tr>
+-          </thead>
+-          <tbody>
+-            {(dispatchRecord.items || []).length ? (
+-              dispatchRecord.items.map((item, index) => (
+-                <tr key={item.id}>
+-                  <td>{index + 1}</td>
+-                  <td>{item.item_code}</td>
+-                  <td>{item.item_name}</td>
+-                  <td>{item.batch_code || "-"}</td>
+-                  <td>{item.unit || "-"}</td>
+-                  <td>{item.quantity}</td>
+-                </tr>
+-              ))
+-            ) : (
+-              <tr>
+-                <td colSpan="6">No items found</td>
+-              </tr>
+-            )}
+-          </tbody>
+-        </table>
+-      </div>
+-
+-      <div className="print-section">
+-        <p><strong>Total Weight:</strong> {totalWeight.toFixed(2)} kg</p>
+-      </div>
+-
+-      <div className="print-footer">
+-        <div>
+-          <p>Prepared By</p>
+-          <div className="signature-line"></div>
+-        </div>
+-        <div>
+-          <p>Received By</p>
+-          <div className="signature-line"></div>
+-        </div>
+-      </div>
+-    </div>
+-  );
+-}
+\ No newline at end of file
+diff --git a/frontend/src/pages/GlobalCustomersPage.jsx b/frontend/src/pages/GlobalCustomersPage.jsx
+index 1b419ba..b975c6e 100644
+--- a/frontend/src/pages/GlobalCustomersPage.jsx
++++ b/frontend/src/pages/GlobalCustomersPage.jsx
+@@ -179,7 +179,7 @@ export default function GlobalCustomersPage() {
+ 
+   const loadCustomers = async (preferredId = null) => {
+     try {
+-      const res = await api.get("/customers?type=global");
++      const res = await api.get("/customers");
+       const rows = Array.isArray(res.data) ? res.data.map(mapApiCustomerToUi) : [];
+ 
+       setCustomers(rows);
+@@ -267,10 +267,10 @@ export default function GlobalCustomersPage() {
+       const url = URL.createObjectURL(blob);
+       const link = document.createElement("a");
+       link.href = url;
+-      link.download = "global-customers.csv";
++      link.download = "customers.csv";
+       link.click();
+       URL.revokeObjectURL(url);
+-      toast.info("Global customers CSV exported.");
++      toast.info("Customers CSV exported.");
+     };
+ 
+     window.addEventListener("fw-open-global-customer-modal", handleOpenFromTopbar);
+@@ -337,7 +337,7 @@ export default function GlobalCustomersPage() {
+     e.preventDefault();
+ 
+     const payload = {
+-      customer_type: "global",
++
+       customer_name: form.customerName,
+       group_name: form.group || "Independent",
+       contact_person: form.contact,
+@@ -359,11 +359,11 @@ export default function GlobalCustomersPage() {
+       if (modalMode === "add") {
+         const res = await api.post("/customers", payload);
+         await loadCustomers(res.data?.id);
+-        toast.success(`Global customer "${form.customerName}" created successfully.`);
++        toast.success(`Customer "${form.customerName}" created successfully.`);
+       } else {
+         await api.put(`/customers/${editingCustomerId}`, payload);
+         await loadCustomers(editingCustomerId);
+-        toast.success(`Global customer "${form.customerName}" saved successfully.`);
++        toast.success(`Customer "${form.customerName}" saved successfully.`);
+       }
+ 
+       closeModal();
+@@ -434,7 +434,7 @@ export default function GlobalCustomersPage() {
+             <Search size={16} />
+             <input
+               type="text"
+-              placeholder="Search global customers..."
++              placeholder="Search customers..."
+               value={search}
+               onChange={(e) => setSearch(e.target.value)}
+             />
+@@ -456,7 +456,7 @@ export default function GlobalCustomersPage() {
+ 
+       <div className="content-card">
+         <div className="card-header-row">
+-          <h3>✈️ Global Customers — Export</h3>
++          <h3>✈️ Customers — Export</h3>
+           <span className="count-pill">{filteredCustomers.length} customers</span>
+         </div>
+ 
+@@ -711,7 +711,7 @@ export default function GlobalCustomersPage() {
+         <div className="modal-backdrop" onClick={closeModal}>
+           <div className="md md-lg" onClick={(e) => e.stopPropagation()}>
+             <div className="md-h">
+-              <h3>{modalMode === "add" ? "✈️ Add Global Customer" : "✏️ Edit Global Customer"}</h3>
++              <h3>{modalMode === "add" ? "✈️ Add Customer" : "✏️ Edit Customer"}</h3>
+               <button type="button" className="md-x" onClick={closeModal}>
+                 ✕
+               </button>
+diff --git a/frontend/src/pages/GlobalDispatchListPage.jsx b/frontend/src/pages/GlobalDispatchListPage.jsx
+index 7339563..6fab3b9 100644
+--- a/frontend/src/pages/GlobalDispatchListPage.jsx
++++ b/frontend/src/pages/GlobalDispatchListPage.jsx
+@@ -142,7 +142,7 @@ export default function GlobalDispatchListPage() {
+   const loadSetup = useCallback(async () => {
+     try {
+       const [customersRes, inventoryRes] = await Promise.all([
+-        api.get("/customers?type=global"),
++        api.get("/customers"),
+         api.get("/inventory"),
+       ]);
+ 
+@@ -563,7 +563,7 @@ export default function GlobalDispatchListPage() {
+ 
+       <div className="content-card global-dispatch-card">
+         <div className="card-header-row">
+-          <h3>✈️ Global Dispatch — Export Shipments</h3>
++          <h3>✈️ Dispatch — Export Shipments</h3>
+           <span className="count-pill">{filteredRows.length} shipments</span>
+         </div>
+ 
+@@ -641,7 +641,7 @@ export default function GlobalDispatchListPage() {
+                 })
+               ) : (
+                 <tr>
+-                  <td colSpan="9">No global shipments found</td>
++                  <td colSpan="9">No shipments found</td>
+                 </tr>
+               )}
+             </tbody>
+diff --git a/frontend/src/pages/LocalCustomersPage.jsx b/frontend/src/pages/LocalCustomersPage.jsx
+deleted file mode 100644
+index 8612342..0000000
+--- a/frontend/src/pages/LocalCustomersPage.jsx
++++ /dev/null
+@@ -1,790 +0,0 @@
+-import React, { useEffect, useMemo, useState } from "react";
+-import { useNavigate } from "react-router-dom";
+-import { Search, Truck, X } from "lucide-react";
+-import { useToast } from "../context/ToastContext";
+-import api from "../utils/api";
+-
+-const emptyForm = {
+-  code: "",
+-  customerName: "",
+-  group: "",
+-  contact: "",
+-  email: "",
+-  phone: "",
+-  address: "",
+-  city: "Colombo 1",
+-  deliveryWindow: "04:00 – 06:00 AM",
+-  preferredDriver: "",
+-  returnsAllowed: true,
+-  notes: "",
+-};
+-
+-const mapApiCustomerToUi = (customer) => ({
+-  id: customer.id,
+-  code: customer.customer_code || "",
+-  customerName: customer.customer_name || "",
+-  group: customer.group_name || "Independent",
+-  contact: customer.contact_person || "",
+-  city: customer.city || "",
+-  deliveryWindow: customer.delivery_window || "",
+-  returnsAllowed: !String(customer.returns_policy || "")
+-    .toLowerCase()
+-    .includes("no"),
+-  dispatches: Number(customer.orders_count || customer.shipment_count || 0),
+-  email: customer.email || "",
+-  phone: customer.phone || customer.whatsapp || customer.whatsapp_number || "",
+-  address: customer.address || "",
+-  preferredDriver: customer.driver_preference || "",
+-  notes: customer.notes || "",
+-  status: customer.status || "active",
+-  createdAt: customer.created_at || "",
+-});
+-
+-const buildLocalExportRows = (rows) => {
+-  const headers = [
+-    "Code",
+-    "Customer Name",
+-    "Group",
+-    "Contact",
+-    "Email",
+-    "Phone",
+-    "Address",
+-    "City",
+-    "Delivery Window",
+-    "Preferred Driver",
+-    "Returns Allowed",
+-    "Dispatches",
+-    "Notes",
+-  ];
+-
+-  const csvRows = rows.map((customer) => [
+-    customer.code,
+-    customer.customerName,
+-    customer.group,
+-    customer.contact,
+-    customer.email,
+-    customer.phone,
+-    customer.address,
+-    customer.city,
+-    customer.deliveryWindow,
+-    customer.preferredDriver,
+-    customer.returnsAllowed ? "Yes" : "No",
+-    customer.dispatches,
+-    customer.notes,
+-  ]);
+-
+-  return [headers, ...csvRows]
+-    .map((row) =>
+-      row
+-        .map((value) => `"${String(value ?? "").replace(/"/g, '""')}"`)
+-        .join(",")
+-    )
+-    .join("\n");
+-};
+-
+-export default function LocalCustomersPage() {
+-  const navigate = useNavigate();
+-  const toast = useToast();
+-
+-  const [customers, setCustomers] = useState([]);
+-  const [search, setSearch] = useState("");
+-  const [cityFilter, setCityFilter] = useState("All Cities");
+-  const [showModal, setShowModal] = useState(false);
+-  const [modalMode, setModalMode] = useState("add");
+-  const [editingCustomerId, setEditingCustomerId] = useState(null);
+-  const [selectedCustomer, setSelectedCustomer] = useState(null);
+-  const [showDetailsPanel, setShowDetailsPanel] = useState(false);
+-  const [selectedRowId, setSelectedRowId] = useState(null);
+-  const [saving, setSaving] = useState(false);
+-
+-  const [form, setForm] = useState({
+-    ...emptyForm,
+-    code: "FW-CLT-L001",
+-  });
+-
+-  const cityOptions = [
+-    "All Cities",
+-    "Colombo 1",
+-    "Colombo 2",
+-    "Colombo 3",
+-    "Colombo 4",
+-    "Colombo 5",
+-    "Colombo 7",
+-    "Dehiwala",
+-    "Mount Lavinia",
+-    "Negombo",
+-    "Kandy",
+-    "Galle",
+-    "Other",
+-  ];
+-
+-  const loadCustomers = async (preferredId = null) => {
+-    try {
+-      const res = await api.get("/customers?type=local");
+-      const rows = Array.isArray(res.data) ? res.data.map(mapApiCustomerToUi) : [];
+-
+-      setCustomers(rows);
+-
+-      if (preferredId) {
+-        const found = rows.find((c) => String(c.id) === String(preferredId));
+-        if (found) {
+-          setSelectedCustomer(found);
+-          setSelectedRowId(found.id);
+-          setShowDetailsPanel(true);
+-        }
+-      } else if (selectedRowId) {
+-        const found = rows.find((c) => String(c.id) === String(selectedRowId));
+-        if (found) {
+-          setSelectedCustomer(found);
+-        }
+-      }
+-    } catch (err) {
+-      console.error("Failed to load local customers:", err);
+-      toast.error("Failed to load local customers");
+-    }
+-  };
+-
+-  useEffect(() => {
+-    loadCustomers();
+-  }, []);
+-
+-  const filteredCustomers = useMemo(() => {
+-    const rows = customers.filter((customer) => {
+-      const q = search.toLowerCase().trim();
+-
+-      const matchesSearch =
+-        customer.code.toLowerCase().includes(q) ||
+-        customer.customerName.toLowerCase().includes(q) ||
+-        customer.group.toLowerCase().includes(q) ||
+-        customer.contact.toLowerCase().includes(q) ||
+-        customer.city.toLowerCase().includes(q);
+-
+-      const matchesCity = cityFilter === "All Cities" || customer.city === cityFilter;
+-      return matchesSearch && matchesCity;
+-    });
+-
+-    return rows.sort((a, b) =>
+-      String(a.code || "").localeCompare(String(b.code || ""), undefined, {
+-        numeric: true,
+-        sensitivity: "base",
+-      })
+-    );
+-  }, [customers, search, cityFilter]);
+-    useEffect(() => {
+-    if (!showModal) return;
+-
+-    const onKeyDown = (e) => {
+-      if (e.key === "Escape") setShowModal(false);
+-    };
+-
+-    window.addEventListener("keydown", onKeyDown);
+-    return () => window.removeEventListener("keydown", onKeyDown);
+-  }, [showModal]);
+-
+-  useEffect(() => {
+-    const handleOpenFromTopbar = () => {
+-      openAddModal();
+-    };
+-
+-    const handleExportFromTopbar = () => {
+-      const csv = buildLocalExportRows(filteredCustomers);
+-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+-      const url = URL.createObjectURL(blob);
+-      const link = document.createElement("a");
+-      link.href = url;
+-      link.download = "local-customers.csv";
+-      link.click();
+-      URL.revokeObjectURL(url);
+-
+-      toast.info("Local customers CSV exported.");
+-    };
+-
+-    window.addEventListener("fw-open-local-customer-modal", handleOpenFromTopbar);
+-    window.addEventListener("fw-export-local-customers", handleExportFromTopbar);
+-
+-    return () => {
+-      window.removeEventListener("fw-open-local-customer-modal", handleOpenFromTopbar);
+-      window.removeEventListener("fw-export-local-customers", handleExportFromTopbar);
+-    };
+-  }, [filteredCustomers, toast]);
+-
+-  const openAddModal = () => {
+-    setModalMode("add");
+-    setEditingCustomerId(null);
+-
+-    setForm({
+-      ...emptyForm,
+-      code: `FW-CLT-L${String(customers.length + 1).padStart(3, "0")}`,
+-    });
+-
+-    setShowModal(true);
+-  };
+-
+-  const openEditModal = (customer) => {
+-    setModalMode("edit");
+-    setEditingCustomerId(customer.id);
+-
+-    setForm({
+-      code: customer.code || "",
+-      customerName: customer.customerName || "",
+-      group: customer.group || "",
+-      contact: customer.contact || "",
+-      email: customer.email || "",
+-      phone: customer.phone || "",
+-      address: customer.address || "",
+-      city: customer.city || "Colombo 1",
+-      deliveryWindow: customer.deliveryWindow || "04:00 – 06:00 AM",
+-      preferredDriver: customer.preferredDriver || "",
+-      returnsAllowed: customer.returnsAllowed ?? true,
+-      notes: customer.notes || "",
+-    });
+-
+-    setShowModal(true);
+-  };
+-
+-  const closeModal = () => {
+-    setShowModal(false);
+-    setModalMode("add");
+-    setEditingCustomerId(null);
+-  };
+-
+-  const handleChange = (e) => {
+-    const { name, value } = e.target;
+-    setForm((prev) => ({ ...prev, [name]: value }));
+-  };
+-
+-  const handleSaveCustomer = async (e) => {
+-    e.preventDefault();
+-
+-    const payload = {
+-      customer_type: "local",
+-      customer_name: form.customerName,
+-      group_name: form.group || "Independent",
+-      contact_person: form.contact,
+-      email: form.email,
+-      phone: form.phone,
+-      whatsapp: form.phone,
+-      address: form.address,
+-      city: form.city,
+-      delivery_window: form.deliveryWindow,
+-      payment_terms: "Cash",
+-      returns_policy: form.returnsAllowed ? "Returns allowed" : "No returns",
+-      driver_preference: form.preferredDriver,
+-      notes: form.notes,
+-      status: "active",
+-    };
+-
+-    try {
+-      setSaving(true);
+-
+-      if (modalMode === "add") {
+-        const res = await api.post("/customers", payload);
+-        await loadCustomers(res.data?.id);
+-        toast.success(`Local customer "${form.customerName}" created successfully.`);
+-      } else {
+-        await api.put(`/customers/${editingCustomerId}`, payload);
+-        await loadCustomers(editingCustomerId);
+-        toast.success(`Local customer "${form.customerName}" saved successfully.`);
+-      }
+-
+-      closeModal();
+-    } catch (err) {
+-      console.error("Failed to save customer:", err);
+-      toast.error(err?.response?.data?.message || "Failed to save local customer");
+-    } finally {
+-      setSaving(false);
+-    }
+-  };
+-
+-  const handleRowOpen = async (customer) => {
+-    try {
+-      const res = await api.get(`/customers/${customer.id}`);
+-      const freshCustomer = mapApiCustomerToUi(res.data);
+-
+-      setSelectedCustomer(freshCustomer);
+-      setSelectedRowId(freshCustomer.id);
+-      setShowDetailsPanel(true);
+-    } catch (err) {
+-      console.error("Failed to load customer details:", err);
+-      setSelectedCustomer(customer);
+-      setSelectedRowId(customer.id);
+-      setShowDetailsPanel(true);
+-    }
+-  };
+-
+-  const closeDetailsPanel = () => {
+-    setShowDetailsPanel(false);
+-    setSelectedRowId(null);
+-  };
+-
+-  const handleDeleteCustomer = async () => {
+-    if (!selectedCustomer) return;
+-
+-    const ok = window.confirm(
+-      `Are you sure you want to delete ${selectedCustomer.customerName}?`
+-    );
+-
+-    if (!ok) return;
+-
+-    try {
+-      await api.delete(`/customers/${selectedCustomer.id}`);
+-      await loadCustomers();
+-      closeDetailsPanel();
+-      toast.warning("Customer removed");
+-    } catch (err) {
+-      console.error("Failed to delete customer:", err);
+-      toast.error(err?.response?.data?.message || "Failed to delete customer");
+-    }
+-  };
+-
+-  const handleNewDispatch = (e, customer) => {
+-    if (e?.stopPropagation) e.stopPropagation();
+-
+-    const customerLabel = `${customer.customerName} — ${customer.city}`;
+-    navigate(`/dispatch/local/add?customer=${encodeURIComponent(customerLabel)}`);
+-  };
+-
+-  return (
+-    <div className="page-shell">
+-      <div className="notice-banner notice-success">
+-        <Truck size={16} />
+-        <span>
+-          Local customers receive lorry deliveries within Sri Lanka. Delivery Note
+-          auto-generated. Stock deducted on Delivered status. Returns possible.
+-        </span>
+-      </div>
+-
+-      <div className="page-toolbar">
+-        <div className="toolbar-left">
+-          <div className="search-field">
+-            <Search size={16} />
+-            <input
+-              type="text"
+-              placeholder="Search local customers..."
+-              value={search}
+-              onChange={(e) => setSearch(e.target.value)}
+-            />
+-          </div>
+-
+-          <select
+-            className="filter-select"
+-            value={cityFilter}
+-            onChange={(e) => setCityFilter(e.target.value)}
+-          >
+-            {cityOptions.map((city) => (
+-              <option key={city} value={city}>
+-                {city}
+-              </option>
+-            ))}
+-          </select>
+-        </div>
+-      </div>
+-
+-      <div className="content-card">
+-        <div className="card-header-row">
+-          <h3>🚚 Local Customers — Sri Lanka</h3>
+-          <span className="count-pill">{filteredCustomers.length} customers</span>
+-        </div>
+-
+-        <div className="table-wrap">
+-          <table className="data-table">
+-            <thead>
+-              <tr>
+-                <th>CODE</th>
+-                <th>CUSTOMER NAME</th>
+-                <th>GROUP</th>
+-                <th>CONTACT</th>
+-                <th>CITY</th>
+-                <th>DELIVERY WINDOW</th>
+-                <th>RETURNS?</th>
+-                <th>DISPATCHES</th>
+-                <th>ACTIONS</th>
+-              </tr>
+-            </thead>
+-            <tbody>
+-              {filteredCustomers.length > 0 ? (
+-                filteredCustomers.map((customer) => (
+-                  <tr
+-                    key={customer.id}
+-                    onClick={() => handleRowOpen(customer)}
+-                    className={selectedRowId === customer.id ? "details-row-active" : ""}
+-                    style={{ cursor: "pointer" }}
+-                  >
+-                    <td className="code-cell">{customer.code}</td>
+-                    <td className="strong-cell">{customer.customerName}</td>
+-                    <td>{customer.group}</td>
+-                    <td>{customer.contact}</td>
+-                    <td>{customer.city}</td>
+-                    <td>{customer.deliveryWindow}</td>
+-                    <td>
+-                      <span
+-                        className={
+-                          customer.returnsAllowed ? "status-text yes-text" : "status-text no-text"
+-                        }
+-                      >
+-                        {customer.returnsAllowed ? "Yes" : "No"}
+-                      </span>
+-                    </td>
+-                    <td>{customer.dispatches}</td>
+-                    <td>
+-                      <div className="table-actions">
+-                        <button
+-                          type="button"
+-                          className="table-icon-btn"
+-                          title="New dispatch"
+-                          onClick={(e) => handleNewDispatch(e, customer)}
+-                        >
+-                          <Truck size={15} />
+-                        </button>
+-                      </div>
+-                    </td>
+-                  </tr>
+-                ))
+-              ) : (
+-                <tr>
+-                  <td colSpan="9" className="empty-row">
+-                    No local customers found
+-                  </td>
+-                </tr>
+-              )}
+-            </tbody>
+-          </table>
+-        </div>
+-      </div>
+-
+-      {showDetailsPanel && selectedCustomer && (
+-        <>
+-          <div className="details-panel-overlay" onClick={closeDetailsPanel}></div>
+-
+-          <div className={`details-panel ${showDetailsPanel ? "open" : ""}`}>
+-            <div className="details-panel-header">
+-              <div className="details-panel-icon">🚚</div>
+-
+-              <div className="details-panel-head-text">
+-                <h3>{selectedCustomer.customerName}</h3>
+-                <p>
+-                  {selectedCustomer.city} · Delivery {selectedCustomer.deliveryWindow}
+-                </p>
+-              </div>
+-
+-              <button
+-                type="button"
+-                className="details-panel-close"
+-                onClick={closeDetailsPanel}
+-              >
+-                <X size={18} />
+-              </button>
+-            </div>
+-
+-            <div className="details-panel-body">
+-              <div className="details-panel-grid">
+-                <div className="details-stat-card">
+-                  <label>CODE</label>
+-                  <span>{selectedCustomer.code}</span>
+-                </div>
+-
+-                <div className="details-stat-card">
+-                  <label>HOTEL / GROUP</label>
+-                  <span>{selectedCustomer.group}</span>
+-                </div>
+-
+-                <div className="details-stat-card">
+-                  <label>CONTACT PERSON</label>
+-                  <span>{selectedCustomer.contact}</span>
+-                </div>
+-
+-                <div className="details-stat-card">
+-                  <label>CITY</label>
+-                  <span>{selectedCustomer.city}</span>
+-                </div>
+-
+-                <div className="details-stat-card">
+-                  <label>EMAIL</label>
+-                  <span>{selectedCustomer.email || "-"}</span>
+-                </div>
+-
+-                <div className="details-stat-card">
+-                  <label>CONTACT NUMBER</label>
+-                  <span>{selectedCustomer.phone || "-"}</span>
+-                </div>
+-
+-                <div className="details-stat-card details-stat-card-full">
+-                  <label>ADDRESS</label>
+-                  <span>{selectedCustomer.address || "-"}</span>
+-                </div>
+-
+-                <div className="details-stat-card">
+-                  <label>DELIVERY WINDOW</label>
+-                  <span>{selectedCustomer.deliveryWindow}</span>
+-                </div>
+-
+-                <div className="details-stat-card">
+-                  <label>RETURNS ALLOWED?</label>
+-                  <span className={selectedCustomer.returnsAllowed ? "yes-text" : "no-text"}>
+-                    {selectedCustomer.returnsAllowed ? "Yes" : "No"}
+-                  </span>
+-                </div>
+-              </div>
+-
+-              <div className="details-stat-card details-stat-card-full">
+-                <label>TOTAL DISPATCHES</label>
+-                <strong>{selectedCustomer.dispatches}</strong>
+-              </div>
+-
+-              <div className="details-mini-title">RECENT DISPATCHES</div>
+-
+-              <table className="details-mini-table">
+-                <thead>
+-                  <tr>
+-                    <th>DISPATCH</th>
+-                    <th>DATE</th>
+-                    <th>DRIVER</th>
+-                    <th>WEIGHT</th>
+-                    <th>STATUS</th>
+-                  </tr>
+-                </thead>
+-                <tbody>
+-                  <tr>
+-                    <td colSpan="5" className="empty-row">
+-                      Recent local dispatch history will appear here from the real dispatch module.
+-                    </td>
+-                  </tr>
+-                </tbody>
+-              </table>
+-            </div>
+-
+-            <div className="details-panel-footer">
+-              <button
+-                type="button"
+-                className="btn btn-primary details-panel-btn-main new-dispatch-btn"
+-                onClick={() => handleNewDispatch(null, selectedCustomer)}
+-              >
+-                New Dispatch
+-              </button>
+-
+-              <button
+-                type="button"
+-                className="btn btn-secondary"
+-                onClick={() => {
+-                  closeDetailsPanel();
+-                  openEditModal(selectedCustomer);
+-                }}
+-              >
+-                Edit
+-              </button>
+-
+-              <button
+-                type="button"
+-                className="btn btn-danger-outline details-panel-btn-delete"
+-                onClick={handleDeleteCustomer}
+-                title="Delete customer"
+-              >
+-                🗑
+-              </button>
+-            </div>
+-          </div>
+-        </>
+-      )}
+-
+-      {showModal && (
+-        <div className="modal-backdrop" onClick={closeModal}>
+-          <div className="modal-shell modal-lg customer-modal" onClick={(e) => e.stopPropagation()}>
+-            <div className="modal-header">
+-              <h2>{modalMode === "add" ? "🚚 Add Local Customer" : "✏️ Edit Local Customer"}</h2>
+-
+-              <button type="button" className="modal-close" onClick={closeModal}>
+-                <X size={20} />
+-              </button>
+-            </div>
+-
+-            <form onSubmit={handleSaveCustomer} className="customer-modal-form">
+-              <div className="customer-modal-scroll">
+-                <div className="notice-banner notice-success notice-inside-modal">
+-                  <Truck size={16} />
+-                  <span>
+-                    Local customers receive lorry deliveries within Sri Lanka. A Delivery
+-                    Note is auto-generated for every dispatch.
+-                  </span>
+-                </div>
+-
+-                <div className="customer-section-title">Customer Details</div>
+-
+-                <div className="form-grid two-col">
+-                  <div className="form-group">
+-                    <label>CUSTOMER CODE</label>
+-                    <input type="text" name="code" value={form.code} readOnly />
+-                  </div>
+-
+-                  <div className="form-group">
+-                    <label>CUSTOMER NAME *</label>
+-                    <input
+-                      type="text"
+-                      name="customerName"
+-                      placeholder="e.g. Galle Face Hotel"
+-                      value={form.customerName}
+-                      onChange={handleChange}
+-                      required
+-                    />
+-                  </div>
+-
+-                  <div className="form-group">
+-                    <label>HOTEL / GROUP</label>
+-                    <input
+-                      type="text"
+-                      name="group"
+-                      placeholder="e.g. Aitken Spence Hotels"
+-                      value={form.group}
+-                      onChange={handleChange}
+-                    />
+-                  </div>
+-
+-                  <div className="form-group">
+-                    <label>CONTACT PERSON *</label>
+-                    <input
+-                      type="text"
+-                      name="contact"
+-                      placeholder="e.g. Chef Samantha"
+-                      value={form.contact}
+-                      onChange={handleChange}
+-                      required
+-                    />
+-                  </div>
+-
+-                  <div className="form-group">
+-                    <label>EMAIL</label>
+-                    <input
+-                      type="email"
+-                      name="email"
+-                      placeholder="chef@hotel.lk"
+-                      value={form.email}
+-                      onChange={handleChange}
+-                    />
+-                  </div>
+-
+-                  <div className="form-group">
+-                    <label>WHATSAPP / MOBILE *</label>
+-                    <input
+-                      type="text"
+-                      name="phone"
+-                      placeholder="07XXXXXXX"
+-                      value={form.phone}
+-                      onChange={handleChange}
+-                      required
+-                    />
+-                  </div>
+-                </div>
+-
+-                <div className="modal-divider" />
+-
+-                <div className="customer-section-title">Delivery Information</div>
+-
+-                <div className="form-grid two-col">
+-                  <div className="form-group form-group-full">
+-                    <label>DELIVERY ADDRESS *</label>
+-                    <textarea
+-                      name="address"
+-                      placeholder="Full street address..."
+-                      value={form.address}
+-                      onChange={handleChange}
+-                      rows="3"
+-                      required
+-                    />
+-                  </div>
+-
+-                  <div className="form-group">
+-                    <label>CITY *</label>
+-                    <select name="city" value={form.city} onChange={handleChange} required>
+-                      {cityOptions
+-                        .filter((x) => x !== "All Cities")
+-                        .map((city) => (
+-                          <option key={city}>{city}</option>
+-                        ))}
+-                    </select>
+-                  </div>
+-
+-                  <div className="form-group">
+-                    <label>DELIVERY WINDOW *</label>
+-                    <select
+-                      name="deliveryWindow"
+-                      value={form.deliveryWindow}
+-                      onChange={handleChange}
+-                      required
+-                    >
+-                      <option>04:00 – 06:00 AM</option>
+-                      <option>04:30 – 06:30 AM</option>
+-                      <option>05:00 – 07:00 AM</option>
+-                      <option>05:30 – 07:30 AM</option>
+-                      <option>06:00 – 08:00 AM</option>
+-                      <option>Custom</option>
+-                    </select>
+-                  </div>
+-
+-                  <div className="form-group">
+-                    <label>PREFERRED DRIVER</label>
+-                    <input
+-                      type="text"
+-                      name="preferredDriver"
+-                      placeholder="e.g. Nuwan (optional)"
+-                      value={form.preferredDriver}
+-                      onChange={handleChange}
+-                    />
+-                  </div>
+-
+-                  <div className="form-group">
+-                    <label>RETURNS ALLOWED?</label>
+-                    <div className="toggle-row">
+-                      <button
+-                        type="button"
+-                        className={`toggle-btn ${form.returnsAllowed ? "active" : ""}`}
+-                        onClick={() =>
+-                          setForm((prev) => ({ ...prev, returnsAllowed: true }))
+-                        }
+-                      >
+-                        ✅ Yes — returns accepted
+-                      </button>
+-
+-                      <button
+-                        type="button"
+-                        className={`toggle-btn ${!form.returnsAllowed ? "active danger" : ""}`}
+-                        onClick={() =>
+-                          setForm((prev) => ({ ...prev, returnsAllowed: false }))
+-                        }
+-                      >
+-                        ❌ No returns
+-                      </button>
+-                    </div>
+-                  </div>
+-
+-                  <div className="form-group form-group-full">
+-                    <label>NOTES</label>
+-                    <textarea
+-                      name="notes"
+-                      placeholder="Special instructions, gate codes, contact on arrival..."
+-                      value={form.notes}
+-                      onChange={handleChange}
+-                      rows="3"
+-                    />
+-                  </div>
+-                </div>
+-              </div>
+-
+-              <div className="modal-footer">
+-                <button type="button" className="btn btn-secondary" onClick={closeModal}>
+-                  Cancel
+-                </button>
+-
+-                <button type="submit" className="btn btn-primary" disabled={saving}>
+-                  {saving
+-                    ? "Saving..."
+-                    : modalMode === "add"
+-                    ? "Save Customer"
+-                    : "Save Customer"}
+-                </button>
+-              </div>
+-            </form>
+-          </div>
+-        </div>
+-      )}
+-    </div>
+-  );
+-}
+\ No newline at end of file
+diff --git a/frontend/src/pages/ManagerDashboard.jsx b/frontend/src/pages/ManagerDashboard.jsx
+index b94421d..cacbf09 100644
+--- a/frontend/src/pages/ManagerDashboard.jsx
++++ b/frontend/src/pages/ManagerDashboard.jsx
+@@ -65,10 +65,8 @@ const ManagerDashboard = () => {
+   const [expiry, setExpiry] = useState([]);
+   const [adjustments, setAdjustments] = useState([]);
+   const [suppliers, setSuppliers] = useState([]);
+-  const [localCustomers, setLocalCustomers] = useState([]);
+-  const [globalCustomers, setGlobalCustomers] = useState([]);
+-  const [localDispatches, setLocalDispatches] = useState([]);
+-  const [globalDispatches, setGlobalDispatches] = useState([]);
++  const [customers, setCustomers] = useState([]);
++  const [dispatches, setDispatches] = useState([]);
+   const [exportDocs, setExportDocs] = useState([]);
+   const [grnList, setGrnList] = useState([]);
+   const [purchaseOrders, setPurchaseOrders] = useState([]);
+@@ -84,10 +82,8 @@ const ManagerDashboard = () => {
+         expiryData,
+         adjustmentsData,
+         suppliersData,
+-        localCustomersData,
+-        globalCustomersData,
+-        localDispatchData,
+-        globalDispatchData,
++        customersData,
++        dispatchesData,
+         exportDocsData,
+         grnData,
+         purchaseOrdersData,
+@@ -98,10 +94,8 @@ const ManagerDashboard = () => {
+         getArray("/inventory/expiry", { params: { days: 14 } }),
+         getArray("/stock-adjustments"),
+         getArray("/suppliers"),
+-        getArray("/customers", { params: { type: "local" } }),
+-        getArray("/customers", { params: { type: "global" } }),
++        getArray("/customers"),
+         getArray("/dispatch"),
+-        getArray("/dispatch/global"),
+         getArray("/export-docs"),
+         getArray("/grn"),
+         getArray("/purchase-orders"),
+@@ -113,10 +107,8 @@ const ManagerDashboard = () => {
+       setExpiry(expiryData);
+       setAdjustments(adjustmentsData);
+       setSuppliers(suppliersData);
+-      setLocalCustomers(localCustomersData);
+-      setGlobalCustomers(globalCustomersData);
+-      setLocalDispatches(localDispatchData);
+-      setGlobalDispatches(globalDispatchData);
++      setCustomers(customersData);
++      setDispatches(dispatchesData);
+       setExportDocs(exportDocsData);
+       setGrnList(grnData);
+       setPurchaseOrders(purchaseOrdersData);
+@@ -145,14 +137,14 @@ const ManagerDashboard = () => {
+   );
+ 
+   const totalCustomers = useMemo(
+-    () => localCustomers.length + globalCustomers.length,
+-    [localCustomers, globalCustomers]
++    () => customers.length,
++    [customers]
+   );
+ 
+   const activeExportShipments = useMemo(
+     () =>
+-      globalDispatches.filter((row) => normalizeStatus(row.status) !== "delivered").length,
+-    [globalDispatches]
++      dispatches.filter((row) => normalizeStatus(row.status) !== "delivered").length,
++    [dispatches]
+   );
+ 
+   const pendingApprovals = useMemo(
+@@ -208,24 +200,14 @@ const ManagerDashboard = () => {
+   const todaysSchedule = useMemo(() => {
+     const today = new Date().toISOString().slice(0, 10);
+ 
+-    const localRows = localDispatches
+-      .filter((row) => String(row.dispatch_date || "").slice(0, 10) === today)
+-      .slice(0, 2)
+-      .map((row) => ({
+-        key: `local-${row.id}`,
+-        title: `${row.client_name || "Local Dispatch"} — ${row.delivery_window || formatDate(row.dispatch_date)}`,
+-        subtitle: `${row.dispatch_number || "Dispatch"} · ${row.status || "scheduled"}`,
+-        to: "/dispatch/local",
+-      }));
+-
+-    const globalRows = globalDispatches
++    const globalRows = dispatches
+       .filter((row) => String(row.dispatch_date || "").slice(0, 10) === today)
+       .slice(0, 1)
+       .map((row) => ({
+         key: `global-${row.id}`,
+         title: `${row.customer_name || "Export Shipment"} — ${row.flight_no || row.airline || "Flight pending"}`,
+         subtitle: `${row.dispatch_number || "Shipment"} · ${row.status || "docs_pending"}`,
+-        to: "/dispatch/global",
++        to: "/dispatch",
+       }));
+ 
+     const grnRows = grnList
+@@ -238,8 +220,8 @@ const ManagerDashboard = () => {
+         to: "/grn",
+       }));
+ 
+-    return [...localRows, ...globalRows, ...grnRows].slice(0, 4);
+-  }, [localDispatches, globalDispatches, grnList]);
++    return [...globalRows, ...grnRows].slice(0, 4);
++  }, [dispatches, grnList]);
+ 
+   const recentAdjustments = useMemo(() => adjustments.slice(0, 4), [adjustments]);
+ 
+@@ -270,14 +252,9 @@ const ManagerDashboard = () => {
+           </div>
+ 
+           <div className="krow k4">
+-            <div className="kc b">
+-              <div className="kv">{Number(stats.localDispatch || localDispatches.length || 0)}</div>
+-              <div className="kl">Local Dispatches</div>
+-            </div>
+-
+             <div className="kc a">
+-              <div className="kv">{activeExportShipments || Number(stats.globalDispatch || 0)}</div>
+-              <div className="kl">Active Export Shipments</div>
++              <div className="kv">{activeExportShipments || Number(stats.activeGlobalShipments || 0)}</div>
++              <div className="kl">Active Shipments</div>
+             </div>
+ 
+             <div className="kc g">
+diff --git a/frontend/src/pages/ReportsPage.jsx b/frontend/src/pages/ReportsPage.jsx
+index 7e46ced..43fb4fd 100644
+--- a/frontend/src/pages/ReportsPage.jsx
++++ b/frontend/src/pages/ReportsPage.jsx
+@@ -63,7 +63,7 @@ const REPORT_CARDS = [
+   {
+     id: "dispatch",
+     title: "Customer Dispatch Report",
+-    description: "Local vs global volumes, top customers",
++    description: "Export volumes, top customers",
+     frequency: "Monthly",
+     endpoints: ["/reports/dispatch", "/reports/customer-dispatch"],
+   },
+@@ -152,13 +152,13 @@ const monthLabelFromDate = (value) => {
+ };
+ 
+ const buildFallbackDispatchSeries = () => [
+-  { label: "Sep", local: 810, global: 630 },
+-  { label: "Oct", local: 900, global: 710 },
+-  { label: "Nov", local: 870, global: 690 },
+-  { label: "Dec", local: 1040, global: 840 },
+-  { label: "Jan", local: 980, global: 780 },
+-  { label: "Feb", local: 1100, global: 870 },
+-  { label: "Mar", local: 1180, global: 940 },
++  { label: "Sep", volume: 630 },
++  { label: "Oct", volume: 710 },
++  { label: "Nov", volume: 690 },
++  { label: "Dec", volume: 840 },
++  { label: "Jan", volume: 780 },
++  { label: "Feb", volume: 870 },
++  { label: "Mar", volume: 940 },
+ ];
+ 
+ const buildFallbackCustomerSeries = () => [
+@@ -417,16 +417,11 @@ const ReportsPage = () => {
+       setLoadingCharts(true);
+ 
+       try {
+-        const [localResult, globalResult, customerResult] = await Promise.allSettled([
+-          fetchFirstSuccess(["/dispatch/local", "/dispatch"], {}),
+-          fetchFirstSuccess(["/dispatch/global", "/global-dispatch", "/dispatch"], {}),
+-          fetchFirstSuccess(["/customers?type=global", "/customers/global", "/customers"], {}),
++        const [globalResult, customerResult] = await Promise.allSettled([
++          fetchFirstSuccess(["/dispatch", "/global-dispatch"], {}),
++          fetchFirstSuccess(["/customers"], {}),
+         ]);
+ 
+-        const localRows =
+-          localResult.status === "fulfilled" && Array.isArray(localResult.value)
+-            ? localResult.value
+-            : [];
+         const globalRows =
+           globalResult.status === "fulfilled" && Array.isArray(globalResult.value)
+             ? globalResult.value
+@@ -438,7 +433,7 @@ const ReportsPage = () => {
+ 
+         const monthMap = new Map();
+ 
+-        const addRowsToSeries = (rows, bucket) => {
++        const addRowsToSeries = (rows) => {
+           rows.forEach((row) => {
+             const rawDate =
+               row.dispatch_date ||
+@@ -452,17 +447,15 @@ const ReportsPage = () => {
+ 
+             const current = monthMap.get(key) || {
+               label: monthLabelFromDate(rawDate),
+-              local: 0,
+-              global: 0,
++              volume: 0,
+             };
+ 
+-            current[bucket] += pickQuantity(row);
++            current.volume += pickQuantity(row);
+             monthMap.set(key, current);
+           });
+         };
+ 
+-        addRowsToSeries(localRows, "local");
+-        addRowsToSeries(globalRows, "global");
++        addRowsToSeries(globalRows);
+ 
+         let nextDispatchSeries = Array.from(monthMap.entries())
+           .sort(([a], [b]) => a.localeCompare(b))
+@@ -476,8 +469,6 @@ const ReportsPage = () => {
+         const customerValueMap = new Map();
+ 
+         customerRows.forEach((row) => {
+-          const type = String(row.customer_type || row.type || "").toLowerCase();
+-          if (type && !type.includes("global")) return;
+ 
+           const name = pickCustomerName(row);
+           if (!name) return;
+@@ -537,18 +528,8 @@ const ReportsPage = () => {
+         labels: dispatchSeries.map((row) => row.label),
+         datasets: [
+           {
+-            label: "Local (kg)",
+-            data: dispatchSeries.map((row) => Number(row.local || 0)),
+-            backgroundColor: "rgba(64, 117, 211, 0.18)",
+-            borderColor: "#2F69C8",
+-            borderWidth: 2,
+-            borderRadius: 5,
+-            barPercentage: 0.78,
+-            categoryPercentage: 0.68,
+-          },
+-          {
+-            label: "Global (kg)",
+-            data: dispatchSeries.map((row) => Number(row.global || 0)),
++            label: "Export Volume (kg)",
++            data: dispatchSeries.map((row) => Number(row.volume || 0)),
+             backgroundColor: "rgba(236, 177, 62, 0.16)",
+             borderColor: "#E3A72C",
+             borderWidth: 2,
+@@ -845,7 +826,7 @@ const ReportsPage = () => {
+                 letterSpacing: "-.2px",
+               }}
+             >
+-              Local vs Global Dispatch — Monthly (kg)
++              Export Dispatch — Monthly (kg)
+             </h3>
+             <p style={{ fontSize: 11, color: "var(--text3)" }}>Volume comparison</p>
+           </div>
+diff --git a/non_global_count.txt b/non_global_count.txt
+new file mode 100644
+index 0000000..0ff68b6
+--- /dev/null
++++ b/non_global_count.txt
+@@ -0,0 +1,2 @@
++COUNT(*)
++0
