@@ -408,7 +408,7 @@ const createGlobalDispatch = async (req, res) => {
       `
       SELECT id
       FROM customers
-      WHERE id = ? AND customer_type = 'global'
+      WHERE id = ?
       LIMIT 1
       `,
       [Number(customer_id)]

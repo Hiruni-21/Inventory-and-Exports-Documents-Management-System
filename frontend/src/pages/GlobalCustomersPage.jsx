@@ -179,7 +179,7 @@ export default function GlobalCustomersPage() {
 
   const loadCustomers = async (preferredId = null) => {
     try {
-      const res = await api.get("/customers?type=global");
+      const res = await api.get("/customers");
       const rows = Array.isArray(res.data) ? res.data.map(mapApiCustomerToUi) : [];
 
       setCustomers(rows);
@@ -267,10 +267,10 @@ export default function GlobalCustomersPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = "global-customers.csv";
+      link.download = "customers.csv";
       link.click();
       URL.revokeObjectURL(url);
-      toast.info("Global customers CSV exported.");
+      toast.info("Customers CSV exported.");
     };
 
     window.addEventListener("fw-open-global-customer-modal", handleOpenFromTopbar);
@@ -337,7 +337,7 @@ export default function GlobalCustomersPage() {
     e.preventDefault();
 
     const payload = {
-      customer_type: "global",
+
       customer_name: form.customerName,
       group_name: form.group || "Independent",
       contact_person: form.contact,
@@ -359,11 +359,11 @@ export default function GlobalCustomersPage() {
       if (modalMode === "add") {
         const res = await api.post("/customers", payload);
         await loadCustomers(res.data?.id);
-        toast.success(`Global customer "${form.customerName}" created successfully.`);
+        toast.success(`Customer "${form.customerName}" created successfully.`);
       } else {
         await api.put(`/customers/${editingCustomerId}`, payload);
         await loadCustomers(editingCustomerId);
-        toast.success(`Global customer "${form.customerName}" saved successfully.`);
+        toast.success(`Customer "${form.customerName}" saved successfully.`);
       }
 
       closeModal();
@@ -434,7 +434,7 @@ export default function GlobalCustomersPage() {
             <Search size={16} />
             <input
               type="text"
-              placeholder="Search global customers..."
+              placeholder="Search customers..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -456,7 +456,7 @@ export default function GlobalCustomersPage() {
 
       <div className="content-card">
         <div className="card-header-row">
-          <h3>✈️ Global Customers — Export</h3>
+          <h3>✈️ Customers — Export</h3>
           <span className="count-pill">{filteredCustomers.length} customers</span>
         </div>
 
@@ -711,7 +711,7 @@ export default function GlobalCustomersPage() {
         <div className="modal-backdrop" onClick={closeModal}>
           <div className="md md-lg" onClick={(e) => e.stopPropagation()}>
             <div className="md-h">
-              <h3>{modalMode === "add" ? "✈️ Add Global Customer" : "✏️ Edit Global Customer"}</h3>
+              <h3>{modalMode === "add" ? "✈️ Add Customer" : "✏️ Edit Customer"}</h3>
               <button type="button" className="md-x" onClick={closeModal}>
                 ✕
               </button>

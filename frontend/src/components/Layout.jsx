@@ -83,7 +83,8 @@ const notificationsByRole = {
     { type: "Notify Ops", message: "Low stock items need to be escalated.", time: "45 min", unread: true },
   ],
   logistics: [
-    { type: "Dispatch", message: "3 local dispatches are scheduled for today.", time: "Just now", unread: true },
+    // TODO: Pull real pending/scheduled global dispatch data from backend instead of mock data
+    { type: "Dispatch", message: "3 export shipments are scheduled for today.", time: "Just now", unread: true },
     { type: "Export", message: "One export shipment is waiting for document completion.", time: "1 hour", unread: true },
   ],
   supplier: [
@@ -128,10 +129,8 @@ const navByRole = {
     {
       label: "CLIENTS & DISPATCH",
       items: [
-        { to: "/customers/local", text: "Local Customers", icon: <IconHome /> },
-        { to: "/customers/global", text: "Global Customers", icon: <IconPlane /> },
-        { to: "/dispatch/local", text: "Local Dispatch", icon: <IconBox /> },
-        { to: "/dispatch/global", text: "Global Dispatch", icon: <IconPlane /> },
+        { to: "/customers", text: "Customers", icon: <IconPlane /> },
+        { to: "/dispatch", text: "Dispatch", icon: <IconPlane /> },
         { to: "/export-documents", text: "Export Documents", icon: <IconFile /> },
       ],
     },
@@ -172,10 +171,8 @@ const navByRole = {
     {
       label: "CLIENTS & DISPATCH",
       items: [
-        { to: "/customers/local", text: "Local Customers", icon: <IconHome /> },
-        { to: "/customers/global", text: "Global Customers", icon: <IconPlane /> },
-        { to: "/dispatch/local", text: "Local Dispatch", icon: <IconBox /> },
-        { to: "/dispatch/global", text: "Global Dispatch", icon: <IconPlane /> },
+        { to: "/customers", text: "Customers", icon: <IconPlane /> },
+        { to: "/dispatch", text: "Dispatch", icon: <IconPlane /> },
         { to: "/export-documents", text: "Export Documents", icon: <IconFile /> },
       ],
     },
@@ -218,10 +215,8 @@ const navByRole = {
     {
       label: "CLIENTS & DISPATCH",
       items: [
-        { to: "/customers/local", text: "Local Customers", icon: <IconHome /> },
-        { to: "/customers/global", text: "Global Customers", icon: <IconPlane /> },
-        { to: "/dispatch/local", text: "Local Dispatch", icon: <IconBox /> },
-        { to: "/dispatch/global", text: "Global Dispatch", icon: <IconPlane /> },
+        { to: "/customers", text: "Customers", icon: <IconPlane /> },
+        { to: "/dispatch", text: "Dispatch", icon: <IconPlane /> },
         { to: "/export-documents", text: "Export Documents", icon: <IconFile /> },
       ],
     },
@@ -262,11 +257,9 @@ const pageMeta = {
   "/returns/add": { title: "Returns & Wastage", subtitle: "Record return" },
   "/wastage": { title: "Returns & Wastage", subtitle: "Wastage records" },
   "/wastage/add": { title: "Returns & Wastage", subtitle: "Record wastage" },
-  "/customers/local": { title: "Local Customers", subtitle: "Sri Lanka customers" },
-  "/customers/global": { title: "Global Customers", subtitle: "Export customers" },
-  "/dispatch/local": { title: "Local Dispatch", subtitle: "Lorry deliveries · Sri Lanka" },
-  "/dispatch/global": { title: "Global Dispatch", subtitle: "Export shipments · Maldives & international" },
-  "/dispatch/global/add": { title: "Dispatch", subtitle: "Create dispatch" },
+  "/customers": { title: "Customers", subtitle: "Export customers" },
+  "/dispatch": { title: "Dispatch", subtitle: "Export shipments · Maldives & international" },
+  "/dispatch/add": { title: "Dispatch", subtitle: "Create dispatch" },
   "/export-documents": { title: "Export Documents", subtitle: "Shipment document sets" },
   "/export-documents/add": { title: "Export Documents", subtitle: "Create export document" },
   "/reports": { title: "Reports & Analytics", subtitle: "Operational reporting" },
@@ -280,15 +273,10 @@ const pageMeta = {
 };
 
 const actionButtons = {
-  "/dispatch/local": [{ label: "+ New Dispatch", eventName: "fw-open-local-dispatch-modal", className: "btn btn-p btn-sm" }],
-  "/dispatch/global": [{ label: "+ New Shipment", eventName: "fw-open-global-shipment-modal", className: "btn btn-p btn-sm" }],
+  "/dispatch": [{ label: "+ New Shipment", eventName: "fw-open-global-shipment-modal", className: "btn btn-p btn-sm" }],
   "/export-documents": [{ label: "+ Create Document Set", eventName: "fw-open-export-docs-modal", className: "btn btn-p btn-sm" }],
 
-  "/customers/local": [
-    { label: "+ Add Customer", eventName: "fw-open-local-customer-modal", className: "btn btn-p btn-sm" },
-    { label: "Export CSV", eventName: "fw-export-local-customers", className: "btn btn-s btn-sm" },
-  ],
-  "/customers/global": [
+  "/customers": [
     { label: "+ Add Customer", eventName: "fw-open-global-customer-modal", className: "btn btn-p btn-sm" },
     { label: "Export CSV", eventName: "fw-export-global-customers", className: "btn btn-s btn-sm" },
   ],

@@ -14,8 +14,8 @@ const normalizeAirlinePreference = (value) => {
   return "UL";
 };
 
-const buildNextCustomerCode = (type, existingRows) => {
-  const prefix = type === "global" ? "FW-CLT-G" : "FW-CLT-L";
+const buildNextCustomerCode = (existingRows) => {
+  const prefix = "FW-CLT-G";
 
   const maxNum = (existingRows || []).reduce((max, row) => {
     const code = String(row.customer_code || "");
@@ -55,7 +55,6 @@ const customerSelectSql = (schema) => `
   SELECT
     c.id,
     c.customer_code,
-    c.customer_type,
     c.customer_name,
     ${schema.hasGroupName ? "c.group_name" : "NULL AS group_name"},
     c.contact_person,
@@ -75,42 +74,27 @@ const customerSelectSql = (schema) => `
     c.cold_chain_required,
     c.status,
     c.created_at,
-    CASE
-      WHEN c.customer_type = 'global' THEN COALESCE(gs.shipment_count, 0)
-      ELSE COALESCE(ls.dispatch_count, 0)
-    END AS shipment_count
+    COALESCE(gs.shipment_count, 0) AS shipment_count
   FROM customers c
   LEFT JOIN (
     SELECT customer_id, COUNT(*) AS shipment_count
     FROM global_dispatch
     GROUP BY customer_id
   ) gs ON gs.customer_id = c.id
-  LEFT JOIN (
-    SELECT customer_id, COUNT(*) AS dispatch_count
-    FROM local_dispatch
-    GROUP BY customer_id
-  ) ls ON ls.customer_id = c.id
 `;
 
 const normalizeCustomerRow = (row) => ({
   ...row,
   whatsapp: row.whatsapp_number || "",
-  orders_count: row.customer_type === "local" ? Number(row.shipment_count || 0) : 0,
-  shipments_count: row.customer_type === "global" ? Number(row.shipment_count || 0) : 0,
+  shipments_count: Number(row.shipment_count || 0),
 });
 
 const getCustomers = async (req, res) => {
   try {
-    const { type } = req.query;
     const schema = await getCustomerSchema();
 
     let sql = customerSelectSql(schema);
     const params = [];
-
-    if (type) {
-      sql += ` WHERE LOWER(c.customer_type) = LOWER(?)`;
-      params.push(type);
-    }
 
     sql += ` ORDER BY c.customer_name ASC`;
 
@@ -124,7 +108,6 @@ const getCustomers = async (req, res) => {
     });
   }
 };
-
 const getCustomerById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -144,13 +127,6 @@ const getCustomerById = async (req, res) => {
     }
 
     const customer = normalizeCustomerRow(rows[0]);
-
-    if (customer.customer_type !== "global") {
-      return res.json({
-        ...customer,
-        recent_shipments: [],
-      });
-    }
 
     const recentShipments = await q(
       `
@@ -225,7 +201,6 @@ const createCustomer = async (req, res) => {
 
     const {
       customer_code,
-      customer_type,
       customer_name,
       group_name,
       contact_person,
@@ -247,9 +222,9 @@ const createCustomer = async (req, res) => {
       status,
     } = req.body;
 
-    if (!customer_type || !customer_name) {
+    if (!customer_name) {
       return res.status(400).json({
-        message: "Customer type and customer name are required",
+        message: "Customer name is required",
       });
     }
 
@@ -259,15 +234,13 @@ const createCustomer = async (req, res) => {
 
     if (!finalCode) {
       const codeRows = await q(
-        `SELECT customer_code FROM customers WHERE customer_type = ? ORDER BY id ASC`,
-        [customer_type]
+        `SELECT customer_code FROM customers ORDER BY id ASC`
       );
-      finalCode = buildNextCustomerCode(customer_type, codeRows);
+      finalCode = buildNextCustomerCode(codeRows);
     }
 
     const columns = [
       "customer_code",
-      "customer_type",
       "customer_name",
       "contact_person",
       "phone",
@@ -289,7 +262,6 @@ const createCustomer = async (req, res) => {
 
     const values = [
       finalCode,
-      customer_type,
       customer_name,
       contact_person || null,
       phone || null,
@@ -302,8 +274,8 @@ const createCustomer = async (req, res) => {
       driver_preference || null,
       notes || null,
       location_island || null,
-      customer_type === "global" ? normalizeAirlinePreference(airline_preference) : null,
-      customer_type === "global" ? (incoterm || "CIF") : null,
+      normalizeAirlinePreference(airline_preference),
+      incoterm || "CIF",
       cold_chain_required ? 1 : 0,
       status || "active",
       userId,
@@ -451,20 +423,13 @@ const deleteCustomer = async (req, res) => {
     const rows = await q(
       `
       SELECT
-        c.customer_type,
-        COALESCE(gs.shipment_count, 0) AS global_count,
-        COALESCE(ls.dispatch_count, 0) AS local_count
+        COALESCE(gs.shipment_count, 0) AS global_count
       FROM customers c
       LEFT JOIN (
         SELECT customer_id, COUNT(*) AS shipment_count
         FROM global_dispatch
         GROUP BY customer_id
       ) gs ON gs.customer_id = c.id
-      LEFT JOIN (
-        SELECT customer_id, COUNT(*) AS dispatch_count
-        FROM local_dispatch
-        GROUP BY customer_id
-      ) ls ON ls.customer_id = c.id
       WHERE c.id = ?
       LIMIT 1
       `,
@@ -476,8 +441,7 @@ const deleteCustomer = async (req, res) => {
     }
 
     const row = rows[0];
-    const hasLinkedRecords =
-      Number(row.global_count || 0) > 0 || Number(row.local_count || 0) > 0;
+    const hasLinkedRecords = Number(row.global_count || 0) > 0;
 
     if (hasLinkedRecords) {
       return res.status(400).json({

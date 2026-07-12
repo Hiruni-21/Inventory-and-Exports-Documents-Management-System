@@ -63,7 +63,7 @@ const REPORT_CARDS = [
   {
     id: "dispatch",
     title: "Customer Dispatch Report",
-    description: "Local vs global volumes, top customers",
+    description: "Export volumes, top customers",
     frequency: "Monthly",
     endpoints: ["/reports/dispatch", "/reports/customer-dispatch"],
   },
@@ -152,13 +152,13 @@ const monthLabelFromDate = (value) => {
 };
 
 const buildFallbackDispatchSeries = () => [
-  { label: "Sep", local: 810, global: 630 },
-  { label: "Oct", local: 900, global: 710 },
-  { label: "Nov", local: 870, global: 690 },
-  { label: "Dec", local: 1040, global: 840 },
-  { label: "Jan", local: 980, global: 780 },
-  { label: "Feb", local: 1100, global: 870 },
-  { label: "Mar", local: 1180, global: 940 },
+  { label: "Sep", volume: 630 },
+  { label: "Oct", volume: 710 },
+  { label: "Nov", volume: 690 },
+  { label: "Dec", volume: 840 },
+  { label: "Jan", volume: 780 },
+  { label: "Feb", volume: 870 },
+  { label: "Mar", volume: 940 },
 ];
 
 const buildFallbackCustomerSeries = () => [
@@ -417,16 +417,11 @@ const ReportsPage = () => {
       setLoadingCharts(true);
 
       try {
-        const [localResult, globalResult, customerResult] = await Promise.allSettled([
-          fetchFirstSuccess(["/dispatch/local", "/dispatch"], {}),
-          fetchFirstSuccess(["/dispatch/global", "/global-dispatch", "/dispatch"], {}),
-          fetchFirstSuccess(["/customers?type=global", "/customers/global", "/customers"], {}),
+        const [globalResult, customerResult] = await Promise.allSettled([
+          fetchFirstSuccess(["/dispatch", "/global-dispatch"], {}),
+          fetchFirstSuccess(["/customers"], {}),
         ]);
 
-        const localRows =
-          localResult.status === "fulfilled" && Array.isArray(localResult.value)
-            ? localResult.value
-            : [];
         const globalRows =
           globalResult.status === "fulfilled" && Array.isArray(globalResult.value)
             ? globalResult.value
@@ -438,7 +433,7 @@ const ReportsPage = () => {
 
         const monthMap = new Map();
 
-        const addRowsToSeries = (rows, bucket) => {
+        const addRowsToSeries = (rows) => {
           rows.forEach((row) => {
             const rawDate =
               row.dispatch_date ||
@@ -452,17 +447,15 @@ const ReportsPage = () => {
 
             const current = monthMap.get(key) || {
               label: monthLabelFromDate(rawDate),
-              local: 0,
-              global: 0,
+              volume: 0,
             };
 
-            current[bucket] += pickQuantity(row);
+            current.volume += pickQuantity(row);
             monthMap.set(key, current);
           });
         };
 
-        addRowsToSeries(localRows, "local");
-        addRowsToSeries(globalRows, "global");
+        addRowsToSeries(globalRows);
 
         let nextDispatchSeries = Array.from(monthMap.entries())
           .sort(([a], [b]) => a.localeCompare(b))
@@ -476,8 +469,6 @@ const ReportsPage = () => {
         const customerValueMap = new Map();
 
         customerRows.forEach((row) => {
-          const type = String(row.customer_type || row.type || "").toLowerCase();
-          if (type && !type.includes("global")) return;
 
           const name = pickCustomerName(row);
           if (!name) return;
@@ -537,18 +528,8 @@ const ReportsPage = () => {
         labels: dispatchSeries.map((row) => row.label),
         datasets: [
           {
-            label: "Local (kg)",
-            data: dispatchSeries.map((row) => Number(row.local || 0)),
-            backgroundColor: "rgba(64, 117, 211, 0.18)",
-            borderColor: "#2F69C8",
-            borderWidth: 2,
-            borderRadius: 5,
-            barPercentage: 0.78,
-            categoryPercentage: 0.68,
-          },
-          {
-            label: "Global (kg)",
-            data: dispatchSeries.map((row) => Number(row.global || 0)),
+            label: "Export Volume (kg)",
+            data: dispatchSeries.map((row) => Number(row.volume || 0)),
             backgroundColor: "rgba(236, 177, 62, 0.16)",
             borderColor: "#E3A72C",
             borderWidth: 2,
@@ -845,7 +826,7 @@ const ReportsPage = () => {
                 letterSpacing: "-.2px",
               }}
             >
-              Local vs Global Dispatch — Monthly (kg)
+              Export Dispatch — Monthly (kg)
             </h3>
             <p style={{ fontSize: 11, color: "var(--text3)" }}>Volume comparison</p>
           </div>

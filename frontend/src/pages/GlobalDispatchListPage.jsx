@@ -142,7 +142,7 @@ export default function GlobalDispatchListPage() {
   const loadSetup = useCallback(async () => {
     try {
       const [customersRes, inventoryRes] = await Promise.all([
-        api.get("/customers?type=global"),
+        api.get("/customers"),
         api.get("/inventory"),
       ]);
 
@@ -563,7 +563,7 @@ export default function GlobalDispatchListPage() {
 
       <div className="content-card global-dispatch-card">
         <div className="card-header-row">
-          <h3>✈️ Global Dispatch — Export Shipments</h3>
+          <h3>✈️ Dispatch — Export Shipments</h3>
           <span className="count-pill">{filteredRows.length} shipments</span>
         </div>
 
@@ -641,7 +641,7 @@ export default function GlobalDispatchListPage() {
                 })
               ) : (
                 <tr>
-                  <td colSpan="9">No global shipments found</td>
+                  <td colSpan="9">No shipments found</td>
                 </tr>
               )}
             </tbody>
