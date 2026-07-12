@@ -324,6 +324,13 @@ const uploadDocument = async (req, res) => {
         const dispatchRows = await q(`SELECT incoterm FROM global_dispatch WHERE id = ?`, [global_dispatch_id]);
         const incoterm = dispatchRows.length ? dispatchRows[0].incoterm : "FOB";
         
+        await q(`
+            UPDATE export_documents
+            SET ${document_type}_status = 'done',
+                ${document_type}_file = ?
+            WHERE global_dispatch_id = ?
+        `, [filePath, global_dispatch_id]);
+        
         await updateAllClearedStatus(global_dispatch_id, incoterm);
 
         res.json({ message: "Document uploaded successfully", file_path: filePath });
