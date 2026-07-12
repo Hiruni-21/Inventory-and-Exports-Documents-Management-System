@@ -215,6 +215,7 @@ const GrnDetailsPage = () => {
                 <th style={{ textAlign: "left", padding: "16px 18px", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6B7280", whiteSpace: "nowrap" }}>Return Coverage</th>
                 <th style={{ textAlign: "right", padding: "16px 18px", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6B7280", whiteSpace: "nowrap" }}>Unit Cost</th>
                 <th style={{ textAlign: "right", padding: "16px 18px", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6B7280", whiteSpace: "nowrap" }}>Line Total</th>
+                <th style={{ textAlign: "left", padding: "16px 18px", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6B7280", whiteSpace: "nowrap" }}>Batch Number</th>
                 <th style={{ width: 40 }}></th>
               </tr>
             </thead>
@@ -238,7 +239,7 @@ const GrnDetailsPage = () => {
 
                   if (totalBatchReturned > 0) {
                     if (totalBatchReturned < totalBatchReceived) {
-                      coverageStatus = `Partially Returned (${totalBatchReturned} of ${totalBatchReceived})`;
+                      coverageStatus = `Partial (${totalBatchReturned} of ${totalBatchReceived} returned)`;
                       coverageColor = "#B45309";
                       coverageBg = "#FEF3C7";
                     } else {
@@ -264,6 +265,7 @@ const GrnDetailsPage = () => {
                         </td>
                         <td style={{ padding: "16px 18px", textAlign: "right", color: "#0F172A" }}>{formatCurrency(item.unit_cost)}</td>
                         <td style={{ padding: "16px 18px", textAlign: "right", color: "#0F172A" }}>{formatCurrency(item.line_total)}</td>
+                        <td style={{ padding: "16px 18px", color: "#0F172A" }}>{item.batch_number || "—"}</td>
                         <td style={{ padding: "16px 18px", textAlign: "right" }}>
                           {hasMultipleBatches && (
                             <button onClick={() => toggleExpand(item.item_id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#6B7280", fontWeight: 700, padding: 4 }}>
@@ -292,8 +294,8 @@ const GrnDetailsPage = () => {
                                   let bStatus = "Not Returned";
                                   let bCol = "#64748b";
                                   if (bRet > 0) {
-                                    if (bRet < bRec) { bStatus = `Partial (${bRet} of ${bRec})`; bCol = "#B45309"; }
-                                    else { bStatus = "Full"; bCol = "#047857"; }
+                                    if (bRet < bRec) { bStatus = `Partial (${bRet} of ${bRec} returned)`; bCol = "#B45309"; }
+                                    else { bStatus = "Fully Returned"; bCol = "#047857"; }
                                   }
                                   return (
                                     <tr key={b.batch_id} style={{ borderBottom: "1px solid #F1F5F9" }}>
@@ -314,7 +316,7 @@ const GrnDetailsPage = () => {
                 })
               ) : (
                 <tr>
-                  <td colSpan="10" style={{ textAlign: "center", color: "#6B7280", padding: 24 }}>
+                  <td colSpan="11" style={{ textAlign: "center", color: "#6B7280", padding: 24 }}>
                     No items available for this GRN.
                   </td>
                 </tr>

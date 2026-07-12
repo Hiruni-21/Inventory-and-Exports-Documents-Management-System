@@ -223,8 +223,64 @@ const sendReturnNote = (req, res) => {
   });
 };
 
+const renderPdf = async (req, res) => {
+  const { id } = req.params;
+  const sql = `
+    SELECT
+      r.id,
+      r.quantity,
+      r.reason,
+      r.notes,
+      r.created_at,
+      r.status,
+      s.supplier_name,
+      s.email AS supplier_email,
+      s.address,
+      s.city,
+      s.contact_number,
+      s.whatsapp_number,
+      s.supplier_code,
+      i.name AS item_name,
+      ib.batch_code,
+      u.full_name AS created_by_name
+    FROM goods_returns r
+    JOIN suppliers s ON r.supplier_id = s.id
+    JOIN items i ON r.item_id = i.id
+    JOIN inventory_batches ib ON r.batch_id = ib.id
+    LEFT JOIN users u ON r.created_by = u.id
+    WHERE r.id = ?
+  `;
+
+  db.query(sql, [id], async (err, results) => {
+    if (err) {
+      return res.status(500).json({ message: "Database error", error: err.message });
+    }
+    if (results.length === 0) {
+      return res.status(404).json({ message: "Return note not found" });
+    }
+
+    const returnNoteData = results[0];
+    try {
+      const { publicPath } = await generateReturnPdf({
+        returnNote: returnNoteData,
+        supplier: returnNoteData,
+      });
+
+      res.json({
+        message: "Return note PDF generated successfully",
+        fileUrl: publicPath,
+        documentUrl: `${process.env.BACKEND_BASE_URL || "http://localhost:5001"}${publicPath}`,
+      });
+    } catch (pdfErr) {
+      console.error("Failed to generate return note PDF:", pdfErr);
+      res.status(500).json({ message: "Failed to generate return note PDF", error: pdfErr.message });
+    }
+  });
+};
+
 module.exports = {
   getAllReturns,
   createReturn,
   sendReturnNote,
+  renderPdf,
 };

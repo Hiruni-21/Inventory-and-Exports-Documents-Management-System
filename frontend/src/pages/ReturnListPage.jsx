@@ -51,6 +51,17 @@ const ReturnListPage = () => {
     }
   };
 
+  const handleViewPdf = async (id) => {
+    try {
+      const res = await api.post(`/returns/${id}/render-pdf`);
+      if (res.data?.documentUrl) {
+        window.open(res.data.documentUrl, "_blank");
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to view return note PDF");
+    }
+  };
+
   return (
     <div>
       {error ? (
@@ -135,15 +146,33 @@ const ReturnListPage = () => {
                       </span>
                     </td>
                     <td>
-                      {(!row.status || row.status === "draft") && (
-                        <button
-                          className="btn btn-s btn-sm"
-                          onClick={() => handleSendNote(row.id)}
-                          disabled={sendingId === row.id}
-                        >
-                          {sendingId === row.id ? "Sending..." : "Send Note"}
-                        </button>
-                      )}
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        {(!row.status || row.status === "draft") ? (
+                          <button
+                            className="btn btn-s btn-sm"
+                            onClick={() => handleSendNote(row.id)}
+                            disabled={sendingId === row.id}
+                          >
+                            {sendingId === row.id ? "Sending..." : "Send Note"}
+                          </button>
+                        ) : (
+                          <>
+                            <button
+                              className="btn btn-s btn-sm"
+                              onClick={() => handleViewPdf(row.id)}
+                            >
+                              View
+                            </button>
+                            <button
+                              className="btn btn-s btn-sm"
+                              onClick={() => handleSendNote(row.id)}
+                              disabled={sendingId === row.id}
+                            >
+                              {sendingId === row.id ? "Sending..." : "Resend"}
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
