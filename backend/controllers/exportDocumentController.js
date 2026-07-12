@@ -162,7 +162,7 @@ const getExportDocumentById = async (req, res) => {
     const docRow = rows[0];
     
     const shipmentDocs = await q(`
-      SELECT sd.*, u.name as uploaded_by_name
+      SELECT sd.*, u.full_name as uploaded_by_name
       FROM shipment_documents sd
       LEFT JOIN users u ON sd.uploaded_by = u.id
       WHERE sd.global_dispatch_id = ?
