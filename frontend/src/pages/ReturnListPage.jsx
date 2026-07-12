@@ -51,10 +51,6 @@ const ReturnListPage = () => {
     }
   };
 
-  const wastageLossEstimate = useMemo(() => {
-    return wastageData.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
-  }, [wastageData]);
-
   return (
     <div>
       {error ? (
@@ -96,6 +92,7 @@ const ReturnListPage = () => {
                 <th>Item</th>
                 <th>Batch</th>
                 <th>Qty</th>
+                <th>Item Coverage</th>
                 <th>Reason</th>
                 <th>Recorded By</th>
                 <th>Status</th>
@@ -121,6 +118,15 @@ const ReturnListPage = () => {
                     <td style={{ fontWeight: 600 }}>{row.item_name}</td>
                     <td>{row.batch_code}</td>
                     <td>{row.quantity}</td>
+                    <td>
+                      {(() => {
+                        const rec = Number(row.total_received_for_item || 0);
+                        const ret = Number(row.total_returned_for_item || 0);
+                        if (ret <= 0) return <span className="badge" style={{background: "#F3F4F6", color: "#6B7280"}}>Not Returned</span>;
+                        if (ret < rec) return <span className="badge badge-y">Partial ({ret} of {rec})</span>;
+                        return <span className="badge badge-g">Fully Returned</span>;
+                      })()}
+                    </td>
                     <td>{row.reason}</td>
                     <td>{row.created_by_name || "—"}</td>
                     <td>
@@ -143,7 +149,7 @@ const ReturnListPage = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="10" style={{ textAlign: "center", color: "var(--text3)" }}>
+                  <td colSpan="11" style={{ textAlign: "center", color: "var(--text3)" }}>
                     No returns found
                   </td>
                 </tr>
@@ -153,14 +159,6 @@ const ReturnListPage = () => {
         </div>
       ) : (
         <div>
-          <div className="ib ib-w">
-            <span>🗑</span>
-            <div>
-              Total wastage quantity recorded so far in this view:{" "}
-              <strong>{wastageLossEstimate.toFixed(2)}</strong>
-            </div>
-          </div>
-
           <div className="tw">
             <div className="tw-h" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <h3>Wastage Records</h3>

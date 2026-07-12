@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import api from "../utils/api";
 
@@ -19,6 +19,7 @@ const GrnDetailsPage = () => {
   const [grn, setGrn] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [expandedItems, setExpandedItems] = useState(new Set());
 
   useEffect(() => {
     const fetchGrn = async () => {
@@ -39,6 +40,15 @@ const GrnDetailsPage = () => {
 
     fetchGrn();
   }, [id]);
+
+  const toggleExpand = (itemId) => {
+    setExpandedItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  };
 
   const totalItems = useMemo(() => grn?.items?.length || 0, [grn]);
 
@@ -193,7 +203,7 @@ const GrnDetailsPage = () => {
         </div>
 
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", minWidth: 940, borderCollapse: "collapse" }}>
+          <table style={{ width: "100%", minWidth: 1040, borderCollapse: "collapse" }}>
             <thead style={{ background: "#F8FAFC", position: "sticky", top: 0, zIndex: 1 }}>
               <tr>
                 <th style={{ textAlign: "left", padding: "16px 18px", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6B7280", whiteSpace: "nowrap" }}>Item Code</th>
@@ -202,9 +212,10 @@ const GrnDetailsPage = () => {
                 <th style={{ textAlign: "right", padding: "16px 18px", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6B7280", whiteSpace: "nowrap" }}>Ordered Qty</th>
                 <th style={{ textAlign: "right", padding: "16px 18px", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6B7280", whiteSpace: "nowrap" }}>Received Qty</th>
                 <th style={{ textAlign: "right", padding: "16px 18px", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6B7280", whiteSpace: "nowrap" }}>Variance</th>
+                <th style={{ textAlign: "left", padding: "16px 18px", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6B7280", whiteSpace: "nowrap" }}>Return Coverage</th>
                 <th style={{ textAlign: "right", padding: "16px 18px", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6B7280", whiteSpace: "nowrap" }}>Unit Cost</th>
                 <th style={{ textAlign: "right", padding: "16px 18px", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6B7280", whiteSpace: "nowrap" }}>Line Total</th>
-                <th style={{ textAlign: "left", padding: "16px 18px", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6B7280", whiteSpace: "nowrap" }}>Batch Number</th>
+                <th style={{ width: 40 }}></th>
               </tr>
             </thead>
             <tbody>
@@ -216,23 +227,94 @@ const GrnDetailsPage = () => {
                   const varianceColor = variance > 0 ? "#047857" : variance < 0 ? "#B91C1C" : "#6B7280";
                   const varianceLabel = variance > 0 ? `+${variance}` : `${variance}`;
 
+                  const itemBatches = grn.batches?.filter(b => String(b.item_id) === String(item.item_id)) || [];
+                  const hasMultipleBatches = itemBatches.length > 1;
+                  const totalBatchReceived = itemBatches.reduce((sum, b) => sum + Number(b.received_quantity || 0), 0);
+                  const totalBatchReturned = itemBatches.reduce((sum, b) => sum + Number(b.returned_quantity || 0), 0);
+
+                  let coverageStatus = "Not Returned";
+                  let coverageColor = "#6B7280";
+                  let coverageBg = "#F3F4F6";
+
+                  if (totalBatchReturned > 0) {
+                    if (totalBatchReturned < totalBatchReceived) {
+                      coverageStatus = `Partially Returned (${totalBatchReturned} of ${totalBatchReceived})`;
+                      coverageColor = "#B45309";
+                      coverageBg = "#FEF3C7";
+                    } else {
+                      coverageStatus = "Fully Returned";
+                      coverageColor = "#047857";
+                      coverageBg = "#D1FAE5";
+                    }
+                  }
+
                   return (
-                    <tr key={item.id ?? index} style={{ background: index % 2 === 0 ? "#FFFFFF" : "#F8FAFC", transition: "background 0.2s ease" }}>
-                      <td style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace", fontSize: 12, color: "#475569", padding: "16px 18px" }}>{item.item_code || "—"}</td>
-                      <td style={{ fontWeight: 600, padding: "16px 18px", color: "#0F172A" }}>{item.item_name || "—"}</td>
-                      <td style={{ padding: "16px 18px", color: "#0F172A" }}>{item.unit || "—"}</td>
-                      <td style={{ padding: "16px 18px", textAlign: "right", color: "#0F172A" }}>{ordered}</td>
-                      <td style={{ padding: "16px 18px", textAlign: "right", color: "#0F172A" }}>{delivered}</td>
-                      <td style={{ padding: "16px 18px", textAlign: "right", color: varianceColor, fontWeight: 700 }}>{varianceLabel}</td>
-                      <td style={{ padding: "16px 18px", textAlign: "right", color: "#0F172A" }}>{formatCurrency(item.unit_cost)}</td>
-                      <td style={{ padding: "16px 18px", textAlign: "right", color: "#0F172A" }}>{formatCurrency(item.line_total)}</td>
-                      <td style={{ padding: "16px 18px", color: "#0F172A" }}>{item.batch_number || "—"}</td>
-                    </tr>
+                    <React.Fragment key={item.id ?? index}>
+                      <tr style={{ background: index % 2 === 0 ? "#FFFFFF" : "#F8FAFC", transition: "background 0.2s ease" }}>
+                        <td style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace", fontSize: 12, color: "#475569", padding: "16px 18px" }}>{item.item_code || "—"}</td>
+                        <td style={{ fontWeight: 600, padding: "16px 18px", color: "#0F172A" }}>{item.item_name || "—"}</td>
+                        <td style={{ padding: "16px 18px", color: "#0F172A" }}>{item.unit || "—"}</td>
+                        <td style={{ padding: "16px 18px", textAlign: "right", color: "#0F172A" }}>{ordered}</td>
+                        <td style={{ padding: "16px 18px", textAlign: "right", color: "#0F172A" }}>{delivered}</td>
+                        <td style={{ padding: "16px 18px", textAlign: "right", color: varianceColor, fontWeight: 700 }}>{varianceLabel}</td>
+                        <td style={{ padding: "16px 18px", color: "#0F172A" }}>
+                          <span style={{ padding: "4px 8px", borderRadius: 4, background: coverageBg, color: coverageColor, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>
+                            {coverageStatus}
+                          </span>
+                        </td>
+                        <td style={{ padding: "16px 18px", textAlign: "right", color: "#0F172A" }}>{formatCurrency(item.unit_cost)}</td>
+                        <td style={{ padding: "16px 18px", textAlign: "right", color: "#0F172A" }}>{formatCurrency(item.line_total)}</td>
+                        <td style={{ padding: "16px 18px", textAlign: "right" }}>
+                          {hasMultipleBatches && (
+                            <button onClick={() => toggleExpand(item.item_id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#6B7280", fontWeight: 700, padding: 4 }}>
+                              {expandedItems.has(item.item_id) ? "▲" : "▼"}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                      {expandedItems.has(item.item_id) && hasMultipleBatches && (
+                        <tr style={{ background: "#F1F5F9" }}>
+                          <td colSpan={10} style={{ padding: "16px 32px" }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "#475569" }}>Batch Breakdown for {item.item_name}</div>
+                            <table style={{ width: "100%", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8 }}>
+                              <thead>
+                                <tr style={{ borderBottom: "1px solid #E2E8F0" }}>
+                                  <th style={{ padding: "8px 12px", textAlign: "left", color: "#64748b", fontSize: 12 }}>Batch Code</th>
+                                  <th style={{ padding: "8px 12px", textAlign: "right", color: "#64748b", fontSize: 12 }}>Received Qty</th>
+                                  <th style={{ padding: "8px 12px", textAlign: "right", color: "#64748b", fontSize: 12 }}>Returned Qty</th>
+                                  <th style={{ padding: "8px 12px", textAlign: "left", color: "#64748b", fontSize: 12 }}>Coverage</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {itemBatches.map(b => {
+                                  const bRec = Number(b.received_quantity || 0);
+                                  const bRet = Number(b.returned_quantity || 0);
+                                  let bStatus = "Not Returned";
+                                  let bCol = "#64748b";
+                                  if (bRet > 0) {
+                                    if (bRet < bRec) { bStatus = `Partial (${bRet} of ${bRec})`; bCol = "#B45309"; }
+                                    else { bStatus = "Full"; bCol = "#047857"; }
+                                  }
+                                  return (
+                                    <tr key={b.batch_id} style={{ borderBottom: "1px solid #F1F5F9" }}>
+                                      <td style={{ padding: "8px 12px", fontSize: 13, fontFamily: "ui-monospace, monospace" }}>{b.batch_code}</td>
+                                      <td style={{ padding: "8px 12px", fontSize: 13, textAlign: "right" }}>{bRec}</td>
+                                      <td style={{ padding: "8px 12px", fontSize: 13, textAlign: "right", fontWeight: bRet > 0 ? 600 : 400 }}>{bRet}</td>
+                                      <td style={{ padding: "8px 12px", fontSize: 13, fontWeight: 600, color: bCol }}>{bStatus}</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })
               ) : (
                 <tr>
-                  <td colSpan="9" style={{ textAlign: "center", color: "#6B7280", padding: 24 }}>
+                  <td colSpan="10" style={{ textAlign: "center", color: "#6B7280", padding: 24 }}>
                     No items available for this GRN.
                   </td>
                 </tr>

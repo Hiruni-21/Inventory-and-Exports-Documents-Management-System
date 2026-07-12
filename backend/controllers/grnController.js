@@ -91,17 +91,38 @@ const getGrnById = (req, res) => {
         return res.status(500).json({ message: "Database error", error: itemErr.message });
       }
 
-      const normalizedItems = itemResults.map((item) => ({
-        ...item,
-        ordered_quantity: Number(item.ordered_quantity ?? item.ordered_qty ?? 0),
-        delivered_quantity: Number(
-          item.delivered_quantity ?? item.received_quantity ?? item.received_qty ?? 0
-        ),
-      }));
+      const batchesSql = `
+        SELECT
+          ib.id AS batch_id,
+          ib.batch_code,
+          ib.item_id,
+          ib.received_quantity,
+          COALESCE(SUM(r.quantity), 0) AS returned_quantity
+        FROM inventory_batches ib
+        LEFT JOIN goods_returns r ON r.batch_id = ib.id
+        WHERE ib.grn_id = ?
+        GROUP BY ib.id, ib.batch_code, ib.item_id, ib.received_quantity
+      `;
 
-      res.json({
-        ...grnResults[0],
-        items: normalizedItems,
+      db.query(batchesSql, [id], (batchErr, batchResults) => {
+        if (batchErr) {
+          console.error("getGrnById batches error:", batchErr);
+          return res.status(500).json({ message: "Database error", error: batchErr.message });
+        }
+
+        const normalizedItems = itemResults.map((item) => ({
+          ...item,
+          ordered_quantity: Number(item.ordered_quantity ?? item.ordered_qty ?? 0),
+          delivered_quantity: Number(
+            item.delivered_quantity ?? item.received_quantity ?? item.received_qty ?? 0
+          ),
+        }));
+
+        res.json({
+          ...grnResults[0],
+          items: normalizedItems,
+          batches: batchResults || [],
+        });
       });
     });
   });
@@ -150,6 +171,7 @@ const getGrnBatches = (req, res) => {
       ib.*,
       i.name AS item_name,
       i.code AS item_code,
+      i.stock_type,
       i.unit
     FROM inventory_batches ib
     JOIN items i ON ib.item_id = i.id

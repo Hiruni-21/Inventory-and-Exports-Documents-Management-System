@@ -15,7 +15,19 @@ const getAllReturns = (req, res) => {
       i.name AS item_name,
       i.code AS item_code,
       ib.batch_code,
-      u.full_name AS created_by_name
+      u.full_name AS created_by_name,
+      r.status,
+      (
+        SELECT COALESCE(SUM(b2.received_quantity), 0)
+        FROM inventory_batches b2
+        WHERE b2.grn_id = ib.grn_id AND b2.item_id = ib.item_id
+      ) AS total_received_for_item,
+      (
+        SELECT COALESCE(SUM(r2.quantity), 0)
+        FROM goods_returns r2
+        JOIN inventory_batches b3 ON r2.batch_id = b3.id
+        WHERE b3.grn_id = ib.grn_id AND b3.item_id = ib.item_id
+      ) AS total_returned_for_item
     FROM goods_returns r
     JOIN suppliers s ON r.supplier_id = s.id
     JOIN items i ON r.item_id = i.id

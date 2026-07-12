@@ -21,6 +21,8 @@ const AddWastageModal = ({ onClose, onSave }) => {
   const [batchLoading, setBatchLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [searchGrn, setSearchGrn] = useState("");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -46,6 +48,21 @@ const AddWastageModal = ({ onClose, onSave }) => {
     loadInitialData();
   }, []);
 
+  const selectedGrn = useMemo(
+    () => grns.find((g) => String(g.id) === String(form.grn_id)),
+    [grns, form.grn_id]
+  );
+
+  const filteredGrns = useMemo(() => {
+    if (!searchGrn) return grns;
+    const lowerSearch = searchGrn.toLowerCase();
+    return grns.filter(
+      (g) =>
+        g.grn_number.toLowerCase().includes(lowerSearch) ||
+        g.supplier_name.toLowerCase().includes(lowerSearch)
+    );
+  }, [grns, searchGrn]);
+
   const displayedItems = useMemo(() => {
     if (form.grn_id) {
       const map = new Map();
@@ -55,15 +72,17 @@ const AddWastageModal = ({ onClose, onSave }) => {
             item_id: b.item_id,
             name: b.item_name || b.name,
             code: b.item_code || b.code,
+            stock_type: b.stock_type,
           });
         }
       });
       return Array.from(map.values());
     }
     return inventory.map(i => ({
-      item_id: i.item_id,
+      item_id: i.item_id || i.id,
       name: i.name || i.item_name,
-      code: i.code || i.item_code
+      code: i.code || i.item_code,
+      stock_type: i.stock_type,
     }));
   }, [form.grn_id, grnBatches, inventory]);
 
@@ -129,6 +148,15 @@ const AddWastageModal = ({ onClose, onSave }) => {
     }
   };
 
+  const handleQuantityChange = (e) => {
+    let val = e.target.value;
+    const activeItem = displayedItems.find(i => String(i.item_id) === String(form.item_id));
+    if (activeItem && activeItem.stock_type === "packaging") {
+      val = val.replace(/\D/g, "");
+    }
+    setForm(prev => ({ ...prev, quantity: val }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -156,6 +184,8 @@ const AddWastageModal = ({ onClose, onSave }) => {
       setSaving(false);
     }
   };
+
+  const activeItemType = displayedItems.find(i => String(i.item_id) === String(form.item_id))?.stock_type;
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -202,16 +232,60 @@ const AddWastageModal = ({ onClose, onSave }) => {
               <div className="fst">Wastage Details</div>
 
               <div className="fr">
-                <div className="ff" style={{ gridColumn: "1 / -1" }}>
+                <div className="ff" style={{ gridColumn: "1 / -1", position: "relative" }}>
                   <label className="fl">Goods Received Note (GRN) <span style={{color: "var(--text3)", fontWeight: "normal"}}>(Optional filter)</span></label>
-                  <select className="fc" name="grn_id" value={form.grn_id} onChange={handleChange}>
-                    <option value="">-- View all available inventory --</option>
-                    {grns.map((grn) => (
-                      <option key={grn.id} value={grn.id}>
-                        {grn.grn_number} - {grn.supplier_name} - {grn.received_date?.substring(0, 10)}
-                      </option>
-                    ))}
-                  </select>
+                  <input
+                    type="text"
+                    className="fc"
+                    placeholder="Search GRN # or Supplier... (or leave blank to view all inventory)"
+                    value={form.grn_id && !isDropdownOpen ? `${selectedGrn?.grn_number} - ${selectedGrn?.supplier_name}` : searchGrn}
+                    onChange={(e) => {
+                      setSearchGrn(e.target.value);
+                      if (form.grn_id) handleChange({ target: { name: "grn_id", value: "" } });
+                      setIsDropdownOpen(true);
+                    }}
+                    onFocus={() => setIsDropdownOpen(true)}
+                    onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)}
+                  />
+                  {isDropdownOpen && (
+                    <ul style={{
+                      position: "absolute", top: "100%", left: 0, right: 0,
+                      background: "#fff", border: "1px solid #ccc", borderRadius: 6,
+                      zIndex: 9999, maxHeight: 240, overflowY: "auto", listStyle: "none",
+                      padding: 0, margin: "4px 0 0 0", boxShadow: "0 4px 6px rgba(0,0,0,0.1)"
+                    }}>
+                      <li
+                        style={{ padding: "10px 14px", cursor: "pointer", borderBottom: "1px solid #F1F5F9", fontStyle: "italic", color: "#6B7280" }}
+                        onMouseDown={(e) => {
+                          e.preventDefault(); 
+                          handleChange({ target: { name: "grn_id", value: "" } });
+                          setSearchGrn("");
+                          setIsDropdownOpen(false);
+                        }}
+                      >
+                        -- View all available inventory --
+                      </li>
+                      {filteredGrns.length ? (
+                        filteredGrns.map((grn) => (
+                          <li
+                            key={grn.id}
+                            style={{ padding: "10px 14px", cursor: "pointer", borderBottom: "1px solid #F1F5F9" }}
+                            onMouseDown={(e) => {
+                              e.preventDefault(); 
+                              handleChange({ target: { name: "grn_id", value: grn.id } });
+                              setSearchGrn("");
+                              setIsDropdownOpen(false);
+                            }}
+                          >
+                            <div style={{ fontWeight: 600 }}>{grn.grn_number}</div>
+                            <div style={{ fontSize: 13, color: "#6B7280" }}>{grn.supplier_name} - {grn.received_date?.substring(0, 10)}</div>
+                          </li>
+                        ))
+                      ) : (
+                        <li style={{ padding: "10px 14px", color: "#6B7280" }}>No matching GRNs found</li>
+                      )}
+                    </ul>
+                  )}
                 </div>
               </div>
 
@@ -248,11 +322,11 @@ const AddWastageModal = ({ onClose, onSave }) => {
                   <input
                     className="fc"
                     type="number"
-                    step="0.01"
+                    step={activeItemType === "packaging" ? "1" : "0.01"}
                     min="0"
                     name="quantity"
                     value={form.quantity}
-                    onChange={handleChange}
+                    onChange={handleQuantityChange}
                     placeholder="0.00"
                   />
                 </div>

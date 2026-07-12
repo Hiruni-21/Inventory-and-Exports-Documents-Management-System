@@ -18,6 +18,8 @@ const AddReturnModal = ({ onClose, onSave }) => {
   const [batchLoading, setBatchLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [searchGrn, setSearchGrn] = useState("");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -41,6 +43,16 @@ const AddReturnModal = ({ onClose, onSave }) => {
     [grns, form.grn_id]
   );
 
+  const filteredGrns = useMemo(() => {
+    if (!searchGrn) return grns;
+    const lowerSearch = searchGrn.toLowerCase();
+    return grns.filter(
+      (g) =>
+        g.grn_number.toLowerCase().includes(lowerSearch) ||
+        g.supplier_name.toLowerCase().includes(lowerSearch)
+    );
+  }, [grns, searchGrn]);
+
   const uniqueItems = useMemo(() => {
     const map = new Map();
     grnBatches.forEach((b) => {
@@ -49,6 +61,7 @@ const AddReturnModal = ({ onClose, onSave }) => {
           item_id: b.item_id,
           name: b.item_name || b.name,
           code: b.item_code || b.code,
+          stock_type: b.stock_type,
         });
       }
     });
@@ -102,6 +115,15 @@ const AddReturnModal = ({ onClose, onSave }) => {
     }
   };
 
+  const handleQuantityChange = (e) => {
+    let val = e.target.value;
+    const activeItem = uniqueItems.find(i => String(i.item_id) === String(form.item_id));
+    if (activeItem && activeItem.stock_type === "packaging") {
+      val = val.replace(/\D/g, "");
+    }
+    setForm(prev => ({ ...prev, quantity: val }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -131,6 +153,8 @@ const AddReturnModal = ({ onClose, onSave }) => {
     }
   };
 
+  const activeItemType = uniqueItems.find(i => String(i.item_id) === String(form.item_id))?.stock_type;
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="md md-lg" style={{ display: "flex", flexDirection: "column" }} onClick={(e) => e.stopPropagation()}>
@@ -142,7 +166,7 @@ const AddReturnModal = ({ onClose, onSave }) => {
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
-          <div className="md-b" style={{ overflowY: "auto", padding: "1.5rem" }}>
+          <div className="md-b" style={{ overflowY: "auto", padding: "1.5rem", position: "relative" }}>
             <div className="ib ib-i">
               <span>↩️</span>
               <div>
@@ -176,16 +200,49 @@ const AddReturnModal = ({ onClose, onSave }) => {
               <div className="fst">Return Details</div>
 
               <div className="fr">
-                <div className="ff">
+                <div className="ff" style={{ position: "relative" }}>
                   <label className="fl">Goods Received Note (GRN)</label>
-                  <select className="fc" name="grn_id" value={form.grn_id} onChange={handleChange}>
-                    <option value="">Select GRN</option>
-                    {grns.map((grn) => (
-                      <option key={grn.id} value={grn.id}>
-                        {grn.grn_number} - {grn.supplier_name} - {grn.received_date?.substring(0, 10)}
-                      </option>
-                    ))}
-                  </select>
+                  <input
+                    type="text"
+                    className="fc"
+                    placeholder="Search GRN # or Supplier..."
+                    value={form.grn_id && !isDropdownOpen ? `${selectedGrn?.grn_number} - ${selectedGrn?.supplier_name}` : searchGrn}
+                    onChange={(e) => {
+                      setSearchGrn(e.target.value);
+                      if (form.grn_id) handleChange({ target: { name: "grn_id", value: "" } });
+                      setIsDropdownOpen(true);
+                    }}
+                    onFocus={() => setIsDropdownOpen(true)}
+                    onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)}
+                  />
+                  {isDropdownOpen && (
+                    <ul style={{
+                      position: "absolute", top: "100%", left: 0, right: 0,
+                      background: "#fff", border: "1px solid #ccc", borderRadius: 6,
+                      zIndex: 9999, maxHeight: 240, overflowY: "auto", listStyle: "none",
+                      padding: 0, margin: "4px 0 0 0", boxShadow: "0 4px 6px rgba(0,0,0,0.1)"
+                    }}>
+                      {filteredGrns.length ? (
+                        filteredGrns.map((grn) => (
+                          <li
+                            key={grn.id}
+                            style={{ padding: "10px 14px", cursor: "pointer", borderBottom: "1px solid #F1F5F9" }}
+                            onMouseDown={(e) => {
+                              e.preventDefault(); 
+                              handleChange({ target: { name: "grn_id", value: grn.id } });
+                              setSearchGrn("");
+                              setIsDropdownOpen(false);
+                            }}
+                          >
+                            <div style={{ fontWeight: 600 }}>{grn.grn_number}</div>
+                            <div style={{ fontSize: 13, color: "#6B7280" }}>{grn.supplier_name} - {grn.received_date?.substring(0, 10)}</div>
+                          </li>
+                        ))
+                      ) : (
+                        <li style={{ padding: "10px 14px", color: "#6B7280" }}>No matching GRNs found</li>
+                      )}
+                    </ul>
+                  )}
                 </div>
 
                 <div className="ff">
@@ -234,11 +291,11 @@ const AddReturnModal = ({ onClose, onSave }) => {
                   <input
                     className="fc"
                     type="number"
-                    step="0.01"
+                    step={activeItemType === "packaging" ? "1" : "0.01"}
                     min="0"
                     name="quantity"
                     value={form.quantity}
-                    onChange={handleChange}
+                    onChange={handleQuantityChange}
                     placeholder="0.00"
                   />
                 </div>
