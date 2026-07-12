@@ -332,12 +332,26 @@ const updateExportDocumentsByDispatchId = async (req, res) => {
 
 const uploadDocument = async (req, res) => {
     try {
-        const { global_dispatch_id, document_type, reference_number, expiry_date } = req.body;
+        const { global_dispatch_id, document_type, reference_number, expiry_date, reason } = req.body;
         const file = req.file;
         const userId = req.user?.id || null;
 
         if (!global_dispatch_id || !document_type || !reference_number || !file) {
             return res.status(400).json({ message: "Missing required fields: global_dispatch_id, document_type, reference_number, or file" });
+        }
+
+        const existingDocs = await q(`SELECT * FROM shipment_documents WHERE global_dispatch_id = ? AND document_type = ?`, [global_dispatch_id, document_type]);
+        if (existingDocs.length > 0) {
+            if (!reason) {
+                return res.status(400).json({ message: "Reason for change is required when replacing a document" });
+            }
+            const oldDoc = existingDocs[0];
+            await q(`
+                INSERT INTO export_document_revisions (global_dispatch_id, document_type, previous_file, previous_ref_no, previous_expiry_date, reason, changed_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            `, [
+                global_dispatch_id, document_type, oldDoc.file_path, oldDoc.reference_number, oldDoc.expiry_date, reason, userId
+            ]);
         }
 
         const filePath = "/uploads/export_docs/" + file.filename;

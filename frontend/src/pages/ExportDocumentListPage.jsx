@@ -69,13 +69,16 @@ const DocumentUploadRow = ({ doc, shipment, documents = [], onUploadSuccess }) =
   const [file, setFile] = useState(null);
   const [refNo, setRefNo] = useState("");
   const [expiry, setExpiry] = useState("");
+  const [reason, setReason] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [isReplacing, setIsReplacing] = useState(false);
 
   const needsExpiry = doc.type === "phytosanitary_certificate" || doc.type === "health_certificate";
   
   const handleUpload = async () => {
     if (!file) return toast.error("Please select a file to upload");
     if (!refNo.trim()) return toast.error("Reference Number is required");
+    if (isReplacing && !reason.trim()) return toast.error("Reason for change is required");
     
     try {
       setUploading(true);
@@ -84,16 +87,19 @@ const DocumentUploadRow = ({ doc, shipment, documents = [], onUploadSuccess }) =
       formData.append("document_type", doc.type);
       formData.append("reference_number", refNo);
       if (expiry) formData.append("expiry_date", expiry);
+      if (isReplacing) formData.append("reason", reason);
       formData.append("file", file);
 
       await api.post("/export-docs/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" }
       });
       
-      toast.success(doc.label + " uploaded successfully");
+      toast.success(doc.label + (isReplacing ? " replaced successfully" : " uploaded successfully"));
       setFile(null);
       setRefNo("");
       setExpiry("");
+      setReason("");
+      setIsReplacing(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
       onUploadSuccess();
     } catch (err) {
@@ -121,6 +127,9 @@ const DocumentUploadRow = ({ doc, shipment, documents = [], onUploadSuccess }) =
         {isDone ? (
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <span className="badge bg-g">Done</span>
+            <button type="button" className="btn btn-s btn-xs" onClick={() => setIsReplacing(!isReplacing)}>
+              {isReplacing ? "Cancel" : "Replace"}
+            </button>
             <a href={`${api.defaults.baseURL.replace('/api', '')}${uploadedDoc.file_path}`} target="_blank" rel="noreferrer" className="btn btn-s btn-xs">
               View
             </a>
@@ -132,7 +141,7 @@ const DocumentUploadRow = ({ doc, shipment, documents = [], onUploadSuccess }) =
         )}
       </div>
 
-      {isDone ? (
+      {isDone && !isReplacing ? (
         <div style={{ display: "flex", gap: 16, fontSize: 12, color: "var(--text2)", background: "rgba(255,255,255,0.6)", padding: "6px 10px", borderRadius: 6 }}>
           <div><strong>Ref:</strong> {uploadedDoc.reference_number}</div>
           {uploadedDoc.expiry_date && (
@@ -146,7 +155,7 @@ const DocumentUploadRow = ({ doc, shipment, documents = [], onUploadSuccess }) =
           </div>
         </div>
       ) : (
-        !insuranceOptional && (
+        (!insuranceOptional || isReplacing) && (
           <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
             <div className="ff" style={{ flex: 1, minWidth: 150, marginBottom: 0 }}>
               <label className="fl" style={{ fontSize: 10 }}>File <span className="rq">*</span></label>
@@ -162,12 +171,19 @@ const DocumentUploadRow = ({ doc, shipment, documents = [], onUploadSuccess }) =
                 <input type="date" className="fc" style={{ padding: "6px 8px", fontSize: 12 }} value={expiry} onChange={e => setExpiry(e.target.value)} />
               </div>
             )}
-            <button type="button" className="btn btn-p btn-sm" onClick={handleUpload} disabled={uploading || !file || !refNo}>
-              {uploading ? "Uploading..." : "Upload"}
+            {isReplacing && (
+              <div className="ff" style={{ flex: 2, minWidth: 200, marginBottom: 0 }}>
+                <label className="fl" style={{ fontSize: 10 }}>Reason for change <span className="rq">*</span></label>
+                <input type="text" className="fc" style={{ padding: "6px 8px", fontSize: 12 }} placeholder="e.g. Wrong invoice number" value={reason} onChange={e => setReason(e.target.value)} />
+              </div>
+            )}
+            <button type="button" className="btn btn-p btn-sm" onClick={handleUpload} disabled={uploading || !file || !refNo || (isReplacing && !reason)}>
+              {uploading ? (isReplacing ? "Replacing..." : "Uploading...") : (isReplacing ? "Confirm Replace" : "Upload")}
             </button>
           </div>
         )
       )}
+
     </div>
   );
 };
