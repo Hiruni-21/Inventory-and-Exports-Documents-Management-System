@@ -18,58 +18,32 @@ const q = (sql, params = []) =>
     });
   });
 
-const DOC_FIELDS = [
-  "commercial_invoice_status",
-  "packing_list_status",
-  "phytosanitary_certificate_status",
-  "airway_bill_status",
-  "certificate_of_origin_status",
-  "health_certificate_status",
-  "insurance_certificate_status",
-];
-
-const computeAllCleared = (statuses, incoterm) => {
-  const requiredFields =
-    String(incoterm || "").toUpperCase() === "CIF"
-      ? DOC_FIELDS
-      : DOC_FIELDS.filter((field) => field !== "insurance_certificate_status");
-
-  return requiredFields.every((field) => statuses[field] === "done") ? 1 : 0;
-};
-
 const ensureMissingExportDocumentRows = async () => {
   await q(`
-    INSERT INTO export_documents
-    (
-      global_dispatch_id,
-      commercial_invoice_status,
-      packing_list_status,
-      phytosanitary_certificate_status,
-      airway_bill_status,
-      certificate_of_origin_status,
-      health_certificate_status,
-      insurance_certificate_status,
-      all_cleared,
-      notes,
-      updated_by
-    )
-    SELECT
-      gd.id,
-      'pending',
-      'pending',
-      'pending',
-      'pending',
-      'pending',
-      'pending',
-      'pending',
-      0,
-      NULL,
-      NULL
+    INSERT INTO export_documents (global_dispatch_id, all_cleared, notes, updated_by)
+    SELECT gd.id, 0, NULL, NULL
     FROM global_dispatch gd
     LEFT JOIN export_documents ed ON ed.global_dispatch_id = gd.id
     WHERE ed.id IS NULL
   `);
 };
+
+const updateAllClearedStatus = async (globalDispatchId, incoterm) => {
+  const reqDocs = String(incoterm || "").toUpperCase() === "CIF" ? 7 : 6;
+  const countRes = await q(`SELECT COUNT(*) as count FROM shipment_documents WHERE global_dispatch_id = ?`, [globalDispatchId]);
+  const docsDoneCount = countRes[0].count;
+  const allCleared = docsDoneCount >= reqDocs ? 1 : 0;
+
+  await q(`UPDATE export_documents SET all_cleared = ? WHERE global_dispatch_id = ?`, [allCleared, globalDispatchId]);
+  
+  if (allCleared) {
+      await q(`UPDATE global_dispatch SET status = 'cleared' WHERE id = ? AND status = 'docs_pending'`, [globalDispatchId]);
+  } else {
+      await q(`UPDATE global_dispatch SET status = 'docs_pending' WHERE id = ? AND status = 'cleared'`, [globalDispatchId]);
+  }
+  
+  return allCleared;
+}
 
 const getAllExportDocuments = async (req, res) => {
   try {
@@ -79,13 +53,6 @@ const getAllExportDocuments = async (req, res) => {
       SELECT
         ed.id,
         ed.global_dispatch_id,
-        ed.commercial_invoice_status,
-        ed.packing_list_status,
-        ed.phytosanitary_certificate_status,
-        ed.airway_bill_status,
-        ed.certificate_of_origin_status,
-        ed.health_certificate_status,
-        ed.insurance_certificate_status,
         ed.all_cleared,
         ed.notes,
         ed.updated_at,
@@ -99,7 +66,8 @@ const getAllExportDocuments = async (req, res) => {
         gd.incoterm,
         gd.total_weight,
         gd.total_boxes,
-        ${CUSTOMER_DISPLAY_SQL} AS customer_name
+        ${CUSTOMER_DISPLAY_SQL} AS customer_name,
+        (SELECT COUNT(*) FROM shipment_documents sd WHERE sd.global_dispatch_id = gd.id) AS docs_done_count
       FROM export_documents ed
       JOIN global_dispatch gd ON gd.id = ed.global_dispatch_id
       JOIN customers c ON c.id = gd.customer_id
@@ -107,12 +75,10 @@ const getAllExportDocuments = async (req, res) => {
     `);
 
     const normalized = rows.map((row) => {
-      const docsDoneCount = DOC_FIELDS.filter((field) => row[field] === "done").length;
       const insuranceRequired = String(row.incoterm || "").toUpperCase() === "CIF";
 
       return {
         ...row,
-        docs_done_count: docsDoneCount,
         insurance_required: insuranceRequired,
       };
     });
@@ -166,13 +132,6 @@ const getExportDocumentById = async (req, res) => {
       SELECT
         ed.id,
         ed.global_dispatch_id,
-        ed.commercial_invoice_status,
-        ed.packing_list_status,
-        ed.phytosanitary_certificate_status,
-        ed.airway_bill_status,
-        ed.certificate_of_origin_status,
-        ed.health_certificate_status,
-        ed.insurance_certificate_status,
         ed.all_cleared,
         ed.notes,
         ed.updated_at,
@@ -200,7 +159,18 @@ const getExportDocumentById = async (req, res) => {
       return res.status(404).json({ message: "Export document set not found" });
     }
 
-    res.json(rows[0]);
+    const docRow = rows[0];
+    
+    const shipmentDocs = await q(`
+      SELECT sd.*, u.name as uploaded_by_name
+      FROM shipment_documents sd
+      LEFT JOIN users u ON sd.uploaded_by = u.id
+      WHERE sd.global_dispatch_id = ?
+    `, [docRow.global_dispatch_id]);
+    
+    docRow.documents = shipmentDocs;
+
+    res.json(docRow);
   } catch (err) {
     console.error("getExportDocumentById error:", err);
     res.status(500).json({
@@ -219,7 +189,8 @@ const updateExportDocuments = async (req, res) => {
       `
       SELECT
         ed.id,
-        gd.incoterm
+        gd.incoterm,
+        gd.id as global_dispatch_id
       FROM export_documents ed
       JOIN global_dispatch gd ON gd.id = ed.global_dispatch_id
       WHERE ed.id = ?
@@ -232,53 +203,22 @@ const updateExportDocuments = async (req, res) => {
       return res.status(404).json({ message: "Export document set not found" });
     }
 
-    const incoterm = existingRows[0].incoterm;
-
-    const statuses = {
-      commercial_invoice_status: req.body.commercial_invoice_status || "pending",
-      packing_list_status: req.body.packing_list_status || "pending",
-      phytosanitary_certificate_status: req.body.phytosanitary_certificate_status || "pending",
-      airway_bill_status: req.body.airway_bill_status || "pending",
-      certificate_of_origin_status: req.body.certificate_of_origin_status || "pending",
-      health_certificate_status: req.body.health_certificate_status || "pending",
-      insurance_certificate_status:
-        String(incoterm || "").toUpperCase() === "CIF"
-          ? req.body.insurance_certificate_status || "pending"
-          : req.body.insurance_certificate_status || "pending",
-    };
-
-    const allCleared = computeAllCleared(statuses, incoterm);
-
     await q(
       `
       UPDATE export_documents
       SET
-        commercial_invoice_status = ?,
-        packing_list_status = ?,
-        phytosanitary_certificate_status = ?,
-        airway_bill_status = ?,
-        certificate_of_origin_status = ?,
-        health_certificate_status = ?,
-        insurance_certificate_status = ?,
-        all_cleared = ?,
         notes = ?,
         updated_by = ?
       WHERE id = ?
       `,
       [
-        statuses.commercial_invoice_status,
-        statuses.packing_list_status,
-        statuses.phytosanitary_certificate_status,
-        statuses.airway_bill_status,
-        statuses.certificate_of_origin_status,
-        statuses.health_certificate_status,
-        statuses.insurance_certificate_status,
-        allCleared,
         req.body.notes || null,
         userId,
         id,
       ]
     );
+
+    const allCleared = await updateAllClearedStatus(existingRows[0].global_dispatch_id, existingRows[0].incoterm);
 
     res.json({
       message: "Export document set updated successfully",
@@ -316,46 +256,15 @@ const updateExportDocumentsByDispatchId = async (req, res) => {
 
     const incoterm = dispatchRows[0].incoterm;
 
-    const statuses = {
-      commercial_invoice_status: req.body.commercial_invoice_status || "pending",
-      packing_list_status: req.body.packing_list_status || "pending",
-      phytosanitary_certificate_status: req.body.phytosanitary_certificate_status || "pending",
-      airway_bill_status: req.body.airway_bill_status || "pending",
-      certificate_of_origin_status: req.body.certificate_of_origin_status || "pending",
-      health_certificate_status: req.body.health_certificate_status || "pending",
-      insurance_certificate_status:
-        String(incoterm || "").toUpperCase() === "CIF"
-          ? req.body.insurance_certificate_status || "pending"
-          : req.body.insurance_certificate_status || "pending",
-    };
-
-    const allCleared = computeAllCleared(statuses, incoterm);
-
     const updateResult = await q(
       `
       UPDATE export_documents
       SET
-        commercial_invoice_status = ?,
-        packing_list_status = ?,
-        phytosanitary_certificate_status = ?,
-        airway_bill_status = ?,
-        certificate_of_origin_status = ?,
-        health_certificate_status = ?,
-        insurance_certificate_status = ?,
-        all_cleared = ?,
         notes = ?,
         updated_by = ?
       WHERE global_dispatch_id = ?
       `,
       [
-        statuses.commercial_invoice_status,
-        statuses.packing_list_status,
-        statuses.phytosanitary_certificate_status,
-        statuses.airway_bill_status,
-        statuses.certificate_of_origin_status,
-        statuses.health_certificate_status,
-        statuses.insurance_certificate_status,
-        allCleared,
         req.body.notes || null,
         userId,
         globalDispatchId,
@@ -365,18 +274,8 @@ const updateExportDocumentsByDispatchId = async (req, res) => {
     if (!updateResult.affectedRows) {
       return res.status(404).json({ message: "Export document set not found" });
     }
-
-    await q(
-      `
-      UPDATE global_dispatch
-      SET status = CASE
-        WHEN status = 'created' THEN 'docs_pending'
-        ELSE status
-      END
-      WHERE id = ?
-      `,
-      [globalDispatchId]
-    );
+    
+    const allCleared = await updateAllClearedStatus(globalDispatchId, incoterm);
 
     res.json({
       message: "Export document set updated successfully",
@@ -391,10 +290,54 @@ const updateExportDocumentsByDispatchId = async (req, res) => {
   }
 };
 
+const uploadDocument = async (req, res) => {
+    try {
+        const { global_dispatch_id, document_type, reference_number, expiry_date } = req.body;
+        const file = req.file;
+        const userId = req.user?.id || null;
+
+        if (!global_dispatch_id || !document_type || !reference_number || !file) {
+            return res.status(400).json({ message: "Missing required fields: global_dispatch_id, document_type, reference_number, or file" });
+        }
+
+        const filePath = "/uploads/export_docs/" + file.filename;
+
+        // Use REPLACE INTO or INSERT ON DUPLICATE KEY UPDATE to handle overwrites
+        await q(`
+            INSERT INTO shipment_documents (global_dispatch_id, document_type, file_path, reference_number, expiry_date, uploaded_by)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE 
+                file_path = VALUES(file_path),
+                reference_number = VALUES(reference_number),
+                expiry_date = VALUES(expiry_date),
+                uploaded_by = VALUES(uploaded_by),
+                uploaded_at = CURRENT_TIMESTAMP
+        `, [
+            global_dispatch_id, 
+            document_type, 
+            filePath, 
+            reference_number, 
+            expiry_date || null, 
+            userId
+        ]);
+
+        const dispatchRows = await q(`SELECT incoterm FROM global_dispatch WHERE id = ?`, [global_dispatch_id]);
+        const incoterm = dispatchRows.length ? dispatchRows[0].incoterm : "FOB";
+        
+        await updateAllClearedStatus(global_dispatch_id, incoterm);
+
+        res.json({ message: "Document uploaded successfully", file_path: filePath });
+    } catch (err) {
+        console.error("uploadDocument error:", err);
+        res.status(500).json({ message: "Failed to upload document", error: err.message });
+    }
+};
+
 module.exports = {
   getAllExportDocuments,
   getExportDocumentShipments,
   getExportDocumentById,
   updateExportDocuments,
   updateExportDocumentsByDispatchId,
+  uploadDocument
 };
