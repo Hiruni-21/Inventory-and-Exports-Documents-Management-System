@@ -367,9 +367,15 @@ const ExportDocumentListPage = () => {
                         )}
                       </td>
                       <td>
-                        <span className={row.all_cleared ? "badge bg-g" : "badge bg-a"}>
-                          {row.all_cleared ? "Yes" : "No"}
-                        </span>
+                        {row.all_cleared ? (
+                          <span className="badge bg-g">All Cleared</span>
+                        ) : docsDone === 0 ? (
+                          <span className="badge bg-w">Not Started</span>
+                        ) : (
+                          <span className="badge bg-a" style={{ whiteSpace: "normal", maxWidth: 200, display: "inline-block", textAlign: "left", lineHeight: 1.4 }}>
+                            {docsDone}/{reqCount} — {row.pending_docs?.join(", ") || "Pending"} pending
+                          </span>
+                        )}
                       </td>
                     </tr>
                   );

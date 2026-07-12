@@ -83,6 +83,14 @@ const getAllExportDocuments = async (req, res) => {
         gd.total_boxes,
         c.city,
         ${CUSTOMER_DISPLAY_SQL} AS customer_name,
+        ed.commercial_invoice_status,
+        ed.packing_list_status,
+        ed.phytosanitary_certificate_status,
+        ed.airway_bill_status,
+        ed.certificate_of_origin_status,
+        ed.health_certificate_status,
+        ed.insurance_certificate_status,
+        ed.gsp_form_a_status,
         (SELECT COUNT(*) FROM shipment_documents sd WHERE sd.global_dispatch_id = gd.id) AS docs_done_count
       FROM export_documents ed
       JOIN global_dispatch gd ON gd.id = ed.global_dispatch_id
@@ -94,10 +102,21 @@ const getAllExportDocuments = async (req, res) => {
       const insuranceRequired = String(row.incoterm || "").toUpperCase() === "CIF";
       const isEU = isEUCountry(row.city); // Note: we need row.city in the query!
 
+      const pendingDocs = [];
+      if (row.commercial_invoice_status !== 'done') pendingDocs.push("Commercial Invoice");
+      if (row.packing_list_status !== 'done') pendingDocs.push("Packing List");
+      if (row.phytosanitary_certificate_status !== 'done') pendingDocs.push("Phyto Cert");
+      if (row.airway_bill_status !== 'done') pendingDocs.push("Airway Bill");
+      if (row.certificate_of_origin_status !== 'done') pendingDocs.push("Cert of Origin");
+      if (row.health_certificate_status !== 'done') pendingDocs.push("Health Cert");
+      if (insuranceRequired && row.insurance_certificate_status !== 'done') pendingDocs.push("Insurance");
+      if (isEU && row.gsp_form_a_status !== 'done') pendingDocs.push("GSP Form A");
+
       return {
         ...row,
         insurance_required: insuranceRequired,
-        is_eu: isEU
+        is_eu: isEU,
+        pending_docs: pendingDocs
       };
     });
 
