@@ -372,8 +372,8 @@ const ExportDocumentListPage = () => {
                         ) : docsDone === 0 ? (
                           <span className="badge bg-w">Not Started</span>
                         ) : (
-                          <span className="badge bg-a" style={{ whiteSpace: "normal", maxWidth: 200, display: "inline-block", textAlign: "left", lineHeight: 1.4 }}>
-                            {docsDone}/{reqCount} — {row.pending_docs?.join(", ") || "Pending"} pending
+                          <span className="badge bg-a" title={row.pending_docs?.join(", ")}>
+                            {docsDone}/{reqCount} — {reqCount - docsDone} pending
                           </span>
                         )}
                       </td>
