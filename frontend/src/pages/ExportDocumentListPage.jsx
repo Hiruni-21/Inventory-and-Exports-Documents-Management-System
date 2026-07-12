@@ -523,7 +523,7 @@ const ExportDocumentListPage = () => {
 
       {noShipments && (
         <div className="ib ib-i" style={{ marginTop: 18 }}>
-          <span>ℹ️</span>
+          <span>ℹ</span>
           <div>Create a global shipment first, then manage its export documents.</div>
         </div>
       )}
@@ -540,7 +540,7 @@ const ExportDocumentListPage = () => {
             style={{ width: "100%", maxWidth: 920, maxHeight: "92vh", display: "flex", flexDirection: "column" }}
           >
             <div className="md-h">
-              <h3>📄 Create / Update Export Document Set</h3>
+              <h3>Create / Update Export Document Set</h3>
               <button type="button" className="md-x" onClick={closeModal}>
                 ✕
               </button>
@@ -552,7 +552,7 @@ const ExportDocumentListPage = () => {
             >
               <div className="md-b" style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>
                 <div className="ib ib-i">
-                  <span>📄</span>
+                  <span></span>
                   <div>
                     All {requiredCount} documents must be marked Done before the shipment can be
                     Cleared and stock deducted.
@@ -656,7 +656,7 @@ const ExportDocumentListPage = () => {
                             onClick={() => setDocStatus(doc.key, "done")}
                             disabled={insuranceOptional}
                           >
-                            ✅ Done
+                            Done
                           </button>
 
                           <button
@@ -667,7 +667,7 @@ const ExportDocumentListPage = () => {
                             style={{ padding: "3px 10px", fontSize: 10 }}
                             onClick={() => setDocStatus(doc.key, "pending")}
                           >
-                            ❌ Missing
+                            Missing
                           </button>
                         </div>
 
@@ -676,7 +676,7 @@ const ExportDocumentListPage = () => {
                           className="btn btn-s btn-xs"
                           onClick={() => handleUploadPlaceholder(doc.label)}
                         >
-                          📎 Upload
+                          Upload
                         </button>
                       </div>
                     );
@@ -734,7 +734,7 @@ const ExportDocumentListPage = () => {
                 </button>
 
                 <button type="submit" className="btn btn-p" disabled={saving}>
-                  {saving ? "Saving..." : "💾 Save Document Status"}
+                  {saving ? "Saving..." : "Save Document Status"}
                 </button>
               </div>
             </form>

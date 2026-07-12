@@ -473,7 +473,7 @@ export default function GlobalCustomersPage() {
       <div className="content-card">
         <div className="card-header-row">
           <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            ✈️ Customers — Export
+            Customers — Export
             <span 
               title="Global customers receive airline shipments. Click any row to view details, shipment history and actions. No returns after departure."
               style={{ cursor: "help", color: "#6B7D71", display: "flex", alignItems: "center", justifyContent: "center", width: 20, height: 20, borderRadius: "50%", background: "#F1F5F9", fontSize: 12, border: "1px solid #E2E8F0" }}
@@ -556,7 +556,7 @@ export default function GlobalCustomersPage() {
 
           <div className={`details-panel ${showDetailsPanel ? "open" : ""}`}>
             <div className="details-panel-header">
-              <div className="details-panel-icon">✈️</div>
+              <div className="details-panel-icon"></div>
 
               <div className="details-panel-head-text">
                 <h3>{selectedCustomer.customerName}</h3>
@@ -739,7 +739,7 @@ export default function GlobalCustomersPage() {
         <div className="modal-backdrop" onClick={closeModal}>
           <div className="md md-lg" onClick={(e) => e.stopPropagation()}>
             <div className="md-h">
-              <h3>{modalMode === "add" ? "✈️ Add Customer" : "✏️ Edit Customer"}</h3>
+              <h3>{modalMode === "add" ? "Add Customer" : "✏Edit Customer"}</h3>
               <button type="button" className="md-x" onClick={closeModal}>
                 ✕
               </button>
@@ -751,7 +751,7 @@ export default function GlobalCustomersPage() {
             >
               <div className="md-b" style={{ overflowY: "auto", maxHeight: "calc(90vh - 150px)" }}>
                 <div className="ib ib-w" style={{ marginTop: "-4px", marginBottom: "14px" }}>
-                  <span>✈️</span>
+                  <span></span>
                   <div>
                     Global customers receive airline shipments. All 7 export documents required per shipment.{" "}
                     <strong>No returns after departure.</strong>
@@ -946,14 +946,14 @@ export default function GlobalCustomersPage() {
                           className={`to ${form.phytoRequired ? "on" : ""}`}
                           onClick={() => setForm((prev) => ({ ...prev, phytoRequired: true }))}
                         >
-                          ✅ Yes (standard)
+                          Yes (standard)
                         </button>
                         <button
                           type="button"
                           className={`to ${!form.phytoRequired ? "on" : ""}`}
                           onClick={() => setForm((prev) => ({ ...prev, phytoRequired: false }))}
                         >
-                          ❌ Not required
+                          Not required
                         </button>
                       </div>
                     </div>
@@ -966,7 +966,7 @@ export default function GlobalCustomersPage() {
                           className={`to ${form.coldChainRequired ? "on" : ""}`}
                           onClick={() => setForm((prev) => ({ ...prev, coldChainRequired: true }))}
                         >
-                          🧊 Yes — Thermocol boxes
+                          Yes — Thermocol boxes
                         </button>
                         <button
                           type="button"

@@ -81,7 +81,7 @@ const GrnListPage = () => {
 
       {error ? (
         <div className="ib ib-d">
-          <span>⚠️</span>
+          <span></span>
           <div>{error}</div>
         </div>
       ) : null}

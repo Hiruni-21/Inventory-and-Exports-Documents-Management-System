@@ -70,7 +70,7 @@ const GrnDetailsPage = () => {
   if (error) {
     return (
       <div className="ib ib-d" style={{ padding: 24 }}>
-        <span>⚠️</span>
+        <span></span>
         <div>{error}</div>
       </div>
     );

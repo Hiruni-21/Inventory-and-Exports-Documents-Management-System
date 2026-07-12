@@ -252,8 +252,7 @@ const SupplierListPage = () => {
                   <td>
                     <div style={{ display: "flex", gap: 8 }}>
                       <button type="button" className="ab" title="Edit" onClick={(e) => openEdit(row, e)}>
-                        ✏️
-                      </button>
+                        ✏                      </button>
                       <button type="button" className="ab d" title="Delete" onClick={(e) => handleDelete(row, e)}>
                         🗑
                       </button>
@@ -274,7 +273,7 @@ const SupplierListPage = () => {
         <div className="modal-backdrop" onClick={closeModal}>
           <div className="md md-lg" onClick={(e) => e.stopPropagation()}>
             <div className="md-h">
-              <h3>{editingId ? "✏️ Edit Supplier" : "🌿 Add Supplier"}</h3>
+              <h3>{editingId ? "✏Edit Supplier" : "Add Supplier"}</h3>
               <button type="button" className="md-x" onClick={closeModal}>
                 ✕
               </button>
@@ -401,18 +400,18 @@ const SupplierListPage = () => {
               </div>
 
               <div style={{ borderTop: "1px solid var(--border)", paddingTop: 20 }}>
-                <h4 style={{ margin: "0 0 16px", color: "var(--g800)" }}>📦 What They Supply</h4>
+                <h4 style={{ margin: "0 0 16px", color: "var(--g800)" }}>What They Supply</h4>
                 
                 {(!selectedSupplier.items || selectedSupplier.items.length === 0) ? (
                   <div className="ib ib-i" style={{ margin: 0 }}>
-                    <span>ℹ️</span>
+                    <span>ℹ</span>
                     <div>No linked items found for this supplier. You can link items from the <strong>Items form</strong> page.</div>
                   </div>
                 ) : (
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
                     <div>
                       <h5 style={{ margin: "0 0 10px", color: "var(--text2)", borderBottom: "1px dashed var(--border)", paddingBottom: 4 }}>
-                        📦 Packaging Materials
+                        Packaging Materials
                       </h5>
                       {selectedSupplier.items.filter(i => i.stock_type === "packaging").length === 0 ? (
                         <div style={{ fontSize: 13, color: "var(--text3)", fontStyle: "italic" }}>No linked packaging materials.</div>
@@ -432,7 +431,7 @@ const SupplierListPage = () => {
 
                     <div>
                       <h5 style={{ margin: "0 0 10px", color: "var(--text2)", borderBottom: "1px dashed var(--border)", paddingBottom: 4 }}>
-                        🌱 Export Products
+                        Export Products
                       </h5>
                       {selectedSupplier.items.filter(i => i.stock_type === "produce").length === 0 ? (
                         <div style={{ fontSize: 13, color: "var(--text3)", fontStyle: "italic" }}>No linked produce products.</div>

@@ -50,7 +50,7 @@ const AddCategoryPage = () => {
   return (
     <>
       <div className="ib ib-i">
-        <span>🗂️</span>
+
         <div>
           Create item categories that match your real Fresh World product groups such as Organic
           Vegetables, Organic Fruits, Herbs, Dairy Products and Hotel Requirements.
@@ -60,7 +60,7 @@ const AddCategoryPage = () => {
       <form onSubmit={handleSubmit}>
         <div className="content-card" style={{ marginTop: 16 }}>
           <div className="card-header-row">
-            <h3>🗂️ Add Item Category</h3>
+            <h3> Add Item Category</h3>
           </div>
 
           <div style={{ padding: 20 }}>

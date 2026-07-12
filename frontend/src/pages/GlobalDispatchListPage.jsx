@@ -63,6 +63,38 @@ const requiredDocsCount = (rowOrIncoterm) =>
     ? 7
     : 6;
 
+const uploadDocsStyle = {
+  height: 34,
+  padding: "0 14px",
+  borderRadius: 14,
+  border: "1.5px solid #2E8B57",
+  background: "#2E8B57",
+  color: "#FFFFFF",
+  fontWeight: 700,
+  fontSize: 12,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  whiteSpace: "nowrap",
+};
+
+const viewDocsStyle = {
+  height: 34,
+  padding: "0 14px",
+  borderRadius: 14,
+  border: "1.5px solid #CFE2D4",
+  background: "#FFFFFF",
+  color: "#215D3D",
+  fontWeight: 700,
+  fontSize: 12,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  whiteSpace: "nowrap",
+};
+
 const docsDoneCount = (exportDocuments, incoterm) => {
   if (!exportDocuments) return 0;
 
@@ -587,7 +619,7 @@ export default function GlobalDispatchListPage() {
       <div className="content-card global-dispatch-card">
         <div className="card-header-row">
           <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            ✈️ Dispatch — Export Shipments
+            Dispatch — Export Shipments
             <span 
               title="Stock deducted only when Cleared (all 7 docs verified). Click any row to view shipment details and document status."
               style={{ cursor: "help", color: "#6B7D71", display: "flex", alignItems: "center", justifyContent: "center", width: 20, height: 20, borderRadius: "50%", background: "#F1F5F9", fontSize: 12, border: "1px solid #E2E8F0" }}
@@ -659,14 +691,10 @@ export default function GlobalDispatchListPage() {
                         <div className="gd-actions" onClick={(e) => e.stopPropagation()}>
                           <button
                             type="button"
-                            className={
-                              docsComplete
-                                ? "gd-action-btn gd-action-btn-secondary"
-                                : "gd-action-btn gd-action-btn-primary"
-                            }
+                            style={docsComplete ? viewDocsStyle : uploadDocsStyle}
                             onClick={(e) => handleOpenDocs(row.id, e)}
                           >
-                            {docsComplete ? "📄 View Docs" : "📄 Upload Docs"}
+                            {docsComplete ? "View Docs" : "Upload Docs"}
                           </button>
                         </div>
                       </td>
@@ -689,7 +717,7 @@ export default function GlobalDispatchListPage() {
 
           <aside className="details-panel open">
             <div className="details-panel-header">
-              <div className="details-panel-icon">✈️</div>
+              <div className="details-panel-icon"></div>
 
               <div className="details-panel-head-text">
                 <h3>{detailsShipment.dispatch_number}</h3>
@@ -790,37 +818,37 @@ export default function GlobalDispatchListPage() {
                       <tr>
                         <td>Commercial Invoice</td>
                         <td style={{ textAlign: "right" }}>
-                          {detailsShipment.export_documents?.commercial_invoice_status === "done" ? "✅ Done" : "❌ Missing"}
+                          {detailsShipment.export_documents?.commercial_invoice_status === "done" ? "Done" : "Missing"}
                         </td>
                       </tr>
                       <tr>
                         <td>Packing List</td>
                         <td style={{ textAlign: "right" }}>
-                          {detailsShipment.export_documents?.packing_list_status === "done" ? "✅ Done" : "❌ Missing"}
+                          {detailsShipment.export_documents?.packing_list_status === "done" ? "Done" : "Missing"}
                         </td>
                       </tr>
                       <tr>
                         <td>Phytosanitary Certificate</td>
                         <td style={{ textAlign: "right" }}>
-                          {detailsShipment.export_documents?.phytosanitary_certificate_status === "done" ? "✅ Done" : "❌ Missing"}
+                          {detailsShipment.export_documents?.phytosanitary_certificate_status === "done" ? "Done" : "Missing"}
                         </td>
                       </tr>
                       <tr>
                         <td>Airway Bill (AWB)</td>
                         <td style={{ textAlign: "right" }}>
-                          {detailsShipment.export_documents?.airway_bill_status === "done" ? "✅ Done" : "❌ Missing"}
+                          {detailsShipment.export_documents?.airway_bill_status === "done" ? "Done" : "Missing"}
                         </td>
                       </tr>
                       <tr>
                         <td>Certificate of Origin</td>
                         <td style={{ textAlign: "right" }}>
-                          {detailsShipment.export_documents?.certificate_of_origin_status === "done" ? "✅ Done" : "❌ Missing"}
+                          {detailsShipment.export_documents?.certificate_of_origin_status === "done" ? "Done" : "Missing"}
                         </td>
                       </tr>
                       <tr>
                         <td>Health Certificate</td>
                         <td style={{ textAlign: "right" }}>
-                          {detailsShipment.export_documents?.health_certificate_status === "done" ? "✅ Done" : "❌ Missing"}
+                          {detailsShipment.export_documents?.health_certificate_status === "done" ? "Done" : "Missing"}
                         </td>
                       </tr>
                       <tr>
@@ -828,9 +856,9 @@ export default function GlobalDispatchListPage() {
                         <td style={{ textAlign: "right" }}>
                           {isInsuranceRequired(detailsShipment.incoterm)
                             ? detailsShipment.export_documents?.insurance_certificate_status === "done"
-                              ? "✅ Done"
-                              : "❌ Missing"
-                            : "ℹ️ CIF only"}
+                              ? "Done"
+                              : "Missing"
+                            : "ℹCIF only"}
                         </td>
                       </tr>
                     </tbody>
@@ -859,14 +887,14 @@ export default function GlobalDispatchListPage() {
                     style={{ flex: 1, justifyContent: "center" }}
                     onClick={() => handleClearShipment(detailsShipment.id)}
                   >
-                    ✅ Mark Cleared
+                    Mark Cleared
                   </button>
                   <button
                     type="button"
                     className="btn btn-s"
                     onClick={() => handleOpenDocs(detailsShipment.id)}
                   >
-                    📄 View Docs
+                    View Docs
                   </button>
                 </>
               ) : currentDetailStatus === "Cleared" ? (
@@ -877,14 +905,14 @@ export default function GlobalDispatchListPage() {
                     style={{ flex: 1, justifyContent: "center", background: "var(--s)" }}
                     onClick={() => handleMarkDelivered(detailsShipment.id)}
                   >
-                    ✅ Mark Delivered
+                    Mark Delivered
                   </button>
                   <button
                     type="button"
                     className="btn btn-s"
                     onClick={() => handleOpenDocs(detailsShipment.id)}
                   >
-                    📄 View Docs
+                    View Docs
                   </button>
                 </>
               ) : (
@@ -902,8 +930,8 @@ export default function GlobalDispatchListPage() {
                   >
                     {detailDocsDone === detailRequiredDocs &&
                     detailsShipment.export_documents?.all_cleared
-                      ? "📄 View Docs"
-                      : "📄 Upload Docs"}
+                      ? "View Docs"
+                      : "Upload Docs"}
                   </button>
                   <button type="button" className="btn btn-s" onClick={closeDetails}>
                     Close
@@ -933,7 +961,7 @@ export default function GlobalDispatchListPage() {
             }}
           >
             <div className="md-h">
-              <h3>✈️ New Global Dispatch (Export Shipment)</h3>
+              <h3>New Global Dispatch (Export Shipment)</h3>
               <button type="button" className="md-x" onClick={closeShipmentModal}>
                 ✕
               </button>
@@ -958,7 +986,7 @@ export default function GlobalDispatchListPage() {
                 }}
               >
                 <div className="ib ib-w">
-                  <span>✈️</span>
+                  <span></span>
                   <div>
                     Stock deducted only when all 7 export documents are verified and shipment is cleared.
                     No returns after departure.
