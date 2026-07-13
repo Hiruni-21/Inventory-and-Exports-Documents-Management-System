@@ -224,6 +224,62 @@ const getIconBoxStyle = (isActive) => ({
   transition: "all .18s ease",
 });
 
+const renderUtilityIcon = (type) => {
+  const common = {
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    fill: "none",
+  };
+  const wrap = (children, size = 16, mr = 6) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" style={{ marginRight: mr, verticalAlign: "middle" }}>
+      {children}
+    </svg>
+  );
+
+  switch (type) {
+    case "excel":
+      return wrap(
+        <>
+          <rect x="3" y="3" width="18" height="18" rx="2" {...common} />
+          <path d="M3 9h18 M9 21V9" {...common} />
+        </>
+      );
+    case "pdf":
+      return wrap(
+        <>
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" {...common} />
+          <path d="M14 2v6h6 M16 13H8 M16 17H8 M10 9H8" {...common} />
+        </>
+      );
+    case "csv":
+      return wrap(
+        <>
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" {...common} />
+          <path d="M14 2v6h6" {...common} />
+        </>
+      );
+    case "loading":
+      return (
+        <svg width="18" height="18" viewBox="0 0 24 24" style={{ marginRight: 8, verticalAlign: "middle", animation: "spin 1s linear infinite" }} className="spin">
+          <circle cx="12" cy="12" r="10" {...common} strokeDasharray="16" strokeLinecap="round" />
+        </svg>
+      );
+    case "error":
+      return wrap(
+        <>
+          <circle cx="12" cy="12" r="10" {...common} />
+          <path d="M12 8v4 M12 16h.01" {...common} />
+        </>,
+        18,
+        8
+      );
+    default:
+      return null;
+  }
+};
+
 const renderReportIcon = (reportId, isActive) => {
   const stroke = isActive ? "#4AA35A" : "#4AA35A";
   const common = {
@@ -830,7 +886,7 @@ const ReportsPage = () => {
           <div style={chartWrapStyle}>
             {loadingCharts ? (
               <div className="ib ib-i">
-                <span>⏳</span>
+                {renderUtilityIcon("loading")}
                 <div>Loading chart...</div>
               </div>
             ) : (
@@ -868,7 +924,7 @@ const ReportsPage = () => {
           <div style={chartWrapStyle}>
             {loadingCharts ? (
               <div className="ib ib-i">
-                <span>⏳</span>
+                {renderUtilityIcon("loading")}
                 <div>Loading chart...</div>
               </div>
             ) : (
@@ -955,28 +1011,28 @@ const ReportsPage = () => {
                     className={`to ${filters.format === "excel" ? "on" : ""}`}
                     onClick={() => setFilters((prev) => ({ ...prev, format: "excel" }))}
                   >
-                    📊 Excel (.xlsx)
+                    {renderUtilityIcon("excel")} Excel (.xlsx)
                   </button>
                   <button
                     type="button"
                     className={`to ${filters.format === "pdf" ? "on" : ""}`}
                     onClick={() => setFilters((prev) => ({ ...prev, format: "pdf" }))}
                   >
-                    📄 PDF
+                    {renderUtilityIcon("pdf")} PDF
                   </button>
                   <button
                     type="button"
                     className={`to ${filters.format === "csv" ? "on" : ""}`}
                     onClick={() => setFilters((prev) => ({ ...prev, format: "csv" }))}
                   >
-                    📁 CSV
+                    {renderUtilityIcon("csv")} CSV
                   </button>
                 </div>
               </div>
 
               {previewError ? (
                 <div className="ib ib-d">
-                  <span>⚠️</span>
+                  {renderUtilityIcon("error")}
                   <div>{previewError}</div>
                 </div>
               ) : null}
