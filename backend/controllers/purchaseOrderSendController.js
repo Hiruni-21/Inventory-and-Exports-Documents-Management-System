@@ -5,6 +5,7 @@ const {
   sendPurchaseOrderEmail,
   buildPurchaseOrderEmailHtml,
 } = require("../services/purchaseOrderEmail.service");
+const logActivity = require("../utils/logActivity");
 
 const q = (sql, params = []) =>
   new Promise((resolve, reject) => {
@@ -115,7 +116,8 @@ const loadPurchaseOrderBundle = async (purchaseOrderId) => {
   };
 };
 
-const updatePoAsSent = async (purchaseOrderId, userId) => {
+const updatePoAsSent = async (purchaseOrderId, req) => {
+  const userId = req.user?.id || null;
   await q(
     `
       UPDATE purchase_orders
@@ -124,8 +126,21 @@ const updatePoAsSent = async (purchaseOrderId, userId) => {
           updated_at = NOW()
       WHERE id = ?
     `,
-    [userId || null, purchaseOrderId]
+    [userId, purchaseOrderId]
   );
+  
+  const poRows = await q(`SELECT po_number FROM purchase_orders WHERE id = ?`, [purchaseOrderId]);
+  if (poRows.length > 0) {
+    logActivity({
+      user_id: userId,
+      user_name: req.user?.name || "System",
+      module: "Purchase Orders",
+      action: `Sent Purchase Order ${poRows[0].po_number}`,
+      reference_type: "purchase_order",
+      reference_id: purchaseOrderId,
+      ip_address: req.ip,
+    });
+  }
 };
 
 const renderPdf = async (req, res) => {
@@ -189,7 +204,7 @@ const sendEmail = async (req, res) => {
       pdfFileName: pdfInfo.fileName,
     });
 
-     await updatePoAsSent(bundle.po.id, req.user?.id || null);
+     await updatePoAsSent(bundle.po.id, req);
 
     const { sendNotification } = require("../utils/notificationHelper");
     sendNotification({

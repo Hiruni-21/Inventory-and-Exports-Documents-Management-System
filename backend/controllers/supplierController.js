@@ -82,13 +82,13 @@ const createSupplier = (req, res) => {
 
       logActivity({
         user_id: req.user?.id,
-        user_name: req.user?.full_name,
+        user_name: req.user?.name || "System",
         module: "Suppliers",
         action: `Created Supplier ${supplier_name}`,
         reference_type: "supplier",
         reference_id: result.insertId,
         ip_address: req.ip,
-      }).catch(err => console.error("Activity log error:", err));
+      });
 
       res.status(201).json({
         message: "Supplier created successfully",
@@ -137,13 +137,13 @@ const updateSupplier = (req, res) => {
 
       logActivity({
         user_id: req.user?.id,
-        user_name: req.user?.full_name,
+        user_name: req.user?.name || "System",
         module: "Suppliers",
         action: `Updated Supplier ${supplier_name}`,
         reference_type: "supplier",
         reference_id: id,
         ip_address: req.ip,
-      }).catch(err => console.error("Activity log error:", err));
+      });
 
       res.json({ message: "Supplier updated successfully" });
     }
