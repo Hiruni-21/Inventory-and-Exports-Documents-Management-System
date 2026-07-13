@@ -51,48 +51,6 @@ const getLowStockReport = (req, res) => {
   });
 };
 
-const getStockMovementsReport = (req, res) => {
-  const { from, to, category } = req.query;
-
-  let sql = `
-    SELECT
-      sm.id,
-      i.item_code,
-      i.item_name,
-      i.unit,
-      c.category_name,
-      sm.movement_type,
-      sm.reference_type,
-      sm.reference_id,
-      sm.quantity,
-      sm.notes,
-      sm.created_at
-    FROM stock_movements sm
-    JOIN items i ON sm.item_id = i.id
-    LEFT JOIN item_categories c ON i.category_id = c.id
-    WHERE 1=1
-  `;
-  const params = [];
-
-  if (from && to) {
-    sql += ` AND DATE(sm.created_at) BETWEEN ? AND ? `;
-    params.push(from, to);
-  }
-
-  if (category && category !== "All Categories") {
-    sql += ` AND c.category_name = ? `;
-    params.push(category);
-  }
-
-  sql += ` ORDER BY sm.id DESC `;
-
-  db.query(sql, params, (err, results) => {
-    if (err) {
-      return res.status(500).json({ message: "Database error", error: err.message });
-    }
-    res.json(results);
-  });
-};
 
 const getDispatchReport = (req, res) => {
   const { start_date, end_date } = req.query;
@@ -305,7 +263,6 @@ const getStockValuationReport = (req, res) => {
 module.exports = {
   getStockSummaryReport,
   getLowStockReport,
-  getStockMovementsReport,
   getDispatchReport,
   getWastageReport,
   getReturnReport,

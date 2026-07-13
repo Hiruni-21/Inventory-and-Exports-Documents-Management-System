@@ -12,13 +12,6 @@ const REPORT_CARDS = [
     endpoints: ["/reports/supplier-purchase", "/reports/purchase-orders", "/reports/supplier-purchases"],
   },
   {
-    id: "stock-movement",
-    title: "Item Stock Movement",
-    description: "In/out movements per item, any period",
-    frequency: "Custom",
-    endpoints: ["/reports/stock-movement", "/reports/movements", "/reports/inventory-movement"],
-  },
-  {
     id: "wastage",
     title: "Monthly Wastage Report",
     description: "By item, batch, cause, LKR loss, trend",
@@ -38,13 +31,6 @@ const REPORT_CARDS = [
     description: "LKR value of all stock by category",
     frequency: "Monthly",
     endpoints: ["/reports/valuation", "/inventory/valuation"],
-  },
-  {
-    id: "expiry",
-    title: "Expiry Report",
-    description: "Expiring within 7/14/30 days + estimated loss",
-    frequency: "Daily",
-    endpoints: ["/reports/expiry", "/inventory/expiry"],
   },
   {
     id: "packaging",
@@ -211,25 +197,25 @@ const fetchFirstSuccess = async (endpoints, params = {}) => {
 
 const getReportCardStyle = (isActive) => ({
   background: "white",
-  borderRadius: 20,
-  padding: "22px",
+  borderRadius: 12,
+  padding: "16px",
   border: `1px solid ${isActive ? "var(--g300)" : "var(--border)"}`,
   boxShadow: isActive
-    ? "0 10px 20px rgba(10,40,24,.08)"
-    : "0 2px 8px rgba(10,40,24,.03)",
+    ? "0 4px 12px rgba(10,40,24,.06)"
+    : "0 1px 4px rgba(10,40,24,.03)",
   cursor: "pointer",
-  minHeight: 154,
+  minHeight: 90,
   display: "flex",
   alignItems: "center",
-  gap: 20,
-  transform: isActive ? "translateY(-2px)" : "translateY(0)",
+  gap: 16,
+  transform: isActive ? "translateY(-1px)" : "translateY(0)",
   transition: "all .18s ease",
 });
 
 const getIconBoxStyle = (isActive) => ({
-  width: 84,
-  height: 84,
-  borderRadius: 20,
+  width: 54,
+  height: 54,
+  borderRadius: 10,
   background: isActive ? "rgba(224,242,230,1)" : "rgba(224,242,230,.78)",
   display: "flex",
   alignItems: "center",
@@ -249,7 +235,7 @@ const renderReportIcon = (reportId, isActive) => {
   };
 
   const wrap = (children) => (
-    <svg width="38" height="38" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <svg width="26" height="26" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
       {children}
     </svg>
   );
@@ -289,7 +275,7 @@ const renderReportIcon = (reportId, isActive) => {
 
 case "returns":
   return (
-    <svg width="38" height="38" viewBox="0 0 24 24" fill="none">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
       <path
         d="M7 6V3L3 7L7 11V8"
         {...common}
@@ -776,12 +762,12 @@ const ReportsPage = () => {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div
                   style={{
-                    fontSize: 15,
+                    fontSize: 14,
                     fontWeight: 700,
                     color: "var(--g900)",
-                    lineHeight: 1.35,
+                    lineHeight: 1.3,
                     letterSpacing: "-0.2px",
-                    marginBottom: 8,
+                    marginBottom: 4,
                   }}
                 >
                   {report.title}
@@ -791,8 +777,8 @@ const ReportsPage = () => {
                   style={{
                     fontSize: 11,
                     color: "#7B7B90",
-                    lineHeight: 1.55,
-                    marginBottom: 10,
+                    lineHeight: 1.4,
+                    marginBottom: 6,
                   }}
                 >
                   {report.description}

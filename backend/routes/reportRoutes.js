@@ -4,7 +4,6 @@ const router = express.Router();
 const {
   getStockSummaryReport,
   getLowStockReport,
-  getStockMovementsReport,
   getDispatchReport,
   getWastageReport,
   getReturnReport,
@@ -23,7 +22,6 @@ router.get("/export-documents", verifyToken, allowRoles("manager", "operations",
 
 // Updated routes for the Reports dashboard
 router.get("/supplier-purchase", verifyToken, allowRoles("manager", "operations", "supervisor"), getSupplierPurchaseReport);
-router.get("/stock-movement", verifyToken, allowRoles("manager", "operations", "supervisor"), getStockMovementsReport);
 router.get("/wastage", verifyToken, allowRoles("manager", "operations", "supervisor"), getWastageReport);
 router.get("/returns", verifyToken, allowRoles("manager", "operations", "supervisor"), getReturnReport);
 router.get("/valuation", verifyToken, allowRoles("manager", "operations", "supervisor"), getStockValuationReport);
