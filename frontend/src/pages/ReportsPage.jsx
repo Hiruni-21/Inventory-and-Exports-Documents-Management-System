@@ -816,19 +816,29 @@ const ReportsPage = () => {
 
       <div className="g2">
         <div style={chartCardStyle}>
-          <div style={{ marginBottom: 10 }}>
-            <h3
-              style={{
-                fontSize: 14,
-                fontWeight: 700,
-                color: "var(--g900)",
-                marginBottom: 3,
-                letterSpacing: "-.2px",
-              }}
-            >
-              Export Dispatch — Monthly (kg)
-            </h3>
-            <p style={{ fontSize: 11, color: "var(--text3)" }}>Volume comparison</p>
+          <div style={{ marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
+                <div style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {renderReportIcon("dispatch", true)}
+                </div>
+                <h3
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 700,
+                    color: "var(--g900)",
+                    letterSpacing: "-.2px",
+                    margin: 0
+                  }}
+                >
+                  Export Dispatch — Monthly (kg)
+                </h3>
+              </div>
+              <p style={{ fontSize: 12, color: "var(--text3)", margin: 0, paddingLeft: 36 }}>Volume comparison</p>
+            </div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "var(--g700)", background: "rgba(224,242,230,1)", padding: "4px 10px", borderRadius: 12 }}>
+              Live Chart
+            </div>
           </div>
 
           <div style={chartWrapStyle}>
@@ -844,19 +854,29 @@ const ReportsPage = () => {
         </div>
 
         <div style={chartCardStyle}>
-          <div style={{ marginBottom: 10 }}>
-            <h3
-              style={{
-                fontSize: 14,
-                fontWeight: 700,
-                color: "var(--g900)",
-                marginBottom: 3,
-                letterSpacing: "-.2px",
-              }}
-            >
-              Top 5 Global Customers by Value
-            </h3>
-            <p style={{ fontSize: 11, color: "var(--text3)" }}>This quarter (LKR thousands)</p>
+          <div style={{ marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
+                <div style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {renderReportIcon("sup-perf", true)}
+                </div>
+                <h3
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 700,
+                    color: "var(--g900)",
+                    letterSpacing: "-.2px",
+                    margin: 0
+                  }}
+                >
+                  Top 5 Global Customers by Value
+                </h3>
+              </div>
+              <p style={{ fontSize: 12, color: "var(--text3)", margin: 0, paddingLeft: 36 }}>This quarter (LKR thousands)</p>
+            </div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "var(--g700)", background: "rgba(224,242,230,1)", padding: "4px 10px", borderRadius: 12 }}>
+              Live Chart
+            </div>
           </div>
 
           <div style={chartWrapStyle}>
