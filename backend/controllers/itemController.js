@@ -380,7 +380,17 @@ const updateItem = async (req, res) => {
       ip_address: req.ip,
     });
 
-    res.json({ message: "Item updated successfully" });
+    logActivity({
+        user_id: req.user?.id,
+        user_name: req.user?.full_name,
+        module: "Items",
+        action: `Updated Item ${code}`,
+        reference_type: "item",
+        reference_id: id,
+        ip_address: req.ip,
+      });
+
+      res.json({ message: "Item updated successfully" });
   } catch (err) {
     console.error("UPDATE ITEM ERROR:", err);
     res.status(500).json({ message: "Database error", error: err.message });

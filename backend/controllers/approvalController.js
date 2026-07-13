@@ -4,6 +4,7 @@ const {
   ALLOWED_TARGETS,
   createApprovalRequest,
 } = require("../utils/approvalHelper");
+const logActivity = require("../utils/logActivity");
 
 const safeJsonParse = (value) => {
   try {
@@ -271,6 +272,16 @@ const decideApproval = async (req, res, decision) => {
               type: "po_approved"
             }).catch(e => console.error("Operations PO action notification error:", e.message));
           }
+          
+          logActivity({
+            user_id: req.user?.id,
+            user_name: userNameFromReq(req),
+            module: "Purchase Orders",
+            action: `${decision === "approved" ? "Approved" : "Rejected"} Purchase Order ${po_number}`,
+            reference_type: "purchase_order",
+            reference_id: request.entity_id,
+            ip_address: req.ip,
+          });
         }
       });
     }

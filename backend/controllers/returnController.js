@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const logActivity = require("../utils/logActivity");
 const { refreshInventorySnapshot } = require("./inventoryController");
 const { generateReturnPdf } = require("../services/returnPdf.service");
 const { sendReturnEmail, buildReturnEmailHtml } = require("../services/returnEmail.service");
@@ -86,19 +87,15 @@ const createReturn = (req, res) => {
     return res.status(400).json({ message: "Required fields are missing" });
   }
 
-  db.getConnection((err, conn) => {
-    if (err) return res.status(500).json({ message: "Database error", error: err.message });
+  db.beginTransaction(async (txErr) => {
+    if (txErr) {
+      return res.status(500).json({ message: "Transaction start error", error: txErr.message });
+    }
 
-    conn.beginTransaction(async (txErr) => {
-      if (txErr) {
-        conn.release();
-        return res.status(500).json({ message: "Transaction start error", error: txErr.message });
-      }
-
-      try {
+    try {
         const year = new Date().getFullYear();
         const numResult = await new Promise((resolve, reject) => {
-          conn.query(
+          db.query(
             "SELECT MAX(CAST(SUBSTRING_INDEX(return_number, '-', -1) AS UNSIGNED)) AS max_num FROM return_notes WHERE return_number LIKE ?",
             [`RN-${year}-%`],
             (e, r) => e ? reject(e) : resolve(r)
@@ -109,7 +106,7 @@ const createReturn = (req, res) => {
         const return_number = `RN-${year}-${nextNumStr}`;
 
         const rnResult = await new Promise((resolve, reject) => {
-          conn.query(
+          db.query(
             "INSERT INTO return_notes (return_number, supplier_id, grn_id, created_by) VALUES (?, ?, ?, ?)",
             [return_number, supplier_id, grn_id, created_by],
             (e, r) => e ? reject(e) : resolve(r)
@@ -124,7 +121,7 @@ const createReturn = (req, res) => {
           if (returnQty <= 0) throw new Error("Return quantity must be greater than 0");
 
           const batchResults = await new Promise((resolve, reject) => {
-            conn.query(
+            db.query(
               "SELECT available_quantity FROM inventory_batches WHERE id = ? AND item_id = ?",
               [batch_id, item_id],
               (e, r) => e ? reject(e) : resolve(r)
@@ -140,7 +137,7 @@ const createReturn = (req, res) => {
           const newStatus = newQty === 0 ? "Depleted" : "Available";
 
           await new Promise((resolve, reject) => {
-            conn.query(
+            db.query(
               "UPDATE inventory_batches SET available_quantity = ?, status = ? WHERE id = ?",
               [newQty, newStatus, batch_id],
               (e, r) => e ? reject(e) : resolve(r)
@@ -148,7 +145,7 @@ const createReturn = (req, res) => {
           });
 
           await new Promise((resolve, reject) => {
-            conn.query(
+            db.query(
               "INSERT INTO return_note_items (return_note_id, item_id, batch_id, quantity, reason, notes) VALUES (?, ?, ?, ?, ?, ?)",
               [return_note_id, item_id, batch_id, returnQty, reason, notes || null],
               (e, r) => e ? reject(e) : resolve(r)
@@ -156,7 +153,7 @@ const createReturn = (req, res) => {
           });
 
           await new Promise((resolve, reject) => {
-            conn.query(
+            db.query(
               "INSERT INTO stock_movements (item_id, movement_type, reference_type, reference_id, quantity, notes) VALUES (?, 'OUT', 'RETURN', ?, ?, ?)",
               [item_id, return_note_id, returnQty, notes || `Goods returned: ${reason}`],
               (e, r) => e ? reject(e) : resolve(r)
@@ -164,10 +161,9 @@ const createReturn = (req, res) => {
           });
         }
 
-        conn.commit((cErr) => {
+        db.commit((cErr) => {
           if (cErr) {
-            conn.rollback(() => {
-              conn.release();
+            db.rollback(() => {
               res.status(500).json({ message: "Commit error", error: cErr.message });
             });
             return;
@@ -176,17 +172,24 @@ const createReturn = (req, res) => {
           const uniqueItems = [...new Set(items.map(i => i.item_id))];
           uniqueItems.forEach(id => refreshInventorySnapshot(id, () => { }));
 
-          conn.release();
           res.status(201).json({ message: "Return note created successfully", return_number });
+          
+          logActivity({
+            user_id: created_by,
+            user_name: req.user?.full_name,
+            module: "Returns",
+            action: `Created Return Note ${return_number}`,
+            reference_type: "return_note",
+            reference_id: return_note_id,
+            ip_address: req.ip,
+          });
         });
       } catch (innerErr) {
-        conn.rollback(() => {
-          conn.release();
+        db.rollback(() => {
           res.status(400).json({ message: innerErr.message });
         });
       }
     });
-  });
 };
 
 const getReturnNoteData = (id) => {
@@ -274,6 +277,16 @@ const sendReturnNote = async (req, res) => {
         return res.status(500).json({ message: "Failed to update return note status", error: updateErr.message });
       }
       res.json({ message: "Return note sent successfully" });
+
+      logActivity({
+        user_id: req.user?.id,
+        user_name: req.user?.full_name,
+        module: "Returns",
+        action: `Sent Return Note ${returnNoteData.return_number} to supplier`,
+        reference_type: "return_note",
+        reference_id: id,
+        ip_address: req.ip,
+      });
     });
   } catch (err) {
     console.error("Failed to send return note:", err);

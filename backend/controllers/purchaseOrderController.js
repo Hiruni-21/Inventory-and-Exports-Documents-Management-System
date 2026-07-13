@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const logActivity = require("../utils/logActivity");
 
 const getAllPurchaseOrders = (req, res) => {
   const sql = `
@@ -165,7 +166,7 @@ const createPurchaseOrder = (req, res) => {
         created_by,
         remarks
       )
-      VALUES (?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     db.query(
@@ -174,13 +175,13 @@ const createPurchaseOrder = (req, res) => {
         poNumber,
         supplier_id,
         required_by,
-        null,
-        remarks,
+        null, // payment_terms
+        remarks, // notes
         finalStatus,
         totalAmount,
         finalPriority,
         createdBy,
-        remarks,
+        remarks, // remarks
       ],
       (err, result) => {
         if (err) {
@@ -220,6 +221,16 @@ const createPurchaseOrder = (req, res) => {
                   res.status(500).json({ message: "Commit error", error: commitErr.message })
                 );
               }
+
+              logActivity({
+                user_id: createdBy,
+                user_name: req.user?.full_name,
+                module: "Purchase Orders",
+                action: `Created Purchase Order ${poNumber}`,
+                reference_type: "purchase_order",
+                reference_id: purchaseOrderId,
+                ip_address: req.ip,
+              });
 
               return res.status(201).json({
                 message: "Purchase order draft created successfully",

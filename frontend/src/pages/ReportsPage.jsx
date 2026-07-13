@@ -12,13 +12,6 @@ const REPORT_CARDS = [
     endpoints: ["/reports/supplier-purchase", "/reports/purchase-orders", "/reports/supplier-purchases"],
   },
   {
-    id: "stock-movement",
-    title: "Item Stock Movement",
-    description: "In/out movements per item, any period",
-    frequency: "Custom",
-    endpoints: ["/reports/stock-movement", "/reports/movements", "/reports/inventory-movement"],
-  },
-  {
     id: "wastage",
     title: "Monthly Wastage Report",
     description: "By item, batch, cause, LKR loss, trend",
@@ -38,13 +31,6 @@ const REPORT_CARDS = [
     description: "LKR value of all stock by category",
     frequency: "Monthly",
     endpoints: ["/reports/valuation", "/inventory/valuation"],
-  },
-  {
-    id: "expiry",
-    title: "Expiry Report",
-    description: "Expiring within 7/14/30 days + estimated loss",
-    frequency: "Daily",
-    endpoints: ["/reports/expiry", "/inventory/expiry"],
   },
   {
     id: "packaging",
@@ -211,25 +197,25 @@ const fetchFirstSuccess = async (endpoints, params = {}) => {
 
 const getReportCardStyle = (isActive) => ({
   background: "white",
-  borderRadius: 20,
-  padding: "22px",
+  borderRadius: 12,
+  padding: "16px",
   border: `1px solid ${isActive ? "var(--g300)" : "var(--border)"}`,
   boxShadow: isActive
-    ? "0 10px 20px rgba(10,40,24,.08)"
-    : "0 2px 8px rgba(10,40,24,.03)",
+    ? "0 4px 12px rgba(10,40,24,.06)"
+    : "0 1px 4px rgba(10,40,24,.03)",
   cursor: "pointer",
-  minHeight: 154,
+  minHeight: 90,
   display: "flex",
   alignItems: "center",
-  gap: 20,
-  transform: isActive ? "translateY(-2px)" : "translateY(0)",
+  gap: 16,
+  transform: isActive ? "translateY(-1px)" : "translateY(0)",
   transition: "all .18s ease",
 });
 
 const getIconBoxStyle = (isActive) => ({
-  width: 84,
-  height: 84,
-  borderRadius: 20,
+  width: 54,
+  height: 54,
+  borderRadius: 10,
   background: isActive ? "rgba(224,242,230,1)" : "rgba(224,242,230,.78)",
   display: "flex",
   alignItems: "center",
@@ -237,6 +223,62 @@ const getIconBoxStyle = (isActive) => ({
   flexShrink: 0,
   transition: "all .18s ease",
 });
+
+const renderUtilityIcon = (type) => {
+  const common = {
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    fill: "none",
+  };
+  const wrap = (children, size = 16, mr = 6) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" style={{ marginRight: mr, verticalAlign: "middle" }}>
+      {children}
+    </svg>
+  );
+
+  switch (type) {
+    case "excel":
+      return wrap(
+        <>
+          <rect x="3" y="3" width="18" height="18" rx="2" {...common} />
+          <path d="M3 9h18 M9 21V9" {...common} />
+        </>
+      );
+    case "pdf":
+      return wrap(
+        <>
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" {...common} />
+          <path d="M14 2v6h6 M16 13H8 M16 17H8 M10 9H8" {...common} />
+        </>
+      );
+    case "csv":
+      return wrap(
+        <>
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" {...common} />
+          <path d="M14 2v6h6" {...common} />
+        </>
+      );
+    case "loading":
+      return (
+        <svg width="18" height="18" viewBox="0 0 24 24" style={{ marginRight: 8, verticalAlign: "middle", animation: "spin 1s linear infinite" }} className="spin">
+          <circle cx="12" cy="12" r="10" {...common} strokeDasharray="16" strokeLinecap="round" />
+        </svg>
+      );
+    case "error":
+      return wrap(
+        <>
+          <circle cx="12" cy="12" r="10" {...common} />
+          <path d="M12 8v4 M12 16h.01" {...common} />
+        </>,
+        18,
+        8
+      );
+    default:
+      return null;
+  }
+};
 
 const renderReportIcon = (reportId, isActive) => {
   const stroke = isActive ? "#4AA35A" : "#4AA35A";
@@ -249,7 +291,7 @@ const renderReportIcon = (reportId, isActive) => {
   };
 
   const wrap = (children) => (
-    <svg width="38" height="38" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <svg width="26" height="26" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
       {children}
     </svg>
   );
@@ -289,7 +331,7 @@ const renderReportIcon = (reportId, isActive) => {
 
 case "returns":
   return (
-    <svg width="38" height="38" viewBox="0 0 24 24" fill="none">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
       <path
         d="M7 6V3L3 7L7 11V8"
         {...common}
@@ -418,7 +460,7 @@ const ReportsPage = () => {
 
       try {
         const [globalResult, customerResult] = await Promise.allSettled([
-          fetchFirstSuccess(["/dispatch", "/global-dispatch"], {}),
+          fetchFirstSuccess(["/dispatch/global"], {}),
           fetchFirstSuccess(["/customers"], {}),
         ]);
 
@@ -776,12 +818,12 @@ const ReportsPage = () => {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div
                   style={{
-                    fontSize: 15,
+                    fontSize: 14,
                     fontWeight: 700,
                     color: "var(--g900)",
-                    lineHeight: 1.35,
+                    lineHeight: 1.3,
                     letterSpacing: "-0.2px",
-                    marginBottom: 8,
+                    marginBottom: 4,
                   }}
                 >
                   {report.title}
@@ -791,8 +833,8 @@ const ReportsPage = () => {
                   style={{
                     fontSize: 11,
                     color: "#7B7B90",
-                    lineHeight: 1.55,
-                    marginBottom: 10,
+                    lineHeight: 1.4,
+                    marginBottom: 6,
                   }}
                 >
                   {report.description}
@@ -816,25 +858,35 @@ const ReportsPage = () => {
 
       <div className="g2">
         <div style={chartCardStyle}>
-          <div style={{ marginBottom: 10 }}>
-            <h3
-              style={{
-                fontSize: 14,
-                fontWeight: 700,
-                color: "var(--g900)",
-                marginBottom: 3,
-                letterSpacing: "-.2px",
-              }}
-            >
-              Export Dispatch — Monthly (kg)
-            </h3>
-            <p style={{ fontSize: 11, color: "var(--text3)" }}>Volume comparison</p>
+          <div style={{ marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
+                <div style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {renderReportIcon("dispatch", true)}
+                </div>
+                <h3
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 700,
+                    color: "var(--g900)",
+                    letterSpacing: "-.2px",
+                    margin: 0
+                  }}
+                >
+                  Export Dispatch — Monthly (kg)
+                </h3>
+              </div>
+              <p style={{ fontSize: 12, color: "var(--text3)", margin: 0, paddingLeft: 36 }}>Volume comparison</p>
+            </div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "var(--g700)", background: "rgba(224,242,230,1)", padding: "4px 10px", borderRadius: 12 }}>
+              Live Chart
+            </div>
           </div>
 
           <div style={chartWrapStyle}>
             {loadingCharts ? (
               <div className="ib ib-i">
-                <span>⏳</span>
+                {renderUtilityIcon("loading")}
                 <div>Loading chart...</div>
               </div>
             ) : (
@@ -844,25 +896,35 @@ const ReportsPage = () => {
         </div>
 
         <div style={chartCardStyle}>
-          <div style={{ marginBottom: 10 }}>
-            <h3
-              style={{
-                fontSize: 14,
-                fontWeight: 700,
-                color: "var(--g900)",
-                marginBottom: 3,
-                letterSpacing: "-.2px",
-              }}
-            >
-              Top 5 Global Customers by Value
-            </h3>
-            <p style={{ fontSize: 11, color: "var(--text3)" }}>This quarter (LKR thousands)</p>
+          <div style={{ marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
+                <div style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {renderReportIcon("sup-perf", true)}
+                </div>
+                <h3
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 700,
+                    color: "var(--g900)",
+                    letterSpacing: "-.2px",
+                    margin: 0
+                  }}
+                >
+                  Top 5 Global Customers by Value
+                </h3>
+              </div>
+              <p style={{ fontSize: 12, color: "var(--text3)", margin: 0, paddingLeft: 36 }}>This quarter (LKR thousands)</p>
+            </div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "var(--g700)", background: "rgba(224,242,230,1)", padding: "4px 10px", borderRadius: 12 }}>
+              Live Chart
+            </div>
           </div>
 
           <div style={chartWrapStyle}>
             {loadingCharts ? (
               <div className="ib ib-i">
-                <span>⏳</span>
+                {renderUtilityIcon("loading")}
                 <div>Loading chart...</div>
               </div>
             ) : (
@@ -949,28 +1011,28 @@ const ReportsPage = () => {
                     className={`to ${filters.format === "excel" ? "on" : ""}`}
                     onClick={() => setFilters((prev) => ({ ...prev, format: "excel" }))}
                   >
-                    📊 Excel (.xlsx)
+                    {renderUtilityIcon("excel")} Excel (.xlsx)
                   </button>
                   <button
                     type="button"
                     className={`to ${filters.format === "pdf" ? "on" : ""}`}
                     onClick={() => setFilters((prev) => ({ ...prev, format: "pdf" }))}
                   >
-                    📄 PDF
+                    {renderUtilityIcon("pdf")} PDF
                   </button>
                   <button
                     type="button"
                     className={`to ${filters.format === "csv" ? "on" : ""}`}
                     onClick={() => setFilters((prev) => ({ ...prev, format: "csv" }))}
                   >
-                    📁 CSV
+                    {renderUtilityIcon("csv")} CSV
                   </button>
                 </div>
               </div>
 
               {previewError ? (
                 <div className="ib ib-d">
-                  <span>⚠️</span>
+                  {renderUtilityIcon("error")}
                   <div>{previewError}</div>
                 </div>
               ) : null}
