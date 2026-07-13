@@ -166,7 +166,7 @@ const createPurchaseOrder = (req, res) => {
         created_by,
         remarks
       )
-      VALUES (?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     db.query(
@@ -175,13 +175,13 @@ const createPurchaseOrder = (req, res) => {
         poNumber,
         supplier_id,
         required_by,
-        null,
-        remarks,
+        null, // payment_terms
+        remarks, // notes
         finalStatus,
         totalAmount,
         finalPriority,
         createdBy,
-        remarks,
+        remarks, // remarks
       ],
       (err, result) => {
         if (err) {
@@ -222,7 +222,7 @@ const createPurchaseOrder = (req, res) => {
                 );
               }
 
-              return logActivity({
+              logActivity({
                 user_id: createdBy,
                 user_name: req.user?.full_name,
                 module: "Purchase Orders",
@@ -230,7 +230,7 @@ const createPurchaseOrder = (req, res) => {
                 reference_type: "purchase_order",
                 reference_id: purchaseOrderId,
                 ip_address: req.ip,
-              }).catch(err => console.error(err));
+              });
 
               return res.status(201).json({
                 message: "Purchase order draft created successfully",

@@ -269,7 +269,7 @@ const updateExportDocuments = async (req, res) => {
       reference_type: "global_dispatch",
       reference_id: globalDispatchId,
       ip_address: req.ip,
-    }).catch(err => console.error(err));
+    });
 
     res.json({
       message: "Export document set updated successfully",
@@ -336,7 +336,7 @@ const updateExportDocumentsByDispatchId = async (req, res) => {
       reference_type: "global_dispatch",
       reference_id: globalDispatchId,
       ip_address: req.ip,
-    }).catch(err => console.error(err));
+    });
 
     res.json({
       message: "Export document set updated successfully",

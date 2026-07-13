@@ -388,7 +388,7 @@ const updateItem = async (req, res) => {
         reference_type: "item",
         reference_id: id,
         ip_address: req.ip,
-      }).catch(err => console.error(err));
+      });
 
       res.json({ message: "Item updated successfully" });
   } catch (err) {

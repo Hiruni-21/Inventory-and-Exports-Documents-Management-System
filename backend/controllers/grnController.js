@@ -412,15 +412,15 @@ const createGrn = (req, res) => {
                                 }).catch(err => console.error("GRN discrepancy notification error:", err.message));
                               }
 
-                              return logActivity({
-                user_id: createdBy,
+                              logActivity({
+                user_id: created_by,
                 user_name: req.user?.full_name,
                 module: "Goods Receiving",
                 action: `Created GRN ${grnNumber}`,
                 reference_type: "grn",
                 reference_id: grnId,
                 ip_address: req.ip,
-              }).catch(err => console.error(err));
+              });
 
               res.status(201).json({
                 message: "GRN created successfully",

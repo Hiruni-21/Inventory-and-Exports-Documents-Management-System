@@ -14,7 +14,7 @@ const getStockSummaryReport = (req, res) => {
       ib.expiry_date
     FROM inventory_batches ib
     JOIN items i ON ib.item_id = i.id
-    LEFT JOIN categories c ON i.category_id = c.id
+    LEFT JOIN item_categories c ON i.category_id = c.id
     ORDER BY i.item_name ASC, ib.batch_code ASC
   `;
 
@@ -52,7 +52,7 @@ const getLowStockReport = (req, res) => {
 };
 
 const getStockMovementsReport = (req, res) => {
-  const { start_date, end_date } = req.query;
+  const { from, to, category } = req.query;
 
   let sql = `
     SELECT
@@ -60,6 +60,7 @@ const getStockMovementsReport = (req, res) => {
       i.item_code,
       i.item_name,
       i.unit,
+      c.category_name,
       sm.movement_type,
       sm.reference_type,
       sm.reference_id,
@@ -68,13 +69,19 @@ const getStockMovementsReport = (req, res) => {
       sm.created_at
     FROM stock_movements sm
     JOIN items i ON sm.item_id = i.id
+    LEFT JOIN item_categories c ON i.category_id = c.id
+    WHERE 1=1
   `;
-
   const params = [];
 
-  if (start_date && end_date) {
-    sql += ` WHERE DATE(sm.created_at) BETWEEN ? AND ? `;
-    params.push(start_date, end_date);
+  if (from && to) {
+    sql += ` AND DATE(sm.created_at) BETWEEN ? AND ? `;
+    params.push(from, to);
+  }
+
+  if (category && category !== "All Categories") {
+    sql += ` AND c.category_name = ? `;
+    params.push(category);
   }
 
   sql += ` ORDER BY sm.id DESC `;
@@ -120,28 +127,33 @@ const getDispatchReport = (req, res) => {
 };
 
 const getWastageReport = (req, res) => {
-  const { start_date, end_date } = req.query;
+  const { from, to, category } = req.query;
 
   let sql = `
     SELECT
-      w.id,
-      w.wastage_number,
-      w.wastage_date,
-      w.reason,
-      w.remarks,
-      COALESCE(NULLIF(u.full_name, ''), u.email, 'System User') AS created_by_name
-    FROM wastage_records w
-    LEFT JOIN users u ON w.created_by = u.id
+      i.name as item_name,
+      c.category_name,
+      SUM(wi.quantity) as total_qty,
+      SUM(wi.quantity * i.unit_cost) as estimated_loss
+    FROM wastage w
+    JOIN wastage_items wi ON w.id = wi.wastage_id
+    JOIN items i ON wi.item_id = i.id
+    LEFT JOIN item_categories c ON i.category_id = c.id
+    WHERE 1=1
   `;
-
   const params = [];
 
-  if (start_date && end_date) {
-    sql += ` WHERE w.wastage_date BETWEEN ? AND ? `;
-    params.push(start_date, end_date);
+  if (from && to) {
+    sql += ` AND w.wastage_date BETWEEN ? AND ? `;
+    params.push(from, to);
+  }
+  
+  if (category && category !== "All Categories") {
+    sql += ` AND c.category_name = ? `;
+    params.push(category);
   }
 
-  sql += ` ORDER BY w.id DESC `;
+  sql += ` GROUP BY i.id, i.name, c.category_name ORDER BY estimated_loss DESC `;
 
   db.query(sql, params, (err, results) => {
     if (err) {
@@ -152,29 +164,34 @@ const getWastageReport = (req, res) => {
 };
 
 const getReturnReport = (req, res) => {
-  const { start_date, end_date } = req.query;
+  const { from, to, category } = req.query;
 
   let sql = `
     SELECT
-      r.id,
-      r.return_number,
-      r.return_date,
-      r.return_type,
-      r.reference_number,
-      r.remarks,
-      COALESCE(NULLIF(u.full_name, ''), u.email, 'System User') AS created_by_name
-    FROM return_records r
-    LEFT JOIN users u ON r.created_by = u.id
+      rn.status as return_type,
+      i.name as item_name,
+      c.category_name,
+      SUM(rni.quantity) as total_qty,
+      SUM(rni.quantity * i.unit_cost) as estimated_value
+    FROM return_notes rn
+    JOIN return_note_items rni ON rn.id = rni.return_note_id
+    JOIN items i ON rni.item_id = i.id
+    LEFT JOIN item_categories c ON i.category_id = c.id
+    WHERE 1=1
   `;
-
   const params = [];
 
-  if (start_date && end_date) {
-    sql += ` WHERE r.return_date BETWEEN ? AND ? `;
-    params.push(start_date, end_date);
+  if (from && to) {
+    sql += ` AND rn.return_date BETWEEN ? AND ? `;
+    params.push(from, to);
+  }
+  
+  if (category && category !== "All Categories") {
+    sql += ` AND c.category_name = ? `;
+    params.push(category);
   }
 
-  sql += ` ORDER BY r.id DESC `;
+  sql += ` GROUP BY rn.status, i.id, i.name, c.category_name ORDER BY estimated_value DESC `;
 
   db.query(sql, params, (err, results) => {
     if (err) {
@@ -220,6 +237,71 @@ const getExportDocumentReport = (req, res) => {
   });
 };
 
+const getSupplierPurchaseReport = (req, res) => {
+  const { from, to, category } = req.query;
+
+  let sql = `
+    SELECT 
+      s.supplier_name, 
+      COUNT(DISTINCT po.id) as order_count, 
+      SUM(poi.quantity) as total_items,
+      SUM(poi.quantity * poi.unit_price) as total_spend 
+    FROM purchase_orders po 
+    JOIN purchase_order_items poi ON po.id = poi.purchase_order_id
+    JOIN suppliers s ON po.supplier_id = s.id
+    JOIN items i ON poi.item_id = i.id
+    LEFT JOIN item_categories c ON i.category_id = c.id
+    WHERE 1=1
+  `;
+  const params = [];
+
+  if (from && to) {
+    sql += ` AND po.order_date BETWEEN ? AND ? `;
+    params.push(from, to);
+  }
+  
+  if (category && category !== "All Categories") {
+    sql += ` AND c.category_name = ? `;
+    params.push(category);
+  }
+
+  sql += ` GROUP BY s.id, s.supplier_name ORDER BY total_spend DESC `;
+
+  db.query(sql, params, (err, results) => {
+    if (err) return res.status(500).json({ message: "Database error", error: err.message });
+    res.json(results);
+  });
+};
+
+const getStockValuationReport = (req, res) => {
+  const { category } = req.query;
+
+  let sql = `
+    SELECT 
+      i.name as item_name,
+      c.category_name,
+      SUM(ib.available_quantity) as total_stock,
+      SUM(ib.available_quantity * i.unit_cost) as total_value
+    FROM inventory_batches ib 
+    JOIN items i ON ib.item_id = i.id
+    LEFT JOIN item_categories c ON i.category_id = c.id
+    WHERE ib.available_quantity > 0
+  `;
+  const params = [];
+
+  if (category && category !== "All Categories") {
+    sql += ` AND c.category_name = ? `;
+    params.push(category);
+  }
+
+  sql += ` GROUP BY i.id, i.name, c.category_name ORDER BY total_value DESC `;
+
+  db.query(sql, params, (err, results) => {
+    if (err) return res.status(500).json({ message: "Database error", error: err.message });
+    res.json(results);
+  });
+};
+
 module.exports = {
   getStockSummaryReport,
   getLowStockReport,
@@ -228,4 +310,6 @@ module.exports = {
   getWastageReport,
   getReturnReport,
   getExportDocumentReport,
+  getSupplierPurchaseReport,
+  getStockValuationReport,
 };

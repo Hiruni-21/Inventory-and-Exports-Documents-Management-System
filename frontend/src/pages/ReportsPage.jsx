@@ -418,7 +418,7 @@ const ReportsPage = () => {
 
       try {
         const [globalResult, customerResult] = await Promise.allSettled([
-          fetchFirstSuccess(["/dispatch", "/global-dispatch"], {}),
+          fetchFirstSuccess(["/dispatch/global"], {}),
           fetchFirstSuccess(["/customers"], {}),
         ]);
 
