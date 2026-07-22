@@ -41,6 +41,7 @@ A full-stack ERP built for a Sri Lankan agricultural export company operating on
 - Reports & Analytics
 
 ## Project Structure
+
 FreshWorldSystem/
 ├── frontend/          # React + Vite app
 │   └── src/
@@ -51,6 +52,7 @@ FreshWorldSystem/
 │   ├── routes/        # One router per module (approvals, purchaseOrders, grn, etc.)
 │   └── controllers/   # Business logic + MySQL queries
 └── database/          # Schema and migration SQL files
+
 
 ## Getting Started
 
